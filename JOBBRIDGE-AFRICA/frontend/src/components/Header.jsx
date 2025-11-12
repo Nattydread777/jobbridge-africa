@@ -152,7 +152,7 @@ const Header = () => {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <nav className="md:hidden mt-4 pb-4 border-t border-white/20 pt-4 space-y-3">
+          <nav className="md:hidden mt-4 pb-4 border-t border-white/20 pt-4 space-y-3 bg-gradient-to-r from-green-600 to-green-700">
             <NavLink
               to="/"
               className={({ isActive }) =>
