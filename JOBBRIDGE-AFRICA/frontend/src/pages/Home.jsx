@@ -5,8 +5,8 @@ import locations from "../data/africaLocations";
 
 const Home = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [country, setCountry] = useState(() => locations[0]?.country || "");
-  const [city, setCity] = useState(() => locations[0]?.cities?.[0] || "");
+  const [country, setCountry] = useState("");
+  const [city, setCity] = useState("");
   const [jobType, setJobType] = useState("All");
   const navigate = useNavigate();
 
