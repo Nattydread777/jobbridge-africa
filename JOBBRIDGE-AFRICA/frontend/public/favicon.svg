@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="JobBridge Africa favicon">
+  <circle cx="32" cy="32" r="30" fill="#0B1220"/>
+  <path d="M8 38 C 18 22, 46 22, 56 38" stroke="#F9FAFB" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <circle cx="32" cy="33" r="3" fill="#F59E0B"/>
+  <rect x="26" y="38" width="4" height="8" rx="2" fill="#F9FAFB"/>
+  <rect x="34" y="38" width="4" height="8" rx="2" fill="#F9FAFB"/>
+</svg>
