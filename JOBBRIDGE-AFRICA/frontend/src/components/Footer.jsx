@@ -184,13 +184,13 @@ const Footer = () => {
         </div>
 
         {/* Bottom bar */}
-        <div className="border-t border-gray-800 mt-10 pt-6 flex flex-col md:flex-row justify-between items-center text-sm text-gray-400">
+        <div className="border-t border-gray-800 mt-10 pt-6 flex flex-col md:flex-row justify-between items-center text-sm text-gray-400 gap-3">
           <p>
             © {new Date().getFullYear()}{" "}
             <span className="font-semibold uppercase">JOBBRIDGE AFRICA</span>.
             All rights reserved.
           </p>
-          <div className="flex gap-4 mt-2 md:mt-0">
+          <div className="flex gap-4 items-center">
             <NavLink to="/privacy" className="hover:text-white transition">
               Privacy Policy
             </NavLink>
@@ -198,8 +198,15 @@ const Footer = () => {
             <NavLink to="/terms" className="hover:text-white transition">
               Terms of Service
             </NavLink>
+            <span>•</span>
+            <span className="inline-flex items-center gap-1">
+              By{" "}
+              <NavLink to="/about" className="font-medium hover:text-white">
+                Nathaniel Usikpedo
+              </NavLink>
+            </span>
           </div>
-          <p className="mt-2 md:mt-0">
+          <p className="text-center md:text-right">
             Supporting UN SDG 8 — Decent Work and Economic Growth
           </p>
         </div>

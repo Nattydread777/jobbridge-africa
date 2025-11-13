@@ -541,7 +541,13 @@ npm run lint
 
 ## Author
 
-Author: Usikpedo Nathaniel Emmu
+**Usikpedo Nathaniel (Nigeria)** — Founder, Project Manager & Software Developer
+
+- Email: [info@jobbridgeafrica.org](mailto:info@jobbridgeafrica.org)
+- Website: [https://www.jobbridgeafrica.org](https://www.jobbridgeafrica.org)
+- LinkedIn: Add your profile URL here
+
+Nathaniel is a certified MERN Full‑Stack Developer and SDG 8 advocate. He leads the strategic and technical direction of JobBridge Africa, focusing on AI‑powered matching, inclusive access to decent work, and Pan‑African collaboration.
 
 ---
 
