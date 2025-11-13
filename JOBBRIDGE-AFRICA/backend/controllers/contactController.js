@@ -12,16 +12,42 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     throw new Error('Please fill in all fields');
   }
 
-  // Create transporter using Zoho SMTP
-  const transporter = nodemailer.createTransport({
-    host: 'smtp.zoho.com',
-    port: 465,
-    secure: true,
+  // Resolve SMTP config with env overrides and sensible defaults
+  const primaryConfig = {
+    host: process.env.EMAIL_HOST || 'smtp.zoho.com',
+    port: Number(process.env.EMAIL_PORT || 465),
+    secure: String(process.env.EMAIL_SECURE || 'true').toLowerCase() === 'true',
     auth: {
-      user: process.env.EMAIL_USER, // Your Zoho email
-      pass: process.env.EMAIL_PASS, // Your Zoho app password
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
     },
-  });
+  };
+
+  const fallbackConfig = {
+    host: process.env.EMAIL_HOST || 'smtp.zoho.com',
+    port: 587,
+    secure: false,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  };
+
+  // Create transporter and verify; fallback to 587 if 465 fails
+  let transporter = nodemailer.createTransport(primaryConfig);
+  try {
+    await transporter.verify();
+  } catch (e) {
+    console.error('SMTP verify failed on primary config:', e?.message || e);
+    transporter = nodemailer.createTransport(fallbackConfig);
+    try {
+      await transporter.verify();
+      console.log('SMTP connected using fallback (587/STARTTLS).');
+    } catch (e2) {
+      console.error('SMTP verify failed on fallback config:', e2?.message || e2);
+      throw new Error('Mail server connection failed. Please check SMTP credentials and network.');
+    }
+  }
 
   // Email to admin
   const mailOptions = {
@@ -111,7 +137,8 @@ const sendContactEmail = asyncHandler(async (req, res) => {
       message: 'Message sent successfully',
     });
   } catch (error) {
-    console.error('Email send error:', error);
+    console.error('Email send error:', error?.message || error);
+    if (error?.response) console.error('SMTP response:', error.response);
     res.status(500);
     throw new Error('Failed to send email. Please try again later or contact us directly at info@jobbridgeafrica.org');
   }
