@@ -81,15 +81,14 @@ const Home = () => {
       >
         {/* Slides Container */}
         <div
-          className="flex transition-transform duration-700 ease-in-out min-h-[85vh] w-full"
+          className="flex transition-transform duration-700 ease-in-out"
           style={{
             transform: `translateX(-${currentSlide * 100}%)`,
-            width: `${slides * 100}%`,
           }}
         >
           {/* Slide 1: Job Search Hero */}
           <div
-            className="min-w-full flex-shrink-0 relative text-white flex items-center"
+            className="min-w-full min-h-[85vh] flex-shrink-0 relative text-white flex items-center justify-center"
             style={{
               backgroundImage: `url(${heroImg})`,
               backgroundSize: "cover",
@@ -249,7 +248,7 @@ const Home = () => {
 
           {/* Slide 2: Mission Statement */}
           <div
-            className="min-w-full flex-shrink-0 relative text-white flex items-center"
+            className="min-w-full min-h-[85vh] flex-shrink-0 relative text-white flex items-center justify-center"
             style={{
               backgroundImage: `url(${heroImg})`,
               backgroundSize: "cover",
