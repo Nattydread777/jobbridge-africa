@@ -1,16 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import heroImg from "../assets/hero.jpg";
 import locations from "../data/africaLocations";
-
-// Fade-in animation is defined in index.css as @keyframes fadeIn
 
 const Home = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [country, setCountry] = useState("");
   const [city, setCity] = useState("");
   const [jobType, setJobType] = useState("All");
+  const [missionVisible, setMissionVisible] = useState(false);
+  const [statsVisible, setStatsVisible] = useState(false);
   const navigate = useNavigate();
+  const missionRef = useRef(null);
+  const statsRef = useRef(null);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -27,6 +29,62 @@ const Home = () => {
     const entry = locations.find((l) => l.country === country);
     setCity(entry?.cities?.[0] || "");
   }, [country]);
+
+  // Intersection Observer for scroll-triggered animations
+  useEffect(() => {
+    const observerOptions = {
+      threshold: 0.2,
+      rootMargin: "0px 0px -100px 0px",
+    };
+
+    const missionObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && !missionVisible) {
+          setMissionVisible(true);
+        }
+      });
+    }, observerOptions);
+
+    const statsObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && !statsVisible) {
+          setStatsVisible(true);
+        }
+      });
+    }, observerOptions);
+
+    if (missionRef.current) missionObserver.observe(missionRef.current);
+    if (statsRef.current) statsObserver.observe(statsRef.current);
+
+    return () => {
+      if (missionRef.current) missionObserver.unobserve(missionRef.current);
+      if (statsRef.current) statsObserver.unobserve(statsRef.current);
+    };
+  }, [missionVisible, statsVisible]);
+
+  // Counter animation hook
+  const useCounter = (end, duration = 2000, isVisible) => {
+    const [count, setCount] = useState(0);
+
+    useEffect(() => {
+      if (!isVisible) return;
+
+      let startTime;
+      const step = (timestamp) => {
+        if (!startTime) startTime = timestamp;
+        const progress = Math.min((timestamp - startTime) / duration, 1);
+        setCount(Math.floor(progress * end));
+
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        }
+      };
+
+      requestAnimationFrame(step);
+    }, [end, duration, isVisible]);
+
+    return count;
+  };
 
   const scrollToMission = () => {
     const missionSection = document.getElementById("mission-section");
@@ -218,13 +276,19 @@ const Home = () => {
 
       {/* Second Hero Section - Mission Statement */}
       <section
+        ref={missionRef}
         id="mission-section"
         aria-label="Mission: Empowering Africa's Youth"
-        className="relative text-white min-h-[75vh] flex items-center animate-fadeIn"
+        className={`relative text-white min-h-[75vh] flex items-center transition-opacity duration-1000 ${
+          missionVisible
+            ? "opacity-100 translate-y-0"
+            : "opacity-0 translate-y-8"
+        }`}
         style={{
           backgroundImage: `url(${heroImg})`,
           backgroundSize: "cover",
-          backgroundPosition: "center",
+          backgroundPosition: "bottom center",
+          filter: "saturate(1.2) brightness(0.9)",
         }}
       >
         <div
@@ -315,28 +379,75 @@ const Home = () => {
       </section>
 
       {/* Stats Section */}
-      <section className="bg-secondary text-white py-12">
+      <section
+        ref={statsRef}
+        className={`bg-secondary text-white py-12 transition-all duration-1000 ${
+          statsVisible ? "opacity-100" : "opacity-0"
+        }`}
+      >
         <div className="max-w-7xl mx-auto px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-4xl font-bold">10,000+</div>
-              <div className="text-gray-200 mt-2">Active Jobs</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold">5,000+</div>
-              <div className="text-gray-200 mt-2">Companies</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold">50,000+</div>
-              <div className="text-gray-200 mt-2">Job Seekers</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold">54</div>
-              <div className="text-gray-200 mt-2">African Countries</div>
-            </div>
+            <StatCard
+              end={10000}
+              suffix="+"
+              label="Active Jobs"
+              isVisible={statsVisible}
+            />
+            <StatCard
+              end={5000}
+              suffix="+"
+              label="Companies"
+              isVisible={statsVisible}
+            />
+            <StatCard
+              end={50000}
+              suffix="+"
+              label="Job Seekers"
+              isVisible={statsVisible}
+            />
+            <StatCard
+              end={54}
+              suffix=""
+              label="African Countries"
+              isVisible={statsVisible}
+            />
           </div>
         </div>
       </section>
+    </div>
+  );
+};
+
+// Stat card component with counter animation
+const StatCard = ({ end, suffix, label, isVisible }) => {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!isVisible) return;
+
+    let startTime;
+    const duration = 2000;
+
+    const step = (timestamp) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / duration, 1);
+      setCount(Math.floor(progress * end));
+
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      }
+    };
+
+    requestAnimationFrame(step);
+  }, [end, isVisible]);
+
+  return (
+    <div>
+      <div className="text-4xl font-bold">
+        {count.toLocaleString()}
+        {suffix}
+      </div>
+      <div className="text-gray-200 mt-2">{label}</div>
     </div>
   );
 };
