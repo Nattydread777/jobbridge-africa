@@ -264,8 +264,8 @@ const Home = () => {
               className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70"
               aria-hidden="true"
             />
-            <div className="relative w-full px-4 md:px-12 z-10 h-full flex items-center">
-              <div className="max-w-5xl mx-auto text-center w-full">
+            <div className="relative w-full px-4 md:px-12 z-10 py-12 md:py-20">
+              <div className="max-w-5xl mx-auto text-center">
                 <h2 className="text-xl md:text-5xl font-extrabold mb-4 md:mb-6 leading-tight drop-shadow-lg">
                   Connecting Africa's Talent with Meaningful Work
                 </h2>
@@ -275,7 +275,12 @@ const Home = () => {
                   Africa's talent with meaningful work through AI‑driven job
                   matching.
                 </p>
-                <p className="text-xs md:text-xl text-gray-200 max-w-3xl mx-auto">
+                <p className="text-xs md:text-xl text-gray-200 max-w-3xl mx-auto mb-6 md:mb-8">
+                  The platform advances{" "}
+                  <span className="font-semibold text-primary">UN SDG 8</span>{" "}
+                  by promoting sustainable employment and inclusive economic
+                  growth across the continent.
+                </p>
                   The platform advances{" "}
                   <span className="font-semibold text-primary">UN SDG 8</span>{" "}
                   by promoting sustainable employment and inclusive economic
