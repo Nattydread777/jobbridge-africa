@@ -75,26 +75,24 @@ const Home = () => {
     <div className="bg-neutral">
       {/* Hero Carousel Container */}
       <section
-        className="relative overflow-x-hidden min-h-[85vh] md:min-h-[80vh] w-screen"
+        className="relative overflow-hidden min-h-[85vh] md:min-h-[80vh] w-full"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
         {/* Slides Container */}
         <div
-          className="flex transition-transform duration-700 ease-in-out"
+          className="flex transition-transform duration-700 ease-in-out h-full"
           style={{
             transform: `translateX(-${currentSlide * 100}%)`,
-            width: `${slides * 100}%`,
           }}
         >
           {/* Slide 1: Job Search Hero */}
           <div
-            className="flex-shrink-0 relative text-white flex items-center justify-center"
+            className="min-w-full flex-shrink-0 relative text-white flex items-center justify-center"
             style={{
               backgroundImage: `url(${heroImg})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
-              width: `${100 / slides}%`,
               minHeight: "85vh",
             }}
           >
@@ -254,12 +252,11 @@ const Home = () => {
 
           {/* Slide 2: Mission Statement */}
           <div
-            className="flex-shrink-0 relative text-white flex items-center justify-center"
+            className="min-w-full flex-shrink-0 relative text-white flex items-center justify-center"
             style={{
               backgroundImage: "url(/hero-mission.jpg)",
               backgroundSize: "cover",
               backgroundPosition: "center",
-              width: `${100 / slides}%`,
               minHeight: "85vh",
             }}
           >
