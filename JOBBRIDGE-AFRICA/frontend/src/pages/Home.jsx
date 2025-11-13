@@ -267,8 +267,8 @@ const Home = () => {
               className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70"
               aria-hidden="true"
             />
-            <div className="relative w-full px-4 md:px-12 z-10">
-              <div className="max-w-5xl mx-auto text-center py-12 md:py-20">
+            <div className="relative w-full px-4 md:px-12 z-10 h-full flex items-center">
+              <div className="max-w-5xl mx-auto text-center w-full">
                 <h2 className="text-xl md:text-5xl font-extrabold mb-4 md:mb-6 leading-tight drop-shadow-lg">
                   Connecting Africa's Talent with Meaningful Work
                 </h2>
