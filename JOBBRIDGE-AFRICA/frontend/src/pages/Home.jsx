@@ -72,27 +72,28 @@ const Home = () => {
   };
 
   return (
-    <div className="bg-neutral overflow-x-hidden">
+    <div className="bg-neutral">
       {/* Hero Carousel Container */}
       <section
-        className="relative overflow-hidden min-h-[85vh] md:min-h-[80vh]"
+        className="relative overflow-hidden min-h-[85vh] md:min-h-[80vh] max-w-full"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
         {/* Slides Container */}
         <div
-          className="flex transition-transform duration-700 ease-in-out"
+          className="flex transition-transform duration-700 ease-in-out w-full"
           style={{
             transform: `translateX(-${currentSlide * 100}%)`,
           }}
         >
           {/* Slide 1: Job Search Hero */}
           <div
-            className="w-screen flex-shrink-0 relative text-white flex items-center justify-center"
+            className="flex-shrink-0 relative text-white flex items-center justify-center"
             style={{
               backgroundImage: `url(${heroImg})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
+              width: "100vw",
               minHeight: "85vh",
             }}
           >
@@ -109,12 +110,12 @@ const Home = () => {
                 backgroundSize: "24px 24px",
               }}
             />
-            <div className="relative w-full px-4 md:px-8 z-10">
-              <div className="max-w-6xl mx-auto text-center pt-10 md:pt-20 pb-8 md:pb-12">
-                <h1 className="text-2xl md:text-5xl font-extrabold mb-4 md:mb-4 drop-shadow leading-tight text-center">
+            <div className="relative w-full px-4 md:px-8 z-10 flex items-center justify-center">
+              <div className="max-w-6xl w-full text-center pt-10 md:pt-20 pb-8 md:pb-12">
+                <h1 className="text-2xl md:text-5xl font-extrabold mb-4 md:mb-4 drop-shadow leading-tight w-full">
                   Find Your Dream Job in Africa
                 </h1>
-                <p className="text-sm md:text-lg mb-4 md:mb-8 text-gray-100 max-w-3xl mx-auto leading-relaxed text-center">
+                <p className="text-sm md:text-lg mb-4 md:mb-8 text-gray-100 max-w-3xl mx-auto leading-relaxed w-full">
                   AI-powered matching connecting African youth and professionals
                   with decent work opportunities across the continent.
                 </p>
@@ -252,11 +253,12 @@ const Home = () => {
 
           {/* Slide 2: Mission Statement */}
           <div
-            className="w-screen flex-shrink-0 relative text-white flex items-center justify-center"
+            className="flex-shrink-0 relative text-white flex items-center justify-center"
             style={{
               backgroundImage: "url(/hero-mission.jpg)",
               backgroundSize: "cover",
               backgroundPosition: "center",
+              width: "100vw",
               minHeight: "85vh",
             }}
           >
