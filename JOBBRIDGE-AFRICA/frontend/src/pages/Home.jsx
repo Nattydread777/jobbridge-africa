@@ -75,20 +75,19 @@ const Home = () => {
     <div className="bg-neutral">
       {/* Hero Carousel Container */}
       <section
-        className="relative overflow-hidden min-h-[85vh] md:min-h-[80vh] w-full"
+        className="relative min-h-[85vh] md:min-h-[80vh] h-[85vh] md:h-[80vh] w-full overflow-hidden"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
           {/* Slide 1: Job Search Hero */}
           <div
             className={`absolute inset-0 text-white flex items-center justify-center transition-opacity duration-700 ${
-              currentSlide === 0 ? "opacity-100 z-10" : "opacity-0 z-0"
+              currentSlide === 0 ? "opacity-100 z-10 pointer-events-auto" : "opacity-0 z-0 pointer-events-none"
             }`}
             style={{
               backgroundImage: `url(${heroImg})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
-              minHeight: "85vh",
             }}
           >
             <div
@@ -248,13 +247,12 @@ const Home = () => {
           {/* Slide 2: Mission Statement */}
           <div
             className={`absolute inset-0 text-white flex items-center justify-center transition-opacity duration-700 ${
-              currentSlide === 1 ? "opacity-100 z-10" : "opacity-0 z-0"
+              currentSlide === 1 ? "opacity-100 z-10 pointer-events-auto" : "opacity-0 z-0 pointer-events-none"
             }`}
             style={{
               backgroundImage: "url(/hero-mission.jpg)",
               backgroundSize: "cover",
               backgroundPosition: "center",
-              minHeight: "85vh",
             }}
           >
             <div
