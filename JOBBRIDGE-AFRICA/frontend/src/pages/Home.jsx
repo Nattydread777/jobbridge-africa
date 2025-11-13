@@ -8,11 +8,12 @@ const Home = () => {
   const [country, setCountry] = useState("");
   const [city, setCity] = useState("");
   const [jobType, setJobType] = useState("All");
-  const [missionVisible, setMissionVisible] = useState(false);
+  const [currentSlide, setCurrentSlide] = useState(0);
   const [statsVisible, setStatsVisible] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const navigate = useNavigate();
-  const missionRef = useRef(null);
   const statsRef = useRef(null);
+  const slides = 2; // Total number of hero slides
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -30,20 +31,23 @@ const Home = () => {
     setCity(entry?.cities?.[0] || "");
   }, [country]);
 
-  // Intersection Observer for scroll-triggered animations
+  // Auto-rotate carousel
+  useEffect(() => {
+    if (isPaused) return;
+
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % slides);
+    }, 6000); // Change slide every 6 seconds
+
+    return () => clearInterval(interval);
+  }, [isPaused]);
+
+  // Intersection Observer for stats animation
   useEffect(() => {
     const observerOptions = {
       threshold: 0.2,
       rootMargin: "0px 0px -100px 0px",
     };
-
-    const missionObserver = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting && !missionVisible) {
-          setMissionVisible(true);
-        }
-      });
-    }, observerOptions);
 
     const statsObserver = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
@@ -53,71 +57,59 @@ const Home = () => {
       });
     }, observerOptions);
 
-    if (missionRef.current) missionObserver.observe(missionRef.current);
     if (statsRef.current) statsObserver.observe(statsRef.current);
 
     return () => {
-      if (missionRef.current) missionObserver.unobserve(missionRef.current);
       if (statsRef.current) statsObserver.unobserve(statsRef.current);
     };
-  }, [missionVisible, statsVisible]);
+  }, [statsVisible]);
 
-  // Counter animation hook
-  const useCounter = (end, duration = 2000, isVisible) => {
-    const [count, setCount] = useState(0);
-
-    useEffect(() => {
-      if (!isVisible) return;
-
-      let startTime;
-      const step = (timestamp) => {
-        if (!startTime) startTime = timestamp;
-        const progress = Math.min((timestamp - startTime) / duration, 1);
-        setCount(Math.floor(progress * end));
-
-        if (progress < 1) {
-          requestAnimationFrame(step);
-        }
-      };
-
-      requestAnimationFrame(step);
-    }, [end, duration, isVisible]);
-
-    return count;
+  const goToSlide = (index) => {
+    setCurrentSlide(index);
   };
 
-  const scrollToMission = () => {
-    const missionSection = document.getElementById("mission-section");
-    missionSection?.scrollIntoView({ behavior: "smooth" });
+  const scrollToFeatures = () => {
+    const featuresSection = document.getElementById("features-section");
+    featuresSection?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
     <div className="bg-neutral">
-      {/* Enhanced Hero Section */}
-      <section
-        aria-label="Hero: Find your dream job in Africa"
-        className="relative text-white min-h-[82vh] flex items-center"
-        style={{
-          backgroundImage: `url(${heroImg})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
+      {/* Hero Carousel Container */}
+      <section 
+        className="relative overflow-hidden min-h-[85vh]"
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
       >
-        <div
-          className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/20"
-          aria-hidden="true"
-        />
-        <div
-          className="pointer-events-none absolute inset-0 opacity-20"
-          aria-hidden="true"
-          style={{
-            backgroundImage:
-              "radial-gradient(rgba(255,255,255,0.15) 1px, transparent 1px)",
-            backgroundSize: "24px 24px",
-          }}
-        />
-        <div className="relative w-full px-6 md:px-8">
-          <div className="max-w-6xl mx-auto text-center pt-24 md:pt-28 pb-16">
+        {/* Slides Container */}
+        <div 
+          className="flex transition-transform duration-700 ease-in-out min-h-[85vh]"
+          style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+        >
+          {/* Slide 1: Job Search Hero */}
+          <div
+            className="min-w-full relative text-white flex items-center"
+            style={{
+              backgroundImage: `url(${heroImg})`,
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }}
+          >
+            <div
+              className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/20"
+              aria-hidden="true"
+            />
+            <div
+              className="pointer-events-none absolute inset-0 opacity-20"
+              aria-hidden="true"
+              style={{
+                backgroundImage:
+                  "radial-gradient(rgba(255,255,255,0.15) 1px, transparent 1px)",
+                backgroundSize: "24px 24px",
+              }}
+            />
+            <div className="relative w-full px-6 md:px-8 z-10">
+              <div className="max-w-6xl mx-auto text-center pt-24 md:pt-28 pb-16"
             <h1 className="text-4xl md:text-6xl font-extrabold mb-5 drop-shadow">
               Find Your Dream Job in Africa
             </h1>
@@ -251,12 +243,78 @@ const Home = () => {
               </Link>
             </div>
           </div>
+            </div>
+          </div>
+
+          {/* Slide 2: Mission Statement */}
+          <div
+            className="min-w-full relative text-white flex items-center"
+            style={{
+              backgroundImage: `url(${heroImg})`,
+              backgroundSize: "cover",
+              backgroundPosition: "bottom center",
+            }}
+          >
+            <div
+              className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70"
+              aria-hidden="true"
+            />
+            <div className="relative w-full px-6 md:px-12 z-10">
+              <div className="max-w-5xl mx-auto text-center py-20">
+                <h2 className="text-3xl md:text-5xl font-extrabold mb-6 leading-tight drop-shadow-lg">
+                  Connecting Africa's Talent with Meaningful Work
+                </h2>
+                <p className="text-lg md:text-2xl mb-6 text-gray-100 leading-relaxed max-w-4xl mx-auto">
+                  JobBridge Africa — a youth empowerment initiative born from the
+                  Power Learn Project (PLP) of Africa — is connecting Africa's
+                  talent with meaningful work through AI‑driven job matching.
+                </p>
+                <p className="text-base md:text-xl text-gray-200 max-w-3xl mx-auto">
+                  The platform advances{" "}
+                  <span className="font-semibold text-primary">UN SDG 8</span> by
+                  promoting sustainable employment and inclusive economic growth
+                  across the continent.
+                </p>
+                <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+                  <Link
+                    to="/about"
+                    className="inline-flex items-center px-8 py-3 rounded-md bg-white text-gray-900 font-semibold hover:bg-gray-100 transition shadow-lg"
+                  >
+                    Learn More About Us
+                  </Link>
+                  <Link
+                    to="/sdg-impact"
+                    className="inline-flex items-center px-8 py-3 rounded-md border-2 border-white/80 text-white hover:bg-white/10 transition"
+                  >
+                    Our SDG 8 Impact
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* Navigation Dots */}
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-3 z-20">
+          {[...Array(slides)].map((_, index) => (
+            <button
+              key={index}
+              onClick={() => goToSlide(index)}
+              className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                currentSlide === index
+                  ? "bg-white w-8"
+                  : "bg-white/50 hover:bg-white/75"
+              }`}
+              aria-label={`Go to slide ${index + 1}`}
+            />
+          ))}
+        </div>
+
         {/* Scroll Down Indicator */}
         <button
-          onClick={scrollToMission}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/80 hover:text-white transition-all animate-bounce cursor-pointer"
-          aria-label="Scroll to mission section"
+          onClick={scrollToFeatures}
+          className="absolute bottom-20 left-1/2 -translate-x-1/2 text-white/80 hover:text-white transition-all animate-bounce cursor-pointer z-20"
+          aria-label="Scroll to features"
         >
           <svg
             className="w-8 h-8"
@@ -274,63 +332,8 @@ const Home = () => {
         </button>
       </section>
 
-      {/* Second Hero Section - Mission Statement */}
-      <section
-        ref={missionRef}
-        id="mission-section"
-        aria-label="Mission: Empowering Africa's Youth"
-        className={`relative text-white min-h-[75vh] flex items-center transition-opacity duration-1000 ${
-          missionVisible
-            ? "opacity-100 translate-y-0"
-            : "opacity-0 translate-y-8"
-        }`}
-        style={{
-          backgroundImage: `url(${heroImg})`,
-          backgroundSize: "cover",
-          backgroundPosition: "bottom center",
-          filter: "saturate(1.2) brightness(0.9)",
-        }}
-      >
-        <div
-          className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70"
-          aria-hidden="true"
-        />
-        <div className="relative w-full px-6 md:px-12">
-          <div className="max-w-5xl mx-auto text-center py-20">
-            <h2 className="text-3xl md:text-5xl font-extrabold mb-6 leading-tight drop-shadow-lg">
-              Connecting Africa's Talent with Meaningful Work
-            </h2>
-            <p className="text-lg md:text-2xl mb-6 text-gray-100 leading-relaxed max-w-4xl mx-auto">
-              JobBridge Africa — a youth empowerment initiative born from the
-              Power Learn Project (PLP) of Africa — is connecting Africa's
-              talent with meaningful work through AI‑driven job matching.
-            </p>
-            <p className="text-base md:text-xl text-gray-200 max-w-3xl mx-auto">
-              The platform advances{" "}
-              <span className="font-semibold text-primary">UN SDG 8</span> by
-              promoting sustainable employment and inclusive economic growth
-              across the continent.
-            </p>
-            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link
-                to="/about"
-                className="inline-flex items-center px-8 py-3 rounded-md bg-white text-gray-900 font-semibold hover:bg-gray-100 transition shadow-lg"
-              >
-                Learn More About Us
-              </Link>
-              <Link
-                to="/sdg-impact"
-                className="inline-flex items-center px-8 py-3 rounded-md border-2 border-white/80 text-white hover:bg-white/10 transition"
-              >
-                Our SDG 8 Impact
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Features Section */}
-      <section className="max-w-7xl mx-auto py-16 px-8">
+      <section id="features-section" className="max-w-7xl mx-auto py-16 px-8">
         <h2 className="text-3xl font-bold text-center mb-12 text-primary">
           Why Choose JobBridge Africa?
         </h2>
