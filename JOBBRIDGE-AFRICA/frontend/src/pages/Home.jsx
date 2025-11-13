@@ -103,12 +103,12 @@ const Home = () => {
                 backgroundSize: "24px 24px",
               }}
             />
-            <div className="relative w-full px-4 md:px-8 z-10">
-              <div className="max-w-6xl mx-auto text-center pt-10 md:pt-20 pb-8 md:pb-12">
-                <h1 className="text-2xl md:text-5xl font-extrabold mb-4 md:mb-4 drop-shadow leading-tight">
+            <div className="relative w-full px-3 md:px-8 z-10">
+              <div className="max-w-6xl mx-auto text-center pt-8 md:pt-20 pb-6 md:pb-12">
+                <h1 className="text-2xl md:text-5xl font-extrabold mb-3 md:mb-4 drop-shadow leading-tight px-2">
                   Find Your Dream Job in Africa
                 </h1>
-                <p className="text-sm md:text-lg mb-4 md:mb-8 text-gray-100 max-w-3xl mx-auto leading-relaxed">
+                <p className="text-sm md:text-lg mb-3 md:mb-8 text-gray-100 max-w-3xl mx-auto leading-relaxed px-2">
                   AI-powered matching connecting African youth and professionals
                   with decent work opportunities across the continent.
                 </p>
