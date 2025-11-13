@@ -250,9 +250,9 @@ const Home = () => {
           <div
             className="min-w-full min-h-[85vh] flex-shrink-0 relative text-white flex items-center justify-center"
             style={{
-              backgroundImage: `url(${heroImg})`,
+              backgroundImage: "url(/hero-mission.jpg)",
               backgroundSize: "cover",
-              backgroundPosition: "bottom center",
+              backgroundPosition: "center",
             }}
           >
             <div
