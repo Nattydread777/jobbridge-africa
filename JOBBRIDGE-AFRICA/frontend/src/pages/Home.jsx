@@ -75,7 +75,7 @@ const Home = () => {
     <div className="bg-neutral">
       {/* Hero Carousel Container */}
       <section
-        className="relative overflow-hidden min-h-[45vh] md:min-h-[70vh]"
+        className="relative overflow-hidden min-h-[75vh] md:min-h-[80vh]"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
@@ -88,7 +88,7 @@ const Home = () => {
         >
           {/* Slide 1: Job Search Hero */}
           <div
-            className="min-w-full min-h-[45vh] md:min-h-[70vh] flex-shrink-0 relative text-white flex items-center justify-center"
+            className="min-w-full min-h-[75vh] md:min-h-[80vh] flex-shrink-0 relative text-white flex items-center justify-center"
             style={{
               backgroundImage: `url(${heroImg})`,
               backgroundSize: "cover",
@@ -109,11 +109,11 @@ const Home = () => {
               }}
             />
             <div className="relative w-full px-4 md:px-8 z-10">
-              <div className="max-w-6xl mx-auto text-center pt-6 md:pt-20 pb-6 md:pb-12">
-                <h1 className="text-2xl md:text-5xl font-extrabold mb-2 md:mb-4 drop-shadow leading-tight">
+              <div className="max-w-6xl mx-auto text-center pt-8 md:pt-20 pb-8 md:pb-12">
+                <h1 className="text-2xl md:text-5xl font-extrabold mb-3 md:mb-4 drop-shadow leading-tight">
                   Find Your Dream Job in Africa
                 </h1>
-                <p className="text-xs md:text-lg mb-4 md:mb-8 text-gray-100 max-w-3xl mx-auto px-2 leading-snug">
+                <p className="text-sm md:text-lg mb-5 md:mb-8 text-gray-100 max-w-3xl mx-auto px-2 leading-snug">
                   AI-powered matching connecting African youth and professionals
                   with decent work opportunities across the continent.
                 </p>
@@ -248,7 +248,7 @@ const Home = () => {
 
           {/* Slide 2: Mission Statement */}
           <div
-            className="min-w-full min-h-[45vh] md:min-h-[70vh] flex-shrink-0 relative text-white flex items-center justify-center"
+            className="min-w-full min-h-[75vh] md:min-h-[80vh] flex-shrink-0 relative text-white flex items-center justify-center"
             style={{
               backgroundImage: "url(/hero-mission.jpg)",
               backgroundSize: "cover",
