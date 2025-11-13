@@ -3,6 +3,8 @@ import { useNavigate, Link } from "react-router-dom";
 import heroImg from "../assets/hero.jpg";
 import locations from "../data/africaLocations";
 
+// Fade-in animation is defined in index.css as @keyframes fadeIn
+
 const Home = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [country, setCountry] = useState("");
@@ -25,6 +27,11 @@ const Home = () => {
     const entry = locations.find((l) => l.country === country);
     setCity(entry?.cities?.[0] || "");
   }, [country]);
+
+  const scrollToMission = () => {
+    const missionSection = document.getElementById("mission-section");
+    missionSection?.scrollIntoView({ behavior: "smooth" });
+  };
 
   return (
     <div className="bg-neutral">
@@ -187,12 +194,33 @@ const Home = () => {
             </div>
           </div>
         </div>
+        {/* Scroll Down Indicator */}
+        <button
+          onClick={scrollToMission}
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/80 hover:text-white transition-all animate-bounce cursor-pointer"
+          aria-label="Scroll to mission section"
+        >
+          <svg
+            className="w-8 h-8"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 14l-7 7m0 0l-7-7m7 7V3"
+            />
+          </svg>
+        </button>
       </section>
 
       {/* Second Hero Section - Mission Statement */}
       <section
+        id="mission-section"
         aria-label="Mission: Empowering Africa's Youth"
-        className="relative text-white min-h-[75vh] flex items-center"
+        className="relative text-white min-h-[75vh] flex items-center animate-fadeIn"
         style={{
           backgroundImage: `url(${heroImg})`,
           backgroundSize: "cover",
