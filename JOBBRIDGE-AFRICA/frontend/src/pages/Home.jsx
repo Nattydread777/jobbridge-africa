@@ -81,7 +81,7 @@ const Home = () => {
       >
         {/* Slides Container */}
         <div
-          className="flex transition-transform duration-700 ease-in-out w-full"
+          className="flex absolute inset-0 transition-transform duration-700 ease-in-out"
           style={{
             transform: `translateX(-${currentSlide * 100}%)`,
           }}
@@ -110,10 +110,10 @@ const Home = () => {
             />
             <div className="relative w-full px-3 md:px-8 z-10">
               <div className="max-w-6xl mx-auto text-center pt-6 md:pt-20 pb-6 md:pb-12">
-                <h1 className="text-xl md:text-5xl font-extrabold mb-2 md:mb-4 drop-shadow leading-tight">
+                <h1 className="text-2xl md:text-5xl font-extrabold mb-3 md:mb-4 drop-shadow leading-tight">
                   Find Your Dream Job in Africa
                 </h1>
-                <p className="text-xs md:text-lg mb-3 md:mb-8 text-gray-100 max-w-3xl mx-auto px-2 leading-snug">
+                <p className="text-sm md:text-lg mb-3 md:mb-8 text-gray-100 max-w-3xl mx-auto px-2 leading-relaxed">
                   AI-powered matching connecting African youth and professionals
                   with decent work opportunities across the continent.
                 </p>
