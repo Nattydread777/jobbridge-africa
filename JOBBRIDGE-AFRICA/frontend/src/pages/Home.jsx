@@ -75,7 +75,7 @@ const Home = () => {
     <div className="bg-neutral">
       {/* Hero Carousel Container */}
       <section
-        className="relative overflow-hidden min-h-[85vh]"
+        className="relative overflow-hidden min-h-[60vh] md:min-h-[85vh]"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
@@ -88,7 +88,7 @@ const Home = () => {
         >
           {/* Slide 1: Job Search Hero */}
           <div
-            className="min-w-full min-h-[85vh] flex-shrink-0 relative text-white flex items-center justify-center"
+            className="min-w-full min-h-[60vh] md:min-h-[85vh] flex-shrink-0 relative text-white flex items-center justify-center"
             style={{
               backgroundImage: `url(${heroImg})`,
               backgroundSize: "cover",
@@ -108,18 +108,18 @@ const Home = () => {
                 backgroundSize: "24px 24px",
               }}
             />
-            <div className="relative w-full px-6 md:px-8 z-10">
-              <div className="max-w-6xl mx-auto text-center pt-24 md:pt-28 pb-16">
-                <h1 className="text-4xl md:text-6xl font-extrabold mb-5 drop-shadow">
+            <div className="relative w-full px-4 md:px-8 z-10">
+              <div className="max-w-6xl mx-auto text-center pt-12 md:pt-28 pb-8 md:pb-16">
+                <h1 className="text-3xl md:text-6xl font-extrabold mb-4 md:mb-5 drop-shadow">
                   Find Your Dream Job in Africa
                 </h1>
-                <p className="text-base md:text-xl mb-10 text-gray-100 max-w-3xl mx-auto">
+                <p className="text-sm md:text-xl mb-6 md:mb-10 text-gray-100 max-w-3xl mx-auto px-2">
                   AI-powered matching connecting African youth and professionals
                   with decent work opportunities across the continent.
                 </p>
                 <form
                   onSubmit={handleSearch}
-                  className="bg-white/90 backdrop-blur-md rounded-xl shadow-2xl p-4 md:p-6 max-w-4xl mx-auto"
+                  className="bg-white/90 backdrop-blur-md rounded-xl shadow-2xl p-3 md:p-6 max-w-4xl mx-auto"
                 >
                   {/* Job type chips */}
                   <div className="flex flex-wrap justify-center gap-2 mb-4">
@@ -146,7 +146,7 @@ const Home = () => {
                     ))}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+                  <div className="grid grid-cols-1 gap-3 mb-3 md:mb-0 md:grid-cols-3 md:gap-4">
                     <label className="flex items-center md:border-r md:border-gray-300 md:pr-4">
                       <span className="sr-only">Job title or keyword</span>
                       <span className="text-gray-400 text-2xl mr-3" aria-hidden>
@@ -195,7 +195,7 @@ const Home = () => {
 
                     <button
                       type="submit"
-                      className="bg-accent text-white px-6 md:px-8 py-3 rounded-md hover:bg-red-700 transition font-semibold text-lg"
+                      className="bg-accent text-white px-6 md:px-8 py-2.5 md:py-3 rounded-md hover:bg-red-700 transition font-semibold text-base md:text-lg w-full md:w-auto"
                     >
                       Search Jobs
                     </button>
@@ -228,7 +228,7 @@ const Home = () => {
                     </button>
                   </div>
                 </form>
-                <div className="mt-8 flex items-center justify-center gap-4">
+                <div className="mt-6 md:mt-8 flex flex-col sm:flex-row items-center justify-center gap-3 md:gap-4 px-2">
                   <Link
                     to="/jobs"
                     className="inline-flex items-center px-6 py-3 rounded-md bg-primary text-black font-semibold hover:brightness-95 transition"
@@ -248,7 +248,7 @@ const Home = () => {
 
           {/* Slide 2: Mission Statement */}
           <div
-            className="min-w-full min-h-[85vh] flex-shrink-0 relative text-white flex items-center justify-center"
+            className="min-w-full min-h-[60vh] md:min-h-[85vh] flex-shrink-0 relative text-white flex items-center justify-center"
             style={{
               backgroundImage: "url(/hero-mission.jpg)",
               backgroundSize: "cover",
