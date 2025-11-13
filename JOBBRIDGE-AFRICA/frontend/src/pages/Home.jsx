@@ -72,10 +72,10 @@ const Home = () => {
   };
 
   return (
-    <div className="bg-neutral">
+    <div className="bg-neutral overflow-hidden">
       {/* Hero Carousel Container */}
       <section
-        className="relative min-h-[85vh] md:min-h-[80vh] h-[85vh] md:h-[80vh] w-full overflow-hidden"
+        className="relative h-[85vh] md:h-[80vh] w-full overflow-hidden"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
@@ -103,12 +103,12 @@ const Home = () => {
                 backgroundSize: "24px 24px",
               }}
             />
-            <div className="relative w-full px-3 md:px-8 z-10">
+            <div className="relative w-full h-full px-3 md:px-8 z-10 overflow-y-auto overflow-x-hidden">
               <div className="max-w-6xl mx-auto text-center pt-8 md:pt-20 pb-6 md:pb-12">
-                <h1 className="text-2xl md:text-5xl font-extrabold mb-3 md:mb-4 drop-shadow leading-tight px-2">
+                <h1 className="text-2xl md:text-5xl font-extrabold mb-3 md:mb-4 drop-shadow leading-tight">
                   Find Your Dream Job in Africa
                 </h1>
-                <p className="text-sm md:text-lg mb-3 md:mb-8 text-gray-100 max-w-3xl mx-auto leading-relaxed px-2">
+                <p className="text-sm md:text-lg mb-3 md:mb-8 text-gray-100 max-w-3xl mx-auto leading-relaxed">
                   AI-powered matching connecting African youth and professionals
                   with decent work opportunities across the continent.
                 </p>
