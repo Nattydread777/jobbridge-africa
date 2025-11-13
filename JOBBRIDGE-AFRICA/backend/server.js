@@ -21,10 +21,18 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Middleware
+const allowedOrigins = (() => {
+  if (process.env.NODE_ENV === 'production') {
+    if (process.env.ALLOWED_ORIGINS) {
+      return process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim());
+    }
+    return ['https://www.jobbridgeafrica.org'];
+  }
+  return ['http://localhost:5173', 'http://localhost:5174'];
+})();
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? 'https://your-frontend-domain.com' // Replace with your actual frontend domain
-    : ['http://localhost:5173', 'http://localhost:5174'], // Allow requests from your Vite frontend
+  origin: allowedOrigins,
   credentials: true,
 }));
 app.use(express.json()); // Allows parsing of raw JSON data

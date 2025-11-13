@@ -13,7 +13,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
   }
 
   // Create transporter using Zoho SMTP
-  const transporter = nodemailer.createTransporter({
+  const transporter = nodemailer.createTransport({
     host: 'smtp.zoho.com',
     port: 465,
     secure: true,
@@ -28,6 +28,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     from: process.env.EMAIL_USER,
     to: 'info@jobbridgeafrica.org',
     subject: `JobBridge Contact: ${subject}`,
+    replyTo: email,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #16a34a;">New Contact Form Submission</h2>
@@ -57,6 +58,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     from: process.env.EMAIL_USER,
     to: email,
     subject: 'We received your message - JobBridge Africa',
+    replyTo: 'info@jobbridgeafrica.org',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: linear-gradient(to right, #16a34a, #15803d); padding: 30px; border-radius: 8px 8px 0 0;">
