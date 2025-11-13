@@ -75,25 +75,19 @@ const Home = () => {
     <div className="bg-neutral">
       {/* Hero Carousel Container */}
       <section
-        className="relative overflow-hidden min-h-[85vh] md:min-h-[80vh] max-w-full"
+        className="relative overflow-hidden min-h-[85vh] md:min-h-[80vh] w-full"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
-        {/* Slides Container */}
-        <div
-          className="flex transition-transform duration-700 ease-in-out w-full"
-          style={{
-            transform: `translateX(-${currentSlide * 100}%)`,
-          }}
-        >
           {/* Slide 1: Job Search Hero */}
           <div
-            className="flex-shrink-0 relative text-white flex items-center justify-center"
+            className={`absolute inset-0 text-white flex items-center justify-center transition-opacity duration-700 ${
+              currentSlide === 0 ? "opacity-100 z-10" : "opacity-0 z-0"
+            }`}
             style={{
               backgroundImage: `url(${heroImg})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
-              width: "100vw",
               minHeight: "85vh",
             }}
           >
@@ -253,12 +247,13 @@ const Home = () => {
 
           {/* Slide 2: Mission Statement */}
           <div
-            className="flex-shrink-0 relative text-white flex items-center justify-center"
+            className={`absolute inset-0 text-white flex items-center justify-center transition-opacity duration-700 ${
+              currentSlide === 1 ? "opacity-100 z-10" : "opacity-0 z-0"
+            }`}
             style={{
               backgroundImage: "url(/hero-mission.jpg)",
               backgroundSize: "cover",
               backgroundPosition: "center",
-              width: "100vw",
               minHeight: "85vh",
             }}
           >
@@ -278,11 +273,6 @@ const Home = () => {
                   matching.
                 </p>
                 <p className="text-xs md:text-xl text-gray-200 max-w-3xl mx-auto mb-6 md:mb-8">
-                  The platform advances{" "}
-                  <span className="font-semibold text-primary">UN SDG 8</span>{" "}
-                  by promoting sustainable employment and inclusive economic
-                  growth across the continent.
-                </p>
                   The platform advances{" "}
                   <span className="font-semibold text-primary">UN SDG 8</span>{" "}
                   by promoting sustainable employment and inclusive economic
