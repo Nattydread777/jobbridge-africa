@@ -37,12 +37,10 @@ const Home = () => {
 
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % slides);
-    }, 6000); // Change slide every 6 seconds
+    }, 30000); // Change slide every 30 seconds
 
     return () => clearInterval(interval);
-  }, [isPaused]);
-
-  // Intersection Observer for stats animation
+  }, [isPaused]); // Intersection Observer for stats animation
   useEffect(() => {
     const observerOptions = {
       threshold: 0.2,
@@ -76,13 +74,13 @@ const Home = () => {
   return (
     <div className="bg-neutral">
       {/* Hero Carousel Container */}
-      <section 
+      <section
         className="relative overflow-hidden min-h-[85vh]"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
         {/* Slides Container */}
-        <div 
+        <div
           className="flex transition-transform duration-700 ease-in-out min-h-[85vh]"
           style={{ transform: `translateX(-${currentSlide * 100}%)` }}
         >
@@ -109,140 +107,140 @@ const Home = () => {
               }}
             />
             <div className="relative w-full px-6 md:px-8 z-10">
-              <div className="max-w-6xl mx-auto text-center pt-24 md:pt-28 pb-16"
-            <h1 className="text-4xl md:text-6xl font-extrabold mb-5 drop-shadow">
-              Find Your Dream Job in Africa
-            </h1>
-            <p className="text-base md:text-xl mb-10 text-gray-100 max-w-3xl mx-auto">
-              AI-powered matching connecting African youth and professionals
-              with decent work opportunities across the continent.
-            </p>
-            <form
-              onSubmit={handleSearch}
-              className="bg-white/90 backdrop-blur-md rounded-xl shadow-2xl p-4 md:p-6 max-w-4xl mx-auto"
-            >
-              {/* Job type chips */}
-              <div className="flex flex-wrap justify-center gap-2 mb-4">
-                {[
-                  "All",
-                  "Full-Time",
-                  "Part-Time",
-                  "Contract",
-                  "Remote",
-                  "Internship",
-                ].map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setJobType(t)}
-                    className={`px-3 py-1 rounded-full text-sm font-medium ${
-                      jobType === t
-                        ? "bg-primary text-black"
-                        : "bg-white/60 text-gray-700"
-                    }`}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-                <label className="flex items-center md:border-r md:border-gray-300 md:pr-4">
-                  <span className="sr-only">Job title or keyword</span>
-                  <span className="text-gray-400 text-2xl mr-3" aria-hidden>
-                    🔍
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="Job title or keyword"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full outline-none text-gray-700 placeholder-gray-400 bg-transparent"
-                  />
-                </label>
-
-                <div className="md:border-r md:border-gray-300 md:pr-4">
-                  <label className="sr-only">Country</label>
-                  <select
-                    value={country}
-                    onChange={(e) => setCountry(e.target.value)}
-                    className="w-full p-2 rounded bg-white/80 text-gray-800"
-                  >
-                    {locations.map((loc) => (
-                      <option key={loc.country} value={loc.country}>
-                        {loc.country}
-                      </option>
+              <div className="max-w-6xl mx-auto text-center pt-24 md:pt-28 pb-16">
+                <h1 className="text-4xl md:text-6xl font-extrabold mb-5 drop-shadow">
+                  Find Your Dream Job in Africa
+                </h1>
+                <p className="text-base md:text-xl mb-10 text-gray-100 max-w-3xl mx-auto">
+                  AI-powered matching connecting African youth and professionals
+                  with decent work opportunities across the continent.
+                </p>
+                <form
+                  onSubmit={handleSearch}
+                  className="bg-white/90 backdrop-blur-md rounded-xl shadow-2xl p-4 md:p-6 max-w-4xl mx-auto"
+                >
+                  {/* Job type chips */}
+                  <div className="flex flex-wrap justify-center gap-2 mb-4">
+                    {[
+                      "All",
+                      "Full-Time",
+                      "Part-Time",
+                      "Contract",
+                      "Remote",
+                      "Internship",
+                    ].map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setJobType(t)}
+                        className={`px-3 py-1 rounded-full text-sm font-medium ${
+                          jobType === t
+                            ? "bg-primary text-black"
+                            : "bg-white/60 text-gray-700"
+                        }`}
+                      >
+                        {t}
+                      </button>
                     ))}
-                  </select>
-                </div>
+                  </div>
 
-                <div>
-                  <label className="sr-only">City</label>
-                  <select
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="w-full p-2 rounded bg-white/80 text-gray-800"
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+                    <label className="flex items-center md:border-r md:border-gray-300 md:pr-4">
+                      <span className="sr-only">Job title or keyword</span>
+                      <span className="text-gray-400 text-2xl mr-3" aria-hidden>
+                        🔍
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="Job title or keyword"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full outline-none text-gray-700 placeholder-gray-400 bg-transparent"
+                      />
+                    </label>
+
+                    <div className="md:border-r md:border-gray-300 md:pr-4">
+                      <label className="sr-only">Country</label>
+                      <select
+                        value={country}
+                        onChange={(e) => setCountry(e.target.value)}
+                        className="w-full p-2 rounded bg-white/80 text-gray-800"
+                      >
+                        {locations.map((loc) => (
+                          <option key={loc.country} value={loc.country}>
+                            {loc.country}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="sr-only">City</label>
+                      <select
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        className="w-full p-2 rounded bg-white/80 text-gray-800"
+                      >
+                        {locations
+                          .find((l) => l.country === country)
+                          ?.cities?.map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="bg-accent text-white px-6 md:px-8 py-3 rounded-md hover:bg-red-700 transition font-semibold text-lg"
+                    >
+                      Search Jobs
+                    </button>
+                  </div>
+
+                  <div className="mt-3 text-xs md:text-sm text-gray-600">
+                    Trending:{" "}
+                    <button
+                      type="button"
+                      onClick={() => setSearchTerm("Software Engineer")}
+                      className="underline hover:text-gray-800"
+                    >
+                      Software Engineer
+                    </button>{" "}
+                    •{" "}
+                    <button
+                      type="button"
+                      onClick={() => setSearchTerm("Data Analyst")}
+                      className="underline hover:text-gray-800"
+                    >
+                      Data Analyst
+                    </button>{" "}
+                    •{" "}
+                    <button
+                      type="button"
+                      onClick={() => setSearchTerm("Product Manager")}
+                      className="underline hover:text-gray-800"
+                    >
+                      Product Manager
+                    </button>
+                  </div>
+                </form>
+                <div className="mt-8 flex items-center justify-center gap-4">
+                  <Link
+                    to="/jobs"
+                    className="inline-flex items-center px-6 py-3 rounded-md bg-primary text-black font-semibold hover:brightness-95 transition"
                   >
-                    {locations
-                      .find((l) => l.country === country)
-                      ?.cities?.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                  </select>
+                    Browse Jobs
+                  </Link>
+                  <Link
+                    to="/employers"
+                    className="inline-flex items-center px-6 py-3 rounded-md border border-white/70 text-white hover:bg-white/10 transition"
+                  >
+                    Post a Job
+                  </Link>
                 </div>
-
-                <button
-                  type="submit"
-                  className="bg-accent text-white px-6 md:px-8 py-3 rounded-md hover:bg-red-700 transition font-semibold text-lg"
-                >
-                  Search Jobs
-                </button>
               </div>
-
-              <div className="mt-3 text-xs md:text-sm text-gray-600">
-                Trending:{" "}
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm("Software Engineer")}
-                  className="underline hover:text-gray-800"
-                >
-                  Software Engineer
-                </button>{" "}
-                •{" "}
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm("Data Analyst")}
-                  className="underline hover:text-gray-800"
-                >
-                  Data Analyst
-                </button>{" "}
-                •{" "}
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm("Product Manager")}
-                  className="underline hover:text-gray-800"
-                >
-                  Product Manager
-                </button>
-              </div>
-            </form>
-            <div className="mt-8 flex items-center justify-center gap-4">
-              <Link
-                to="/jobs"
-                className="inline-flex items-center px-6 py-3 rounded-md bg-primary text-black font-semibold hover:brightness-95 transition"
-              >
-                Browse Jobs
-              </Link>
-              <Link
-                to="/employers"
-                className="inline-flex items-center px-6 py-3 rounded-md border border-white/70 text-white hover:bg-white/10 transition"
-              >
-                Post a Job
-              </Link>
-            </div>
-          </div>
             </div>
           </div>
 
@@ -265,15 +263,16 @@ const Home = () => {
                   Connecting Africa's Talent with Meaningful Work
                 </h2>
                 <p className="text-lg md:text-2xl mb-6 text-gray-100 leading-relaxed max-w-4xl mx-auto">
-                  JobBridge Africa — a youth empowerment initiative born from the
-                  Power Learn Project (PLP) of Africa — is connecting Africa's
-                  talent with meaningful work through AI‑driven job matching.
+                  JobBridge Africa — a youth empowerment initiative born from
+                  the Power Learn Project (PLP) of Africa — is connecting
+                  Africa's talent with meaningful work through AI‑driven job
+                  matching.
                 </p>
                 <p className="text-base md:text-xl text-gray-200 max-w-3xl mx-auto">
                   The platform advances{" "}
-                  <span className="font-semibold text-primary">UN SDG 8</span> by
-                  promoting sustainable employment and inclusive economic growth
-                  across the continent.
+                  <span className="font-semibold text-primary">UN SDG 8</span>{" "}
+                  by promoting sustainable employment and inclusive economic
+                  growth across the continent.
                 </p>
                 <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
                   <Link
