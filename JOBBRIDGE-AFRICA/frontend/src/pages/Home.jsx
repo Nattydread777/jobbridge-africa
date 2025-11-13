@@ -75,13 +75,13 @@ const Home = () => {
     <div className="bg-neutral">
       {/* Hero Carousel Container */}
       <section
-        className="relative overflow-hidden min-h-[75vh] md:min-h-[80vh]"
+        className="relative overflow-hidden min-h-[75vh] md:min-h-[80vh] w-full"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
         {/* Slides Container */}
         <div
-          className="flex transition-transform duration-700 ease-in-out"
+          className="flex transition-transform duration-700 ease-in-out w-full"
           style={{
             transform: `translateX(-${currentSlide * 100}%)`,
           }}
@@ -204,7 +204,7 @@ const Home = () => {
                     </button>
                   </div>
 
-                  <div className="mt-2 text-xs md:text-sm text-gray-600 hidden md:block">
+                  <div className="mt-1.5 md:mt-2 text-[10px] md:text-sm text-gray-600">
                     Trending:{" "}
                     <button
                       type="button"
@@ -262,33 +262,33 @@ const Home = () => {
               className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70"
               aria-hidden="true"
             />
-            <div className="relative w-full px-6 md:px-12 z-10">
-              <div className="max-w-5xl mx-auto text-center py-20">
-                <h2 className="text-3xl md:text-5xl font-extrabold mb-6 leading-tight drop-shadow-lg">
+            <div className="relative w-full px-4 md:px-12 z-10">
+              <div className="max-w-5xl mx-auto text-center py-12 md:py-20">
+                <h2 className="text-xl md:text-5xl font-extrabold mb-4 md:mb-6 leading-tight drop-shadow-lg">
                   Connecting Africa's Talent with Meaningful Work
                 </h2>
-                <p className="text-lg md:text-2xl mb-6 text-gray-100 leading-relaxed max-w-4xl mx-auto">
+                <p className="text-sm md:text-2xl mb-4 md:mb-6 text-gray-100 leading-relaxed max-w-4xl mx-auto">
                   JobBridge Africa — a youth empowerment initiative born from
                   the Power Learn Project (PLP) of Africa — is connecting
                   Africa's talent with meaningful work through AI‑driven job
                   matching.
                 </p>
-                <p className="text-base md:text-xl text-gray-200 max-w-3xl mx-auto">
+                <p className="text-xs md:text-xl text-gray-200 max-w-3xl mx-auto">
                   The platform advances{" "}
                   <span className="font-semibold text-primary">UN SDG 8</span>{" "}
                   by promoting sustainable employment and inclusive economic
                   growth across the continent.
                 </p>
-                <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+                <div className="mt-6 md:mt-10 flex flex-col sm:flex-row items-center justify-center gap-2 md:gap-4">
                   <Link
                     to="/about"
-                    className="inline-flex items-center px-8 py-3 rounded-md bg-white text-gray-900 font-semibold hover:bg-gray-100 transition shadow-lg"
+                    className="inline-flex items-center px-4 md:px-8 py-2 md:py-3 rounded-md bg-white text-gray-900 font-semibold hover:bg-gray-100 transition shadow-lg text-xs md:text-base w-full sm:w-auto justify-center"
                   >
                     Learn More About Us
                   </Link>
                   <Link
                     to="/sdg-impact"
-                    className="inline-flex items-center px-8 py-3 rounded-md border-2 border-white/80 text-white hover:bg-white/10 transition"
+                    className="inline-flex items-center px-4 md:px-8 py-2 md:py-3 rounded-md border-2 border-white/80 text-white hover:bg-white/10 transition text-xs md:text-base w-full sm:w-auto justify-center"
                   >
                     Our SDG 8 Impact
                   </Link>
