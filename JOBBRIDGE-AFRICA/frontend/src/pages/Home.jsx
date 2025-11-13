@@ -189,6 +189,54 @@ const Home = () => {
         </div>
       </section>
 
+      {/* Second Hero Section - Mission Statement */}
+      <section
+        aria-label="Mission: Empowering Africa's Youth"
+        className="relative text-white min-h-[75vh] flex items-center"
+        style={{
+          backgroundImage: `url(${heroImg})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      >
+        <div
+          className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70"
+          aria-hidden="true"
+        />
+        <div className="relative w-full px-6 md:px-12">
+          <div className="max-w-5xl mx-auto text-center py-20">
+            <h2 className="text-3xl md:text-5xl font-extrabold mb-6 leading-tight drop-shadow-lg">
+              Connecting Africa's Talent with Meaningful Work
+            </h2>
+            <p className="text-lg md:text-2xl mb-6 text-gray-100 leading-relaxed max-w-4xl mx-auto">
+              JobBridge Africa — a youth empowerment initiative born from the
+              Power Learn Project (PLP) of Africa — is connecting Africa's
+              talent with meaningful work through AI‑driven job matching.
+            </p>
+            <p className="text-base md:text-xl text-gray-200 max-w-3xl mx-auto">
+              The platform advances{" "}
+              <span className="font-semibold text-primary">UN SDG 8</span> by
+              promoting sustainable employment and inclusive economic growth
+              across the continent.
+            </p>
+            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Link
+                to="/about"
+                className="inline-flex items-center px-8 py-3 rounded-md bg-white text-gray-900 font-semibold hover:bg-gray-100 transition shadow-lg"
+              >
+                Learn More About Us
+              </Link>
+              <Link
+                to="/sdg-impact"
+                className="inline-flex items-center px-8 py-3 rounded-md border-2 border-white/80 text-white hover:bg-white/10 transition"
+              >
+                Our SDG 8 Impact
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Features Section */}
       <section className="max-w-7xl mx-auto py-16 px-8">
         <h2 className="text-3xl font-bold text-center mb-12 text-primary">
