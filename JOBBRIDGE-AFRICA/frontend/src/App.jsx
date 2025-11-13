@@ -19,6 +19,8 @@ import AIMatching from "./pages/AIMatching";
 import PanAfricanNetwork from "./pages/PanAfricanNetwork";
 import SDGImpact from "./pages/SDGImpact";
 import EmployerDashboard from "./pages/EmployerDashboard";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 
 function App() {
   return (
@@ -51,6 +53,8 @@ function App() {
                 element={<PanAfricanNetwork />}
               />
               <Route path="/sdg-impact" element={<SDGImpact />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/terms" element={<TermsOfService />} />
             </Routes>
           </main>
           <Footer />

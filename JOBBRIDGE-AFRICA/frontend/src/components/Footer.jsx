@@ -165,8 +165,8 @@ const Footer = () => {
               </li>
             </ul>
             <div className="mt-4 text-gray-400 text-xs space-y-1">
-              <p>📞 +234 800 000 0000</p>
-              <p>📧 support@jobbridge.africa</p>
+              <p>📞 +2348073208945</p>
+              <p>📧 info@jobbridgeafrica.org</p>
             </div>
           </div>
         </div>
@@ -178,6 +178,15 @@ const Footer = () => {
             <span className="font-semibold uppercase">JOBBRIDGE AFRICA</span>.
             All rights reserved.
           </p>
+          <div className="flex gap-4 mt-2 md:mt-0">
+            <NavLink to="/privacy" className="hover:text-white transition">
+              Privacy Policy
+            </NavLink>
+            <span>•</span>
+            <NavLink to="/terms" className="hover:text-white transition">
+              Terms of Service
+            </NavLink>
+          </div>
           <p className="mt-2 md:mt-0">
             Supporting UN SDG 8 — Decent Work and Economic Growth
           </p>
