@@ -160,14 +160,20 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
+                <Link
+                  to="/privacy"
+                  className="hover:text-primary transition-colors"
+                >
                   Privacy Policy
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
+                <Link
+                  to="/terms"
+                  className="hover:text-primary transition-colors"
+                >
                   Terms of Service
-                </a>
+                </Link>
               </li>
             </ul>
             <div className="mt-4 text-gray-400 text-xs space-y-1">
