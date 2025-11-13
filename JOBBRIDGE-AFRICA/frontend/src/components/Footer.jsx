@@ -91,14 +91,20 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
+                <Link
+                  to="/upload-resume"
+                  className="hover:text-primary transition-colors"
+                >
                   Upload Resume
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
+                <Link
+                  to="/career-resources"
+                  className="hover:text-primary transition-colors"
+                >
                   Career Resources
-                </a>
+                </Link>
               </li>
             </ul>
           </div>

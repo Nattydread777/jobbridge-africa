@@ -21,6 +21,8 @@ import SDGImpact from "./pages/SDGImpact";
 import EmployerDashboard from "./pages/EmployerDashboard";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
+import UploadResume from "./pages/UploadResume";
+import CareerResources from "./pages/CareerResources";
 
 function App() {
   return (
@@ -55,6 +57,8 @@ function App() {
               <Route path="/sdg-impact" element={<SDGImpact />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/terms" element={<TermsOfService />} />
+              <Route path="/upload-resume" element={<UploadResume />} />
+              <Route path="/career-resources" element={<CareerResources />} />
             </Routes>
           </main>
           <Footer />
