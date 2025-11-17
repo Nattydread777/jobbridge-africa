@@ -16,6 +16,7 @@ import jobRoutes from './routes/jobRoutes.js'; // Assuming this route exists
 import applicationRoutes from './routes/applicationRoutes.js'; // Application routes
 import aiRoutes from './routes/aiRoutes.js'; // AI routes
 import contactRoutes from './routes/contactRoutes.js'; // Contact form routes
+import teamRoutes from './routes/teamRoutes.js'; // Team member routes
 import { notFound, errorHandler } from './middleware/errorMiddleware.js'; // MUST include .js extension
 
 // -------------------
@@ -129,6 +130,7 @@ app.use('/api/jobs', jobRoutes); // Assuming you export routes as default from j
 app.use('/api/applications', applicationRoutes); // Application submission and management
 app.use('/api/ai', aiRoutes); // AI matching
 app.use('/api/contact', contactLimiter, contactRoutes); // Contact form
+app.use('/api/team', teamRoutes); // Team member management
 
 // -------------------
 // Health Check Endpoints
