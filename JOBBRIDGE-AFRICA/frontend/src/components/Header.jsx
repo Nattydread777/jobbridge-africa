@@ -31,8 +31,9 @@ const Header = () => {
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-2">
             <img
-              src="/logo.svg"
-              alt="JobBridge Africa logo"
+              src="/logo.png"
+              alt="JobBridge Africa Logo"
+              style={{ mixBlendMode: "multiply" }}
               className="w-8 h-8"
             />
             <h1 className="text-2xl font-extrabold uppercase tracking-wide">

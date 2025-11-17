@@ -9,8 +9,9 @@ const Footer = () => {
           <div>
             <div className="flex items-center gap-3 mb-4">
               <img
-                src="/logo.svg"
-                alt="JobBridge Africa logo"
+                src="/logo.png"
+                alt="JobBridge Africa Logo"
+                style={{ mixBlendMode: "multiply" }}
                 className="w-8 h-8"
               />
               <h3 className="text-xl font-extrabold uppercase tracking-wide text-primary">

@@ -72,22 +72,24 @@ const Home = () => {
   };
 
   return (
-    <div className="bg-neutral overflow-hidden">
+    <div className="bg-neutral">
       {/* Hero Carousel Container */}
       <section
-        className="relative h-[85vh] md:h-[80vh] w-full overflow-hidden"
+        className="relative h-screen w-screen overflow-hidden"
+        style={{ maxHeight: "100vh", maxWidth: "100vw" }}
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
           {/* Slide 1: Job Search Hero */}
           <div
-            className={`absolute inset-0 text-white flex items-center justify-center transition-opacity duration-700 ${
-              currentSlide === 0 ? "opacity-100 z-10 pointer-events-auto" : "opacity-0 z-0 pointer-events-none"
+            className={`absolute top-0 left-0 right-0 bottom-0 text-white transition-opacity duration-700 ${
+              currentSlide === 0 ? "opacity-100 z-10" : "opacity-0 z-0"
             }`}
             style={{
               backgroundImage: `url(${heroImg})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
+              pointerEvents: currentSlide === 0 ? "auto" : "none",
             }}
           >
             <div
@@ -103,12 +105,13 @@ const Home = () => {
                 backgroundSize: "24px 24px",
               }}
             />
-            <div className="relative w-full h-full px-3 md:px-8 z-10 overflow-y-auto overflow-x-hidden">
-              <div className="max-w-6xl mx-auto text-center pt-8 md:pt-20 pb-6 md:pb-12">
-                <h1 className="text-2xl md:text-5xl font-extrabold mb-3 md:mb-4 drop-shadow leading-tight">
+            <div className="relative w-full h-full overflow-y-auto overflow-x-hidden pointer-events-auto">
+              <div className="min-h-full flex flex-col justify-center px-4 py-8 md:px-8 md:py-12">
+                <div className="max-w-6xl mx-auto w-full text-center">
+                <h1 className="text-2xl sm:text-3xl md:text-5xl font-extrabold mb-3 md:mb-4 drop-shadow leading-tight">
                   Find Your Dream Job in Africa
                 </h1>
-                <p className="text-sm md:text-lg mb-3 md:mb-8 text-gray-100 max-w-3xl mx-auto leading-relaxed">
+                <p className="text-sm sm:text-base md:text-lg mb-4 md:mb-8 text-gray-100 max-w-2xl mx-auto leading-relaxed">
                   AI-powered matching connecting African youth and professionals
                   with decent work opportunities across the continent.
                 </p>
@@ -246,31 +249,33 @@ const Home = () => {
 
           {/* Slide 2: Mission Statement */}
           <div
-            className={`absolute inset-0 text-white flex items-center justify-center transition-opacity duration-700 ${
-              currentSlide === 1 ? "opacity-100 z-10 pointer-events-auto" : "opacity-0 z-0 pointer-events-none"
+            className={`absolute top-0 left-0 right-0 bottom-0 text-white transition-opacity duration-700 ${
+              currentSlide === 1 ? "opacity-100 z-10" : "opacity-0 z-0"
             }`}
             style={{
               backgroundImage: "url(/hero-mission.jpg)",
               backgroundSize: "cover",
               backgroundPosition: "center",
+              pointerEvents: currentSlide === 1 ? "auto" : "none",
             }}
           >
             <div
               className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70"
               aria-hidden="true"
             />
-            <div className="relative w-full px-4 md:px-12 z-10 py-12 md:py-20">
-              <div className="max-w-5xl mx-auto text-center">
-                <h2 className="text-xl md:text-5xl font-extrabold mb-4 md:mb-6 leading-tight drop-shadow-lg">
+            <div className="relative w-full h-full overflow-y-auto overflow-x-hidden">
+              <div className="min-h-full flex flex-col justify-center px-4 py-12 md:px-12 md:py-20">
+                <div className="max-w-5xl mx-auto w-full text-center">
+                <h2 className="text-2xl sm:text-3xl md:text-5xl font-extrabold mb-4 md:mb-6 leading-tight drop-shadow-lg">
                   Connecting Africa's Talent with Meaningful Work
                 </h2>
-                <p className="text-sm md:text-2xl mb-4 md:mb-6 text-gray-100 leading-relaxed max-w-4xl mx-auto">
+                <p className="text-sm sm:text-base md:text-2xl mb-4 md:mb-6 text-gray-100 leading-relaxed max-w-3xl mx-auto">
                   JobBridge Africa — a youth empowerment initiative born from
                   the Power Learn Project (PLP) of Africa — is connecting
                   Africa's talent with meaningful work through AI‑driven job
                   matching.
                 </p>
-                <p className="text-xs md:text-xl text-gray-200 max-w-3xl mx-auto mb-6 md:mb-8">
+                <p className="text-xs sm:text-sm md:text-xl text-gray-200 max-w-2xl mx-auto mb-6 md:mb-8">
                   The platform advances{" "}
                   <span className="font-semibold text-primary">UN SDG 8</span>{" "}
                   by promoting sustainable employment and inclusive economic
