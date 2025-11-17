@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import asyncHandler from 'express-async-handler';
+import sgMail from '@sendgrid/mail';
 
 // @desc    Send contact form email
 // @route   POST /api/contact
@@ -45,19 +46,31 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     greetingTimeout: 10000,
   };
 
-  // Create transporter and verify; fallback to 587 if 465 fails
-  let transporter = nodemailer.createTransport(primaryConfig);
+  // Prepare diagnostics object
+  const diagnostics = { attempts: [], providerUsed: null };
+
+  let transporter = null;
+  let smtpReady = false;
+  // Attempt primary (587 / STARTTLS default)
   try {
+    transporter = nodemailer.createTransport(primaryConfig);
+    const start = Date.now();
     await transporter.verify();
+    diagnostics.attempts.push({ provider: 'smtp', config: 'primary', ok: true, ms: Date.now() - start });
+    smtpReady = true;
+    diagnostics.providerUsed = 'smtp-primary';
   } catch (e) {
-    console.error('SMTP verify failed on primary config:', e?.message || e);
-    transporter = nodemailer.createTransport(fallbackConfig);
+    diagnostics.attempts.push({ provider: 'smtp', config: 'primary', ok: false, error: e?.message || String(e) });
+    // Attempt fallback (465 / SSL)
     try {
+      transporter = nodemailer.createTransport(fallbackConfig);
+      const start2 = Date.now();
       await transporter.verify();
-      console.log('SMTP connected using fallback (587/STARTTLS).');
+      diagnostics.attempts.push({ provider: 'smtp', config: 'fallback', ok: true, ms: Date.now() - start2 });
+      smtpReady = true;
+      diagnostics.providerUsed = 'smtp-fallback';
     } catch (e2) {
-      console.error('SMTP verify failed on fallback config:', e2?.message || e2);
-      throw new Error('Mail server connection failed. Please check SMTP credentials and network.');
+      diagnostics.attempts.push({ provider: 'smtp', config: 'fallback', ok: false, error: e2?.message || String(e2) });
     }
   }
 
@@ -76,8 +89,28 @@ const sendContactEmail = asyncHandler(async (req, res) => {
           <p><strong>Subject:</strong> ${subject}</p>
         </div>
         <div style="background-color: #ffffff; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
-          <h3 style="color: #374151; margin-top: 0;">Message:</h3>
-          <p style="color: #4b5563; line-height: 1.6;">${message.replace(/\n/g, '<br>')}</p>
+    const canUseSendGrid = !smtpReady && process.env.SENDGRID_API_KEY;
+    if (smtpReady) {
+            await transporter.sendMail(mailOptions);
+            await transporter.sendMail(autoReplyOptions);
+          } else if (canUseSendGrid && diagnostics.providerUsed === 'sendgrid') {
+            await sgMail.send({
+              to: 'info@jobbridgeafrica.org',
+              from: process.env.EMAIL_USER,
+              subject: mailOptions.subject,
+              html: mailOptions.html,
+              replyTo: mailOptions.replyTo,
+            });
+            await sgMail.send({
+              to: mailOptions.replyTo,
+              from: process.env.EMAIL_USER,
+              subject: autoReplyOptions.subject,
+              html: autoReplyOptions.html,
+              replyTo: 'info@jobbridgeafrica.org',
+            });
+          } else {
+            throw new Error('No email transport available (SMTP and SendGrid both unavailable).');
+          }
         </div>
         <div style="margin-top: 20px; padding: 15px; background-color: #ecfdf5; border-left: 4px solid #16a34a; border-radius: 4px;">
           <p style="margin: 0; color: #065f46; font-size: 14px;">
