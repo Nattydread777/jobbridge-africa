@@ -7,7 +7,8 @@ import {
     logoutUser,
     getUserProfile,
     updateUserProfile,
-    uploadProfileImage
+  uploadProfileImage,
+  bootstrapAdmin
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -31,6 +32,8 @@ const upload = multer({
 // Public Routes
 router.post('/register', registerUser);
 router.post('/login', loginUser);
+// One-time bootstrap (no auth): requires ADMIN_SETUP_TOKEN and no existing admin
+router.post('/bootstrap-admin', bootstrapAdmin);
 
 // Private/Protected Routes
 router.post('/logout', logoutUser);

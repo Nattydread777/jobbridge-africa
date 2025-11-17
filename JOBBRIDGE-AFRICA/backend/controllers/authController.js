@@ -168,3 +168,44 @@ export const uploadProfileImage = asyncHandler(async (req, res) => {
     throw new Error('Failed to upload image to cloud storage');
   }
 });
+
+// One-time bootstrap: promote a user to admin securely
+// Only works if no admin exists and token matches env ADMIN_SETUP_TOKEN
+export const bootstrapAdmin = asyncHandler(async (req, res) => {
+  const token = (req.body?.token || req.query?.token || '').trim();
+  const email = (req.body?.email || req.query?.email || '').trim().toLowerCase();
+
+  if (!process.env.ADMIN_SETUP_TOKEN) {
+    res.status(500);
+    throw new Error('ADMIN_SETUP_TOKEN not configured');
+  }
+  if (!token || token !== process.env.ADMIN_SETUP_TOKEN) {
+    res.status(403);
+    throw new Error('Invalid setup token');
+  }
+  if (!email) {
+    res.status(400);
+    throw new Error('Email is required');
+  }
+
+  const existingAdmin = await User.findOne({ role: 'admin' });
+  if (existingAdmin) {
+    res.status(400);
+    throw new Error('An admin already exists');
+  }
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+
+  user.role = 'admin';
+  await user.save();
+
+  res.json({
+    success: true,
+    message: 'User promoted to admin',
+    user: { _id: user._id, name: user.name, email: user.email, role: user.role },
+  });
+});
