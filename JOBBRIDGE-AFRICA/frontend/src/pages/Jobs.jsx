@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { useLocation, useSearchParams, Link } from "react-router-dom";
 import api from "../services/api";
 import JobCard from "../components/JobCard";
 import locations from "../data/africaLocations";
@@ -62,6 +62,16 @@ const Jobs = () => {
 
   return (
     <div className="max-w-7xl mx-auto p-6">
+      {/* Back to Dashboard Link */}
+      <Link
+        to="/dashboard"
+        className="text-primary hover:underline mb-4 inline-flex items-center gap-2 font-medium"
+      >
+        <span>←</span> Back to Dashboard
+      </Link>
+
+      <h1 className="text-3xl font-bold mb-6">Find Your Dream Job</h1>
+
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Filters Sidebar */}
         <aside className="lg:col-span-1 space-y-6">
