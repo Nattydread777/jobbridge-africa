@@ -8,6 +8,8 @@
 ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb&logoColor=white)
 ![Cloudinary](https://img.shields.io/badge/Cloudinary-Storage-3448C5?logo=cloudinary&logoColor=white)
 
+**🌐 Live Application:** [https://www.jobbridgeafrica.org](https://www.jobbridgeafrica.org)
+
 JobBridge Africa is a MERN-stack platform connecting African job seekers with employers, aligned with SDG 8 (Decent Work and Economic Growth). It includes candidate profiles with completion tracking, job search and application workflows, employer job posting, and AI-powered job matching.
 
 This README documents the current system, setup, tooling, conventions, and a roadmap (monetization, in-app chat for job seekers to connect, and more).
