@@ -9,11 +9,14 @@ const generateToken = (res, userId) => {
     expiresIn: process.env.JWT_EXPIRE,
   });
 
+  const isProd = process.env.NODE_ENV === 'production';
+  const sameSite = isProd ? 'none' : 'lax';
+
   res.cookie('jwt', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: process.env.COOKIE_EXPIRE * 24 * 60 * 60 * 1000,
+    secure: isProd, // required for SameSite=None
+    sameSite, // allow cross-site cookies in production (Vercel + Render)
+    maxAge: Number(process.env.COOKIE_EXPIRE) * 24 * 60 * 60 * 1000,
   });
 };
 
