@@ -392,6 +392,41 @@ Optional frontend `.env` (future enhancement)
 
 - You can refactor `api.js` to use `import.meta.env.VITE_API_BASE`.
 
+### Email Configuration (Zoho + SendGrid Fallback)
+
+Add these to `backend/.env` for production email delivery:
+
+```
+# Primary SMTP (Zoho)
+EMAIL_HOST=smtp.zoho.com
+EMAIL_PORT=587            # use 465 for SSL if 587 blocked
+EMAIL_SECURE=false        # set true if using 465
+EMAIL_USER=info@jobbridgeafrica.org
+EMAIL_PASS=<zoho_app_password>
+
+# Optional SendGrid fallback (used automatically if SMTP fails)
+SENDGRID_API_KEY=<your_sendgrid_api_key>
+
+# CORS origins (comma-separated)
+ALLOWED_ORIGINS=https://www.jobbridgeafrica.org,https://jobbridge-africa.vercel.app
+```
+
+How it works:
+
+- App first tries SMTP on the configured port (defaults to 587 STARTTLS).
+- Falls back to 465/SSL if verification fails.
+- If both fail and `SENDGRID_API_KEY` is present, switches to SendGrid.
+- Contact form responses include a `transport` field and diagnostics when failures occur.
+
+Health check endpoint (SMTP connectivity only): `GET /api/contact/health`
+
+Troubleshooting:
+
+- Timeouts: Often host egress restrictions; try switching ports or confirm outbound rules.
+- Zoho + 2FA: Use an App Password (Zoho Mail Settings → Security → App Passwords).
+- SendGrid: Verify domain & sender identity to avoid silent drops.
+- Improve deliverability: Add SPF + DKIM records for `jobbridgeafrica.org` (recommended future step).
+
 ---
 
 ## Running the App
