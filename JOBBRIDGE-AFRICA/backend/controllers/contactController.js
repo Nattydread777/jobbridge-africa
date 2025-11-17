@@ -21,16 +21,21 @@ const sendContactEmail = asyncHandler(async (req, res) => {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
   };
 
   const fallbackConfig = {
     host: process.env.EMAIL_HOST || 'smtp.zoho.com',
     port: 587,
     secure: false,
+    requireTLS: true,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
   };
 
   // Create transporter and verify; fallback to 587 if 465 fails
@@ -145,3 +150,51 @@ const sendContactEmail = asyncHandler(async (req, res) => {
 });
 
 export { sendContactEmail };
+
+// @desc    Email transport health check (no email sent)
+// @route   GET /api/contact/health
+// @access  Public (read-only)
+export const checkEmailHealth = asyncHandler(async (req, res) => {
+  const primaryConfig = {
+    host: process.env.EMAIL_HOST || 'smtp.zoho.com',
+    port: Number(process.env.EMAIL_PORT || 465),
+    secure: String(process.env.EMAIL_SECURE || 'true').toLowerCase() === 'true',
+    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+  };
+
+  const fallbackConfig = {
+    host: process.env.EMAIL_HOST || 'smtp.zoho.com',
+    port: 587,
+    secure: false,
+    requireTLS: true,
+    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+  };
+
+  const results = [];
+
+  // Try primary
+  try {
+    const t1 = nodemailer.createTransport(primaryConfig);
+    await t1.verify();
+    results.push({ config: 'primary', host: primaryConfig.host, port: primaryConfig.port, secure: primaryConfig.secure, ok: true });
+    return res.json({ ok: true, using: 'primary', results });
+  } catch (e) {
+    results.push({ config: 'primary', host: primaryConfig.host, port: primaryConfig.port, secure: primaryConfig.secure, ok: false, error: e?.message || String(e) });
+  }
+
+  // Try fallback
+  try {
+    const t2 = nodemailer.createTransport(fallbackConfig);
+    await t2.verify();
+    results.push({ config: 'fallback', host: fallbackConfig.host, port: fallbackConfig.port, secure: fallbackConfig.secure, ok: true });
+    return res.json({ ok: true, using: 'fallback', results });
+  } catch (e2) {
+    results.push({ config: 'fallback', host: fallbackConfig.host, port: fallbackConfig.port, secure: fallbackConfig.secure, ok: false, error: e2?.message || String(e2) });
+  }
+
+  res.status(503).json({ ok: false, results, message: 'SMTP connectivity failed for both primary and fallback.' });
+});
