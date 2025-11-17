@@ -13,45 +13,36 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     throw new Error('Please fill in all fields');
   }
 
-  // Resolve SMTP config with env overrides and sensible defaults
-  // Prefer 587/STARTTLS by default (more widely allowed on hosts)
+  // Build SMTP configs
   const primaryPort = Number(process.env.EMAIL_PORT || 587);
   const primarySecure = process.env.EMAIL_SECURE !== undefined
     ? String(process.env.EMAIL_SECURE).toLowerCase() === 'true'
-    : primaryPort === 465; // secure only if 465 unless explicitly set
+    : primaryPort === 465;
 
   const primaryConfig = {
     host: process.env.EMAIL_HOST || 'smtp.zoho.com',
     port: primaryPort,
     secure: primarySecure,
     requireTLS: !primarySecure,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
+    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
     connectionTimeout: 10000,
     greetingTimeout: 10000,
   };
 
-  // Fallback to 465/SSL if 587/STARTTLS fails
   const fallbackConfig = {
     host: process.env.EMAIL_HOST || 'smtp.zoho.com',
     port: 465,
     secure: true,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
+    auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
     connectionTimeout: 10000,
     greetingTimeout: 10000,
   };
 
-  // Prepare diagnostics object
   const diagnostics = { attempts: [], providerUsed: null };
-
   let transporter = null;
   let smtpReady = false;
-  // Attempt primary (587 / STARTTLS default)
+
+  // Try primary
   try {
     transporter = nodemailer.createTransport(primaryConfig);
     const start = Date.now();
@@ -61,7 +52,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     diagnostics.providerUsed = 'smtp-primary';
   } catch (e) {
     diagnostics.attempts.push({ provider: 'smtp', config: 'primary', ok: false, error: e?.message || String(e) });
-    // Attempt fallback (465 / SSL)
+    // Try fallback
     try {
       transporter = nodemailer.createTransport(fallbackConfig);
       const start2 = Date.now();
@@ -74,7 +65,18 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     }
   }
 
-  // Email to admin
+  // Optionally init SendGrid
+  const canUseSendGrid = !smtpReady && process.env.SENDGRID_API_KEY;
+  if (canUseSendGrid) {
+    try {
+      sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+      diagnostics.attempts.push({ provider: 'sendgrid', init: true });
+      diagnostics.providerUsed = 'sendgrid';
+    } catch (e) {
+      diagnostics.attempts.push({ provider: 'sendgrid', init: false, error: e?.message || String(e) });
+    }
+  }
+
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: 'info@jobbridgeafrica.org',
@@ -89,42 +91,17 @@ const sendContactEmail = asyncHandler(async (req, res) => {
           <p><strong>Subject:</strong> ${subject}</p>
         </div>
         <div style="background-color: #ffffff; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
-    const canUseSendGrid = !smtpReady && process.env.SENDGRID_API_KEY;
-    if (smtpReady) {
-            await transporter.sendMail(mailOptions);
-            await transporter.sendMail(autoReplyOptions);
-          } else if (canUseSendGrid && diagnostics.providerUsed === 'sendgrid') {
-            await sgMail.send({
-              to: 'info@jobbridgeafrica.org',
-              from: process.env.EMAIL_USER,
-              subject: mailOptions.subject,
-              html: mailOptions.html,
-              replyTo: mailOptions.replyTo,
-            });
-            await sgMail.send({
-              to: mailOptions.replyTo,
-              from: process.env.EMAIL_USER,
-              subject: autoReplyOptions.subject,
-              html: autoReplyOptions.html,
-              replyTo: 'info@jobbridgeafrica.org',
-            });
-          } else {
-            throw new Error('No email transport available (SMTP and SendGrid both unavailable).');
-          }
+          <h3 style="color:#374151; margin-top:0;">Message:</h3>
+          <p style="color:#4b5563; line-height:1.6;">${message.replace(/\n/g,'<br>')}</p>
         </div>
         <div style="margin-top: 20px; padding: 15px; background-color: #ecfdf5; border-left: 4px solid #16a34a; border-radius: 4px;">
-          <p style="margin: 0; color: #065f46; font-size: 14px;">
-            📧 <strong>Reply to:</strong> <a href="mailto:${email}" style="color: #16a34a;">${email}</a>
-          </p>
+          <p style="margin: 0; color: #065f46; font-size: 14px;">📧 <strong>Reply to:</strong> <a href="mailto:${email}" style="color:#16a34a;">${email}</a></p>
         </div>
-        <p style="color: #9ca3af; font-size: 12px; margin-top: 30px;">
-          This email was sent from the JobBridge Africa contact form.
-        </p>
+        <p style="color: #9ca3af; font-size: 12px; margin-top: 30px;">This email was sent from the JobBridge Africa contact form.</p>
       </div>
     `,
   };
 
-  // Auto-reply to sender
   const autoReplyOptions = {
     from: process.env.EMAIL_USER,
     to: email,
@@ -137,35 +114,20 @@ const sendContactEmail = asyncHandler(async (req, res) => {
         </div>
         <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
           <h2 style="color: #16a34a; margin-top: 0;">Thank you for contacting us!</h2>
-          <p style="color: #4b5563; line-height: 1.6;">
-            Hi ${name},
-          </p>
-          <p style="color: #4b5563; line-height: 1.6;">
-            We've received your message and our team will get back to you within 24-48 hours. 
-            We appreciate your interest in JobBridge Africa!
-          </p>
+          <p style="color: #4b5563; line-height: 1.6;">Hi ${name},</p>
+          <p style="color: #4b5563; line-height: 1.6;">We've received your message and our team will get back to you within 24-48 hours.</p>
           <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <p style="margin: 0; color: #6b7280; font-size: 14px;"><strong>Your message:</strong></p>
             <p style="color: #4b5563; margin-top: 10px;">${message.substring(0, 200)}${message.length > 200 ? '...' : ''}</p>
           </div>
-          <p style="color: #4b5563; line-height: 1.6;">
-            In the meantime, feel free to explore our platform and discover opportunities across Africa.
-          </p>
           <div style="margin: 30px 0;">
-            <a href="https://www.jobbridgeafrica.org/jobs" 
-               style="background-color: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">
-              Browse Jobs
-            </a>
+            <a href="https://www.jobbridgeafrica.org/jobs" style="background-color: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">Browse Jobs</a>
           </div>
           <div style="border-top: 1px solid #e5e7eb; margin-top: 30px; padding-top: 20px;">
             <p style="color: #6b7280; font-size: 14px; margin: 0;">
-              <strong>JobBridge Africa</strong><br>
-              📧 info@jobbridgeafrica.org<br>
-              📞 +234 807 320 8945
+              <strong>JobBridge Africa</strong><br>📧 info@jobbridgeafrica.org<br>📞 +234 807 320 8945
             </p>
-            <p style="color: #9ca3af; font-size: 12px; margin-top: 15px;">
-              Supporting UN SDG 8: Decent Work and Economic Growth
-            </p>
+            <p style="color: #9ca3af; font-size: 12px; margin-top: 15px;">Supporting UN SDG 8: Decent Work and Economic Growth</p>
           </div>
         </div>
       </div>
@@ -173,19 +135,21 @@ const sendContactEmail = asyncHandler(async (req, res) => {
   };
 
   try {
-    // Send both emails
-    await transporter.sendMail(mailOptions);
-    await transporter.sendMail(autoReplyOptions);
+    if (smtpReady) {
+      await transporter.sendMail(mailOptions);
+      await transporter.sendMail(autoReplyOptions);
+    } else if (diagnostics.providerUsed === 'sendgrid') {
+      await sgMail.send({ to: mailOptions.to, from: mailOptions.from, subject: mailOptions.subject, html: mailOptions.html, replyTo: mailOptions.replyTo });
+      await sgMail.send({ to: autoReplyOptions.to, from: autoReplyOptions.from, subject: autoReplyOptions.subject, html: autoReplyOptions.html, replyTo: autoReplyOptions.replyTo });
+    } else {
+      throw new Error('No email transport available (SMTP and SendGrid both unavailable).');
+    }
 
-    res.status(200).json({
-      success: true,
-      message: 'Message sent successfully',
-    });
+    res.status(200).json({ success: true, message: 'Message sent successfully', transport: diagnostics.providerUsed, diagnostics });
   } catch (error) {
-    console.error('Email send error:', error?.message || error);
-    if (error?.response) console.error('SMTP response:', error.response);
-    res.status(500);
-    throw new Error('Failed to send email. Please try again later or contact us directly at info@jobbridgeafrica.org');
+    diagnostics.finalError = error?.message || String(error);
+    console.error('Email send error diagnostics:', diagnostics);
+    res.status(500).json({ success: false, message: 'Failed to send email. Please try again later or contact us directly at info@jobbridgeafrica.org', diagnostics });
   }
 });
 
