@@ -80,34 +80,34 @@ const Home = () => {
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
-          {/* Slide 1: Job Search Hero */}
+        {/* Slide 1: Job Search Hero */}
+        <div
+          className={`absolute top-0 left-0 right-0 bottom-0 text-white transition-opacity duration-700 ${
+            currentSlide === 0 ? "opacity-100 z-10" : "opacity-0 z-0"
+          }`}
+          style={{
+            backgroundImage: `url(${heroImg})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            pointerEvents: currentSlide === 0 ? "auto" : "none",
+          }}
+        >
           <div
-            className={`absolute top-0 left-0 right-0 bottom-0 text-white transition-opacity duration-700 ${
-              currentSlide === 0 ? "opacity-100 z-10" : "opacity-0 z-0"
-            }`}
+            className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/20"
+            aria-hidden="true"
+          />
+          <div
+            className="pointer-events-none absolute inset-0 opacity-20"
+            aria-hidden="true"
             style={{
-              backgroundImage: `url(${heroImg})`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              pointerEvents: currentSlide === 0 ? "auto" : "none",
+              backgroundImage:
+                "radial-gradient(rgba(255,255,255,0.15) 1px, transparent 1px)",
+              backgroundSize: "24px 24px",
             }}
-          >
-            <div
-              className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black/20"
-              aria-hidden="true"
-            />
-            <div
-              className="pointer-events-none absolute inset-0 opacity-20"
-              aria-hidden="true"
-              style={{
-                backgroundImage:
-                  "radial-gradient(rgba(255,255,255,0.15) 1px, transparent 1px)",
-                backgroundSize: "24px 24px",
-              }}
-            />
-            <div className="relative w-full h-full overflow-y-auto overflow-x-hidden pointer-events-auto">
-              <div className="min-h-full flex flex-col justify-center px-4 py-8 md:px-8 md:py-12">
-                <div className="max-w-6xl mx-auto w-full text-center">
+          />
+          <div className="relative w-full h-full overflow-y-auto overflow-x-hidden pointer-events-auto">
+            <div className="min-h-full flex flex-col justify-center px-4 py-8 md:px-8 md:py-12">
+              <div className="max-w-6xl mx-auto w-full text-center">
                 <h1 className="text-2xl sm:text-3xl md:text-5xl font-extrabold mb-3 md:mb-4 drop-shadow leading-tight">
                   Find Your Dream Job in Africa
                 </h1>
@@ -246,26 +246,27 @@ const Home = () => {
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Slide 2: Mission Statement */}
+        {/* Slide 2: Mission Statement */}
+        <div
+          className={`absolute top-0 left-0 right-0 bottom-0 text-white transition-opacity duration-700 ${
+            currentSlide === 1 ? "opacity-100 z-10" : "opacity-0 z-0"
+          }`}
+          style={{
+            backgroundImage: "url(/hero-mission.jpg)",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            pointerEvents: currentSlide === 1 ? "auto" : "none",
+          }}
+        >
           <div
-            className={`absolute top-0 left-0 right-0 bottom-0 text-white transition-opacity duration-700 ${
-              currentSlide === 1 ? "opacity-100 z-10" : "opacity-0 z-0"
-            }`}
-            style={{
-              backgroundImage: "url(/hero-mission.jpg)",
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              pointerEvents: currentSlide === 1 ? "auto" : "none",
-            }}
-          >
-            <div
-              className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70"
-              aria-hidden="true"
-            />
-            <div className="relative w-full h-full overflow-y-auto overflow-x-hidden">
-              <div className="min-h-full flex flex-col justify-center px-4 py-12 md:px-12 md:py-20">
-                <div className="max-w-5xl mx-auto w-full text-center">
+            className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-black/70"
+            aria-hidden="true"
+          />
+          <div className="relative w-full h-full overflow-y-auto overflow-x-hidden">
+            <div className="min-h-full flex flex-col justify-center px-4 py-12 md:px-12 md:py-20">
+              <div className="max-w-5xl mx-auto w-full text-center">
                 <h2 className="text-2xl sm:text-3xl md:text-5xl font-extrabold mb-4 md:mb-6 leading-tight drop-shadow-lg">
                   Connecting Africa's Talent with Meaningful Work
                 </h2>

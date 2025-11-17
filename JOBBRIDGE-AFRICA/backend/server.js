@@ -4,6 +4,10 @@ import 'dotenv/config'; // Loads environment variables immediately
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import rateLimit from 'express-rate-limit';
+import morgan from 'morgan';
 
 // Internal modules
 import connectDB from './config/db.js'; // MUST include .js extension
@@ -14,12 +18,72 @@ import aiRoutes from './routes/aiRoutes.js'; // AI routes
 import contactRoutes from './routes/contactRoutes.js'; // Contact form routes
 import { notFound, errorHandler } from './middleware/errorMiddleware.js'; // MUST include .js extension
 
+// -------------------
+// Environment Validation
+// -------------------
+const requiredEnvVars = [
+  'MONGO_URI',
+  'JWT_SECRET',
+  'JWT_EXPIRE',
+  'COOKIE_EXPIRE',
+  'CLOUDINARY_CLIENT_NAME',
+  'CLOUDINARY_CLIENT_API',
+  'CLOUDINARY_CLIENT_SECRET',
+];
+
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+if (missingEnvVars.length > 0) {
+  console.error('❌ Missing required environment variables:', missingEnvVars.join(', '));
+  process.exit(1);
+}
+
 // Connect to the database
 connectDB(); 
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// -------------------
+// Security & Performance Middleware
+// -------------------
+// Security headers
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow Cloudinary images
+}));
+
+// Compression for faster responses
+app.use(compression());
+
+// HTTP request logging (only in dev mode)
+if (process.env.NODE_ENV !== 'production') {
+  app.use(morgan('dev'));
+}
+
+// Rate limiting to prevent abuse
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+});
+app.use('/api/', limiter);
+
+// Stricter rate limit for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // limit each IP to 20 requests per windowMs
+  message: 'Too many authentication attempts, please try again later.',
+});
+
+// Stricter rate limit for contact form
+const contactLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // limit each IP to 5 contact form submissions per hour
+  message: 'Too many contact form submissions, please try again later.',
+});
+
+// -------------------
+// CORS Configuration
+// -------------------
 // Middleware
 const allowedOrigins = (() => {
   if (process.env.NODE_ENV === 'production') {
@@ -42,15 +106,41 @@ app.use(cookieParser()); // Enables reading cookies
 // -------------------
 // API Routes
 // -------------------
-app.use('/api/auth', authRoutes); // Assuming you export routes as default from authRoutes.js
+app.use('/api/auth', authLimiter, authRoutes); // Assuming you export routes as default from authRoutes.js
 app.use('/api/jobs', jobRoutes); // Assuming you export routes as default from jobRoutes.js
 app.use('/api/applications', applicationRoutes); // Application submission and management
 app.use('/api/ai', aiRoutes); // AI matching
-app.use('/api/contact', contactRoutes); // Contact form
+app.use('/api/contact', contactLimiter, contactRoutes); // Contact form
 
-// Placeholder for root URL
+// -------------------
+// Health Check Endpoints
+// -------------------
+// Root endpoint
 app.get('/', (req, res) => {
-  res.send('API Running for JobBridge Africa...');
+  res.json({ 
+    message: 'JobBridge Africa API is running',
+    version: '1.0.0',
+    status: 'healthy',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Detailed health check for monitoring
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Error Handling Middleware (must be last)

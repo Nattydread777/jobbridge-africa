@@ -127,7 +127,33 @@ Open in browser or use curl:
 https://jobbridge-backend.onrender.com/
 ```
 
-You should see: `"API Running for JobBridge Africa..."`
+You should see a JSON response:
+
+```json
+{
+  "message": "JobBridge Africa API is running",
+  "version": "1.0.0",
+  "status": "healthy",
+  "timestamp": "2025-11-17T..."
+}
+```
+
+### Test Health Endpoint
+
+```bash
+https://jobbridge-backend.onrender.com/health
+```
+
+Should return:
+
+```json
+{
+  "status": "OK",
+  "uptime": 123.45,
+  "timestamp": "...",
+  "environment": "production"
+}
+```
 
 ### Test Contact Form
 
@@ -188,9 +214,10 @@ You should see: `"API Running for JobBridge Africa..."`
 
 Use a service like [UptimeRobot](https://uptimerobot.com) to ping your backend every 10 minutes:
 
-- Ping URL: `https://jobbridge-backend.onrender.com/`
+- Ping URL: `https://jobbridge-backend.onrender.com/health`
 - Interval: 10 minutes
 - This keeps it from sleeping (stays within 750hr/month limit)
+- Use `/health` endpoint instead of `/` for cleaner logs
 
 ### Auto-Deploy from GitHub
 
@@ -225,7 +252,24 @@ Use a service like [UptimeRobot](https://uptimerobot.com) to ping your backend e
 4. 🚀 Optional upgrades:
    - Consider paid tier ($7/month) to avoid sleep
    - Set up custom domain in Render (if not using Vercel domain)
-   - Add health check endpoint for monitoring
+   - Add health check endpoint monitoring with UptimeRobot
+   - Review rate limiting settings if needed (currently 100 req/15min general, 20 req/15min auth, 5 req/hour contact)
+
+---
+
+## Security & Performance Features
+
+The backend now includes:
+
+- ✅ **Helmet.js**: Security headers (XSS protection, content policy, etc.)
+- ✅ **Compression**: Gzip compression for faster API responses
+- ✅ **Rate Limiting**:
+  - General API: 100 requests per 15 minutes per IP
+  - Auth endpoints: 20 requests per 15 minutes per IP
+  - Contact form: 5 submissions per hour per IP
+- ✅ **Environment Validation**: Server won't start if required env vars are missing
+- ✅ **Health Endpoints**: `/health` and `/api/health` for monitoring
+- ✅ **HTTP Logging**: Morgan logger (dev mode only, not in production logs)
 
 ---
 
