@@ -29,13 +29,13 @@ const Header = () => {
     <header className={`${base} ${elevatedStyles}`}>
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-3">
             <img
               src="/logo.png"
               alt="JobBridge Africa Logo"
-              className="w-12 h-12"
+              className="w-16 h-16 md:w-20 md:h-20"
             />
-            <h1 className="text-2xl font-extrabold uppercase tracking-wide">
+            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-wide">
               JOBBRIDGE AFRICA
             </h1>
           </div>

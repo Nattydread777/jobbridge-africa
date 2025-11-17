@@ -11,9 +11,9 @@ const Footer = () => {
               <img
                 src="/logo.png"
                 alt="JobBridge Africa Logo"
-                className="w-12 h-12 brightness-0 invert"
+                className="w-16 h-16 md:w-20 md:h-20"
               />
-              <h3 className="text-xl font-extrabold uppercase tracking-wide text-primary">
+              <h3 className="text-xl md:text-2xl font-black uppercase tracking-wide text-primary">
                 JOBBRIDGE AFRICA
               </h3>
             </div>
