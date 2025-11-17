@@ -13,10 +13,17 @@ const sendContactEmail = asyncHandler(async (req, res) => {
   }
 
   // Resolve SMTP config with env overrides and sensible defaults
+  // Prefer 587/STARTTLS by default (more widely allowed on hosts)
+  const primaryPort = Number(process.env.EMAIL_PORT || 587);
+  const primarySecure = process.env.EMAIL_SECURE !== undefined
+    ? String(process.env.EMAIL_SECURE).toLowerCase() === 'true'
+    : primaryPort === 465; // secure only if 465 unless explicitly set
+
   const primaryConfig = {
     host: process.env.EMAIL_HOST || 'smtp.zoho.com',
-    port: Number(process.env.EMAIL_PORT || 465),
-    secure: String(process.env.EMAIL_SECURE || 'true').toLowerCase() === 'true',
+    port: primaryPort,
+    secure: primarySecure,
+    requireTLS: !primarySecure,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
@@ -25,11 +32,11 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     greetingTimeout: 10000,
   };
 
+  // Fallback to 465/SSL if 587/STARTTLS fails
   const fallbackConfig = {
     host: process.env.EMAIL_HOST || 'smtp.zoho.com',
-    port: 587,
-    secure: false,
-    requireTLS: true,
+    port: 465,
+    secure: true,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
@@ -155,10 +162,16 @@ export { sendContactEmail };
 // @route   GET /api/contact/health
 // @access  Public (read-only)
 export const checkEmailHealth = asyncHandler(async (req, res) => {
+  const port = Number(process.env.EMAIL_PORT || 587);
+  const secure = process.env.EMAIL_SECURE !== undefined
+    ? String(process.env.EMAIL_SECURE).toLowerCase() === 'true'
+    : port === 465;
+
   const primaryConfig = {
     host: process.env.EMAIL_HOST || 'smtp.zoho.com',
-    port: Number(process.env.EMAIL_PORT || 465),
-    secure: String(process.env.EMAIL_SECURE || 'true').toLowerCase() === 'true',
+    port,
+    secure,
+    requireTLS: !secure,
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
     connectionTimeout: 10000,
     greetingTimeout: 10000,
@@ -166,9 +179,8 @@ export const checkEmailHealth = asyncHandler(async (req, res) => {
 
   const fallbackConfig = {
     host: process.env.EMAIL_HOST || 'smtp.zoho.com',
-    port: 587,
-    secure: false,
-    requireTLS: true,
+    port: 465,
+    secure: true,
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
     connectionTimeout: 10000,
     greetingTimeout: 10000,
