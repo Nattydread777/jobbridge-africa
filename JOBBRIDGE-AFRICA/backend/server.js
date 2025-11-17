@@ -87,7 +87,7 @@ const contactLimiter = rateLimit({
 // -------------------
 // CORS Configuration
 // -------------------
-// Middleware
+// Parse allowed origins from environment variable
 const allowedOrigins = (() => {
   if (process.env.NODE_ENV === 'production') {
     if (process.env.ALLOWED_ORIGINS) {
@@ -98,10 +98,25 @@ const allowedOrigins = (() => {
   return ['http://localhost:5173', 'http://localhost:5174'];
 })();
 
-app.use(cors({
-  origin: allowedOrigins,
+// Robust CORS configuration with dynamic origin checking
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like Postman, cURL, or mobile apps)
+    if (!origin) return callback(null, true);
+    
+    // Allow requests from whitelisted origins
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      // Block requests from non-whitelisted origins
+      callback(new Error(`CORS policy: Origin ${origin} not allowed`), false);
+    }
+  },
+  // CRITICAL: Must be true to allow cookies/credentials cross-domain
   credentials: true,
-}));
+};
+
+app.use(cors(corsOptions));
 app.use(express.json()); // Allows parsing of raw JSON data
 app.use(express.urlencoded({ extended: true })); // Allows parsing of form data
 app.use(cookieParser()); // Enables reading cookies
