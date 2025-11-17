@@ -28,3 +28,12 @@ export const employer = (req, res, next) => {
     throw new Error('Not authorized: Requires Employer access');
   }
 };
+
+export const admin = (req, res, next) => {
+  if (req.user && req.user.role === 'admin') {
+    next();
+  } else {
+    res.status(403);
+    throw new Error('Not authorized: Requires Admin access');
+  }
+};
