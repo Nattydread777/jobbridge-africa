@@ -11,8 +11,7 @@ const Footer = () => {
               <img
                 src="/logo.png"
                 alt="JobBridge Africa Logo"
-                style={{ mixBlendMode: "multiply" }}
-                className="w-8 h-8"
+                className="w-12 h-12 brightness-0 invert"
               />
               <h3 className="text-xl font-extrabold uppercase tracking-wide text-primary">
                 JOBBRIDGE AFRICA
