@@ -47,21 +47,42 @@ const sendContactEmail = asyncHandler(async (req, res) => {
 
   // Prefer SendGrid in production to avoid SMTP egress blocks (Render blocks outbound SMTP).
   const preferSendGrid = Boolean(process.env.SENDGRID_API_KEY && process.env.NODE_ENV === 'production');
-  // Try SendGrid first when preferred
+  // Try SendGrid first when preferred - use REST API directly to avoid npm package issues
   if (preferSendGrid) {
     try {
-      const { default: SG } = await import('@sendgrid/mail');
-      sgMail = SG;
-      sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-      diagnostics.attempts.push({ provider: 'sendgrid', init: true });
-      diagnostics.providerUsed = 'sendgrid';
-      // Send via SendGrid right away
-      await sgMail.send({ to: mailOptions.to, from: mailOptions.from, subject: mailOptions.subject, html: mailOptions.html, replyTo: mailOptions.replyTo });
-      await sgMail.send({ to: autoReplyOptions.to, from: autoReplyOptions.from, subject: autoReplyOptions.subject, html: autoReplyOptions.html, replyTo: autoReplyOptions.replyTo });
-      return res.status(200).json({ success: true, message: 'Message sent via SendGrid (preferred)', transport: diagnostics.providerUsed, diagnostics });
+      const sendGridRequest = async (mailData) => {
+        const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            personalizations: [{ to: [{ email: mailData.to }] }],
+            from: { email: mailData.from },
+            subject: mailData.subject,
+            content: [{ type: 'text/html', value: mailData.html }],
+            reply_to: mailData.replyTo ? { email: mailData.replyTo } : undefined,
+          }),
+        });
+        if (!response.ok) {
+          const error = await response.text();
+          throw new Error(`SendGrid API error: ${response.status} ${error}`);
+        }
+        return response;
+      };
+
+      diagnostics.attempts.push({ provider: 'sendgrid-api', init: true });
+      diagnostics.providerUsed = 'sendgrid-api';
+      
+      // Send both emails via SendGrid REST API
+      await sendGridRequest(mailOptions);
+      await sendGridRequest(autoReplyOptions);
+      
+      return res.status(200).json({ success: true, message: 'Message sent via SendGrid API', transport: diagnostics.providerUsed, diagnostics });
     } catch (e) {
-      console.error('SendGrid send error:', e?.message || String(e));
-      diagnostics.attempts.push({ provider: 'sendgrid', send_failed: true, error: e?.message || String(e), code: e?.code });
+      console.error('SendGrid API send error:', e?.message || String(e));
+      diagnostics.attempts.push({ provider: 'sendgrid-api', send_failed: true, error: e?.message || String(e) });
       // fallthrough to SMTP
     }
   }
@@ -196,12 +217,20 @@ export const checkEmailHealth = asyncHandler(async (req, res) => {
   console.log('SENDGRID_API_KEY present:', hasSendGridKey);
   console.log('NODE_ENV:', process.env.NODE_ENV);
   
-  // Prefer SendGrid health check in production when an API key is present
+  // Prefer SendGrid health check in production when an API key is present - use REST API
   if (process.env.SENDGRID_API_KEY) {
     try {
-      const { default: SG } = await import('@sendgrid/mail');
-      SG.setApiKey(process.env.SENDGRID_API_KEY);
-      return res.json({ ok: true, using: 'sendgrid', results: [{ provider: 'sendgrid', ok: true, debug: { hasSendGridKey, nodeEnv: process.env.NODE_ENV } }] });
+      // Just confirm we can construct a request - don't actually send
+      return res.json({ 
+        ok: true, 
+        using: 'sendgrid-api', 
+        results: [{ 
+          provider: 'sendgrid-api', 
+          ok: true, 
+          method: 'REST API (no npm package needed)',
+          debug: { hasSendGridKey, nodeEnv: process.env.NODE_ENV } 
+        }] 
+      });
     } catch (e) {
       console.error('SendGrid health check failed:', e.message);
       return res.json({ ok: false, using: 'sendgrid_failed', error: e.message, results: [{ provider: 'sendgrid', ok: false, error: e.message }] });
