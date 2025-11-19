@@ -71,9 +71,10 @@ const sendContactEmail = asyncHandler(async (req, res) => {
 
   // Prepare email payloads BEFORE attempting any provider so variables exist.
   const defaultFrom = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'info@jobbridgeafrica.org';
+  const adminEmail = process.env.ADMIN_EMAIL || 'info@jobbridgeafrica.org';
   const mailOptions = {
     from: defaultFrom,
-    to: 'info@jobbridgeafrica.org',
+    to: adminEmail,
     subject: `JobBridge Contact: ${subject}`,
     replyTo: email,
     html: `

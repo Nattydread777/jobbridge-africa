@@ -17,6 +17,7 @@ import applicationRoutes from './routes/applicationRoutes.js'; // Application ro
 import aiRoutes from './routes/aiRoutes.js'; // AI routes
 import contactRoutes from './routes/contactRoutes.js'; // Contact form routes
 import teamRoutes from './routes/teamRoutes.js'; // Team member routes
+import userAdminRoutes from './routes/userAdminRoutes.js'; // Admin user management
 import { notFound, errorHandler } from './middleware/errorMiddleware.js'; // MUST include .js extension
 
 // -------------------
@@ -131,6 +132,7 @@ app.use('/api/applications', applicationRoutes); // Application submission and m
 app.use('/api/ai', aiRoutes); // AI matching
 app.use('/api/contact', contactLimiter, contactRoutes); // Contact form
 app.use('/api/team', teamRoutes); // Team member management
+app.use('/api/users', userAdminRoutes); // Admin user management
 
 // -------------------
 // Health Check Endpoints
