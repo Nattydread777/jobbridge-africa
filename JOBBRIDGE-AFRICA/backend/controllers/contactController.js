@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import asyncHandler from 'express-async-handler';
-import sgMail from '@sendgrid/mail';
+// Do not import SendGrid at top-level. We'll dynamically import it only when a key is configured.
+let sgMail = null;
 
 // @desc    Send contact form email
 // @route   POST /api/contact
@@ -42,6 +43,28 @@ const sendContactEmail = asyncHandler(async (req, res) => {
   let transporter = null;
   let smtpReady = false;
 
+  // mailOptions and autoReplyOptions are defined earlier now
+
+  // Prefer SendGrid in production to avoid SMTP egress blocks (Render blocks outbound SMTP).
+  const preferSendGrid = Boolean(process.env.SENDGRID_API_KEY && process.env.NODE_ENV === 'production');
+  // Try SendGrid first when preferred
+  if (preferSendGrid) {
+    try {
+      const { default: SG } = await import('@sendgrid/mail');
+      sgMail = SG;
+      sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+      diagnostics.attempts.push({ provider: 'sendgrid', init: true });
+      diagnostics.providerUsed = 'sendgrid';
+      // Send via SendGrid right away
+      await sgMail.send({ to: mailOptions.to, from: mailOptions.from, subject: mailOptions.subject, html: mailOptions.html, replyTo: mailOptions.replyTo });
+      await sgMail.send({ to: autoReplyOptions.to, from: autoReplyOptions.from, subject: autoReplyOptions.subject, html: autoReplyOptions.html, replyTo: autoReplyOptions.replyTo });
+      return res.status(200).json({ success: true, message: 'Message sent via SendGrid (preferred)', transport: diagnostics.providerUsed, diagnostics });
+    } catch (e) {
+      diagnostics.attempts.push({ provider: 'sendgrid', init: false, error: e?.message || String(e) });
+      // fallthrough to SMTP
+    }
+  }
+
   // Try primary
   try {
     transporter = nodemailer.createTransport(primaryConfig);
@@ -69,6 +92,11 @@ const sendContactEmail = asyncHandler(async (req, res) => {
   const canUseSendGrid = !smtpReady && process.env.SENDGRID_API_KEY;
   if (canUseSendGrid) {
     try {
+      // Dynamically import SendGrid so we don't crash when the package is missing
+      // (Render might not have installed it or it may fail during deploy). This keeps startup safe.
+      // eslint-disable-next-line no-await-in-loop
+      const { default: SG } = await import('@sendgrid/mail');
+      sgMail = SG;
       sgMail.setApiKey(process.env.SENDGRID_API_KEY);
       diagnostics.attempts.push({ provider: 'sendgrid', init: true });
       diagnostics.providerUsed = 'sendgrid';
@@ -77,8 +105,9 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     }
   }
 
+  const defaultFrom = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'info@jobbridgeafrica.org';
   const mailOptions = {
-    from: process.env.EMAIL_USER,
+    from: defaultFrom,
     to: 'info@jobbridgeafrica.org',
     subject: `JobBridge Contact: ${subject}`,
     replyTo: email,
@@ -103,7 +132,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
   };
 
   const autoReplyOptions = {
-    from: process.env.EMAIL_USER,
+    from: defaultFrom,
     to: email,
     subject: 'We received your message - JobBridge Africa',
     replyTo: 'info@jobbridgeafrica.org',
@@ -159,6 +188,16 @@ export { sendContactEmail };
 // @route   GET /api/contact/health
 // @access  Public (read-only)
 export const checkEmailHealth = asyncHandler(async (req, res) => {
+  // Prefer SendGrid health check in production when an API key is present
+  if (process.env.SENDGRID_API_KEY) {
+    try {
+      const { default: SG } = await import('@sendgrid/mail');
+      SG.setApiKey(process.env.SENDGRID_API_KEY);
+      return res.json({ ok: true, using: 'sendgrid', results: [{ provider: 'sendgrid', ok: true }] });
+    } catch (e) {
+      // Fall through to SMTP checks
+    }
+  }
   const port = Number(process.env.EMAIL_PORT || 587);
   const secure = process.env.EMAIL_SECURE !== undefined
     ? String(process.env.EMAIL_SECURE).toLowerCase() === 'true'

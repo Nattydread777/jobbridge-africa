@@ -38,7 +38,7 @@ Fill in the following settings:
 - **Name**: `jobbridge-backend` (or choose your own)
 - **Region**: Choose closest to your users (e.g., Frankfurt for Europe, Oregon for US)
 - **Branch**: `main`
-- **Root Directory**: `backend`
+- **Root Directory**: `JOBBRIDGE-AFRICA/backend` (important: your repo has a nested folder structure)
 - **Runtime**: `Node`
 
 ### Build & Deploy
@@ -71,6 +71,7 @@ Click **Advanced** → **Add Environment Variable** and add these one by one:
 | `CLOUDINARY_CLIENT_SECRET` | Your Cloudinary API secret                                            | From local `.env`                   |
 | `EMAIL_USER`               | `info@jobbridgeafrica.org`                                            | -                                   |
 | `EMAIL_PASS`               | `pBC7sZeQYAB9`                                                        | Your Zoho app password              |
+| `EMAIL_FROM`               | `info@jobbridgeafrica.org`                                            | Optional: preferred sender address  |
 | `ALLOWED_ORIGINS`          | `https://www.jobbridgeafrica.org,https://jobbridge-africa.vercel.app` | Comma-separated, no spaces          |
 
 ### Optional Variables (only if needed)
@@ -186,6 +187,11 @@ Should return:
 - Check Render logs: Dashboard → Your Service → Logs
 - Look for "SMTP verify failed" or "EAUTH" errors
 - Try setting `EMAIL_PORT=587` and `EMAIL_SECURE=false`
+- If Render blocks SMTP, add a SendGrid API key and prefer using SendGrid in production:
+  1. Create a SendGrid account (https://app.sendgrid.com)
+  2. Settings → API Keys → Create API Key → copy the key
+  3. Render Dashboard → Your Service → Environment → Add `SENDGRID_API_KEY` and paste the key
+  4. The backend prefers SendGrid in production automatically; check `GET /api/contact/health` for `using: "sendgrid"`
 
 ### MongoDB Connection Failed
 
@@ -282,3 +288,57 @@ The backend now includes:
 ---
 
 **Good luck with your deployment! 🚀**
+
+---
+
+# Frontend Deployment Guide - Vercel
+
+This project is a monorepo. The frontend lives under `frontend/`. In Vercel, you must set the project root to that folder or Vercel will fail to build.
+
+## Quick Setup (Dashboard)
+
+1. Go to https://vercel.com/dashboard and click "New Project".
+2. Import the `Nattydread777/jobbridge-africa` repository.
+3. Under "Framework Preset", pick "Vite".
+4. Click "Edit" next to Root Directory and set it to `frontend`.
+5. Build & Output Settings:
+   - Build Command: `npm run build`
+   - Output Directory: `dist`
+6. Add Environment Variables:
+   - Key: `VITE_API_BASE`
+   - Value: `https://jobbridge-backend.onrender.com/api` (replace if your Render URL differs)
+   - Environments: Production, Preview, Development
+7. Deploy.
+
+If you already created the project and see build errors like "No Output Directory found" or it tries to build the backend, fix by going to Settings → General → Root Directory and set `frontend`, then redeploy.
+
+## SPA Routing (Deep Links)
+
+We included `frontend/vercel.json` to rewrite all routes to `index.html` for React Router deep links. Ensure your Vercel project root is `frontend` so this config is picked up.
+
+```json
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
+```
+
+## Common Vercel Build Issues
+
+- Builds from the repo root instead of `frontend` → Set Root Directory to `frontend`.
+- Missing API base → Add `VITE_API_BASE` to Environment Variables.
+- Old cache causing failures → Redeploy with "Use existing Build Cache" unchecked.
+
+---
+
+# Monorepo One-Click Deploy (Render)
+
+We added `render.yaml` at the repo root. From Render, click New → "Blueprint" and connect this repo. Render will automatically:
+
+- Use `rootDir: backend` for the web service
+- Run `npm install` then `npm start`
+- Expose `/health` for health checks
+
+You still need to input the required environment variables (marked `sync: false`) during the first deployment.
