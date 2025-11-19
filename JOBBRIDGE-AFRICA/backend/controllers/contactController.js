@@ -1,7 +1,5 @@
 import nodemailer from 'nodemailer';
 import asyncHandler from 'express-async-handler';
-// Do not import SendGrid at top-level. We'll dynamically import it only when a key is configured.
-let sgMail = null;
 
 // @desc    Send contact form email
 // @route   POST /api/contact
@@ -43,92 +41,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
   let transporter = null;
   let smtpReady = false;
 
-  // mailOptions and autoReplyOptions are defined earlier now
-
-  // Prefer SendGrid in production to avoid SMTP egress blocks (Render blocks outbound SMTP).
-  const preferSendGrid = Boolean(process.env.SENDGRID_API_KEY && process.env.NODE_ENV === 'production');
-  // Try SendGrid first when preferred - use REST API directly to avoid npm package issues
-  if (preferSendGrid) {
-    try {
-      const sendGridRequest = async (mailData) => {
-        console.log('SendGrid: Sending to', mailData.to, 'from', mailData.from);
-        const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            personalizations: [{ to: [{ email: mailData.to }] }],
-            from: { email: mailData.from },
-            subject: mailData.subject,
-            content: [{ type: 'text/html', value: mailData.html }],
-            reply_to: mailData.replyTo ? { email: mailData.replyTo } : undefined,
-          }),
-        });
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('SendGrid API error:', response.status, errorText);
-          throw new Error(`SendGrid API error: ${response.status} ${errorText}`);
-        }
-        return response;
-      };
-
-      diagnostics.attempts.push({ provider: 'sendgrid-api', init: true });
-      diagnostics.providerUsed = 'sendgrid-api';
-      
-      // Send both emails via SendGrid REST API
-      await sendGridRequest(mailOptions);
-      await sendGridRequest(autoReplyOptions);
-      
-      return res.status(200).json({ success: true, message: 'Message sent via SendGrid API', transport: diagnostics.providerUsed, diagnostics });
-    } catch (e) {
-      console.error('SendGrid API send error:', e?.message || String(e));
-      diagnostics.attempts.push({ provider: 'sendgrid-api', send_failed: true, error: e?.message || String(e) });
-      // fallthrough to SMTP
-    }
-  }
-
-  // Try primary
-  try {
-    transporter = nodemailer.createTransport(primaryConfig);
-    const start = Date.now();
-    await transporter.verify();
-    diagnostics.attempts.push({ provider: 'smtp', config: 'primary', ok: true, ms: Date.now() - start });
-    smtpReady = true;
-    diagnostics.providerUsed = 'smtp-primary';
-  } catch (e) {
-    diagnostics.attempts.push({ provider: 'smtp', config: 'primary', ok: false, error: e?.message || String(e) });
-    // Try fallback
-    try {
-      transporter = nodemailer.createTransport(fallbackConfig);
-      const start2 = Date.now();
-      await transporter.verify();
-      diagnostics.attempts.push({ provider: 'smtp', config: 'fallback', ok: true, ms: Date.now() - start2 });
-      smtpReady = true;
-      diagnostics.providerUsed = 'smtp-fallback';
-    } catch (e2) {
-      diagnostics.attempts.push({ provider: 'smtp', config: 'fallback', ok: false, error: e2?.message || String(e2) });
-    }
-  }
-
-  // Optionally init SendGrid
-  const canUseSendGrid = !smtpReady && process.env.SENDGRID_API_KEY;
-  if (canUseSendGrid) {
-    try {
-      // Dynamically import SendGrid so we don't crash when the package is missing
-      // (Render might not have installed it or it may fail during deploy). This keeps startup safe.
-      // eslint-disable-next-line no-await-in-loop
-      const { default: SG } = await import('@sendgrid/mail');
-      sgMail = SG;
-      sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-      diagnostics.attempts.push({ provider: 'sendgrid', init: true });
-      diagnostics.providerUsed = 'sendgrid';
-    } catch (e) {
-      diagnostics.attempts.push({ provider: 'sendgrid', init: false, error: e?.message || String(e) });
-    }
-  }
-
+  // Prepare email payloads BEFORE attempting any provider so variables exist.
   const defaultFrom = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'info@jobbridgeafrica.org';
   const mailOptions = {
     from: defaultFrom,
@@ -154,7 +67,6 @@ const sendContactEmail = asyncHandler(async (req, res) => {
       </div>
     `,
   };
-
   const autoReplyOptions = {
     from: defaultFrom,
     to: email,
@@ -187,18 +99,67 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     `,
   };
 
-  try {
-    if (smtpReady) {
-      await transporter.sendMail(mailOptions);
-      await transporter.sendMail(autoReplyOptions);
-    } else if (diagnostics.providerUsed === 'sendgrid') {
-      await sgMail.send({ to: mailOptions.to, from: mailOptions.from, subject: mailOptions.subject, html: mailOptions.html, replyTo: mailOptions.replyTo });
-      await sgMail.send({ to: autoReplyOptions.to, from: autoReplyOptions.from, subject: autoReplyOptions.subject, html: autoReplyOptions.html, replyTo: autoReplyOptions.replyTo });
-    } else {
-      throw new Error('No email transport available (SMTP and SendGrid both unavailable).');
+  // Prefer SendGrid REST API first (avoids blocked SMTP on some hosts)
+  const canUseSendGrid = Boolean(process.env.SENDGRID_API_KEY);
+  if (canUseSendGrid) {
+    try {
+      const sendViaSendGrid = async (mailData) => {
+        const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            personalizations: [{ to: [{ email: mailData.to }] }],
+            from: { email: mailData.from },
+            subject: mailData.subject,
+            content: [{ type: 'text/html', value: mailData.html }],
+            reply_to: mailData.replyTo ? { email: mailData.replyTo } : undefined,
+          }),
+        });
+        if (!response.ok) throw new Error(`SendGrid API error: ${response.status}`);
+      };
+      diagnostics.attempts.push({ provider: 'sendgrid-api', init: true });
+      await sendViaSendGrid(mailOptions);
+      await sendViaSendGrid(autoReplyOptions);
+      diagnostics.providerUsed = 'sendgrid-api';
+      return res.status(200).json({ success: true, message: 'Message sent via SendGrid API', transport: diagnostics.providerUsed, diagnostics });
+    } catch (e) {
+      diagnostics.attempts.push({ provider: 'sendgrid-api', send_failed: true, error: e?.message || String(e) });
+      // Fall through to SMTP attempts
     }
+  }
 
-    res.status(200).json({ success: true, message: 'Message sent successfully', transport: diagnostics.providerUsed, diagnostics });
+  // Try primary
+  try {
+    transporter = nodemailer.createTransport(primaryConfig);
+    const start = Date.now();
+    await transporter.verify();
+    diagnostics.attempts.push({ provider: 'smtp', config: 'primary', ok: true, ms: Date.now() - start });
+    smtpReady = true;
+    diagnostics.providerUsed = 'smtp-primary';
+  } catch (e) {
+    diagnostics.attempts.push({ provider: 'smtp', config: 'primary', ok: false, error: e?.message || String(e) });
+    // Try fallback
+    try {
+      transporter = nodemailer.createTransport(fallbackConfig);
+      const start2 = Date.now();
+      await transporter.verify();
+      diagnostics.attempts.push({ provider: 'smtp', config: 'fallback', ok: true, ms: Date.now() - start2 });
+      smtpReady = true;
+      diagnostics.providerUsed = 'smtp-fallback';
+    } catch (e2) {
+      diagnostics.attempts.push({ provider: 'smtp', config: 'fallback', ok: false, error: e2?.message || String(e2) });
+    }
+  }
+
+
+  try {
+    if (!smtpReady) throw new Error('No email transport available (SMTP unavailable and SendGrid failed).');
+    await transporter.sendMail(mailOptions);
+    await transporter.sendMail(autoReplyOptions);
+    res.status(200).json({ success: true, message: 'Message sent via SMTP', transport: diagnostics.providerUsed, diagnostics });
   } catch (error) {
     diagnostics.finalError = error?.message || String(error);
     diagnostics.finalErrorCode = error?.code;
