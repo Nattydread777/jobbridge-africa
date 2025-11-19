@@ -132,25 +132,36 @@ const sendContactEmail = asyncHandler(async (req, res) => {
   if (canUseSendGrid) {
     try {
       const sendViaSendGrid = async (mailData) => {
+        const payload = {
+          personalizations: [{ to: [{ email: mailData.to }] }],
+          from: { email: mailData.from },
+          subject: mailData.subject,
+          content: [{ type: 'text/html', value: mailData.html }],
+          reply_to: mailData.replyTo ? { email: mailData.replyTo } : undefined,
+        };
+        console.log(`[SendGrid] Sending to: ${mailData.to}, from: ${mailData.from}, subject: ${mailData.subject}`);
         const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            personalizations: [{ to: [{ email: mailData.to }] }],
-            from: { email: mailData.from },
-            subject: mailData.subject,
-            content: [{ type: 'text/html', value: mailData.html }],
-            reply_to: mailData.replyTo ? { email: mailData.replyTo } : undefined,
-          }),
+          body: JSON.stringify(payload),
         });
-        if (!response.ok) throw new Error(`SendGrid API error: ${response.status}`);
+        if (!response.ok) {
+          const errorBody = await response.text();
+          console.error(`[SendGrid] Error ${response.status}: ${errorBody}`);
+          throw new Error(`SendGrid API error: ${response.status}`);
+        }
+        console.log(`[SendGrid] Successfully sent to ${mailData.to}, status: ${response.status}`);
       };
       diagnostics.attempts.push({ provider: 'sendgrid-api', init: true });
+      console.log('[SendGrid] Sending admin notification...');
       await sendViaSendGrid(mailOptions);
+      diagnostics.attempts.push({ provider: 'sendgrid-api', admin_sent: true, to: mailOptions.to });
+      console.log('[SendGrid] Sending auto-reply...');
       await sendViaSendGrid(autoReplyOptions);
+      diagnostics.attempts.push({ provider: 'sendgrid-api', auto_reply_sent: true, to: autoReplyOptions.to });
       diagnostics.providerUsed = 'sendgrid-api';
       const payload = { success: true, message: 'Message sent via SendGrid API', transport: diagnostics.providerUsed };
       if (process.env.NODE_ENV !== 'production') payload.diagnostics = diagnostics;
