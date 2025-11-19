@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../services/api";
 
 const Contact = () => {
@@ -10,6 +10,43 @@ const Contact = () => {
   });
   const [status, setStatus] = useState({ type: "", message: "" });
   const [loading, setLoading] = useState(false);
+  const [captchaReady, setCaptchaReady] = useState(false);
+  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+
+  useEffect(() => {
+    if (!siteKey) return;
+    // Inject reCAPTCHA v3 script once
+    const id = "recaptcha-v3-script";
+    if (document.getElementById(id)) return;
+    const s = document.createElement("script");
+    s.id = id;
+    s.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
+    s.async = true;
+    s.defer = true;
+    s.onload = () => {
+      if (window.grecaptcha?.ready) {
+        window.grecaptcha.ready(() => setCaptchaReady(true));
+      } else {
+        setCaptchaReady(true);
+      }
+    };
+    document.body.appendChild(s);
+  }, [siteKey]);
+
+  const getRecaptchaToken = async () => {
+    if (!siteKey || !window.grecaptcha) return null;
+    try {
+      await new Promise((r) =>
+        window.grecaptcha.ready ? window.grecaptcha.ready(r) : r()
+      );
+      const token = await window.grecaptcha.execute(siteKey, {
+        action: "contact",
+      });
+      return token;
+    } catch {
+      return null;
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,7 +54,8 @@ const Contact = () => {
     setStatus({ type: "", message: "" });
 
     try {
-      await api.post("/contact", formData);
+      const recaptchaToken = await getRecaptchaToken();
+      await api.post("/contact", { ...formData, recaptchaToken });
       setStatus({
         type: "success",
         message:
@@ -139,6 +177,11 @@ const Contact = () => {
               >
                 {loading ? "Sending..." : "Send Message"}
               </button>
+              {siteKey && (
+                <p className="mt-2 text-xs text-gray-400">
+                  Protected by reCAPTCHA. Privacy & Terms apply.
+                </p>
+              )}
             </form>
           </div>
 

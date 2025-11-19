@@ -5,7 +5,7 @@ import asyncHandler from 'express-async-handler';
 // @route   POST /api/contact
 // @access  Public
 const sendContactEmail = asyncHandler(async (req, res) => {
-  const { name, email, subject, message } = req.body;
+  const { name, email, subject, message, recaptchaToken } = req.body;
 
   if (!name || !email || !subject || !message) {
     res.status(400);
@@ -40,6 +40,34 @@ const sendContactEmail = asyncHandler(async (req, res) => {
   const diagnostics = { attempts: [], providerUsed: null };
   let transporter = null;
   let smtpReady = false;
+
+  // Optional: Verify reCAPTCHA v3 if configured
+  if (process.env.RECAPTCHA_SECRET_KEY) {
+    try {
+      const params = new URLSearchParams();
+      params.append('secret', process.env.RECAPTCHA_SECRET_KEY);
+      if (recaptchaToken) params.append('response', recaptchaToken);
+      const remoteIp = req.headers['x-forwarded-for']?.split(',')[0] || req.ip;
+      if (remoteIp) params.append('remoteip', remoteIp);
+
+      const resp = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      });
+      const data = await resp.json();
+      diagnostics.recaptcha = { success: data.success, score: data.score, action: data.action };
+
+      const minScore = Number(process.env.RECAPTCHA_MIN_SCORE || 0.5);
+      const ok = data.success && (data.score === undefined || data.score >= minScore);
+      if (!ok) {
+        return res.status(400).json({ success: false, message: 'Verification failed. Please try again.' });
+      }
+    } catch (e) {
+      diagnostics.recaptchaError = e?.message || String(e);
+      return res.status(400).json({ success: false, message: 'Verification error. Please try again.' });
+    }
+  }
 
   // Prepare email payloads BEFORE attempting any provider so variables exist.
   const defaultFrom = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'info@jobbridgeafrica.org';
@@ -124,7 +152,9 @@ const sendContactEmail = asyncHandler(async (req, res) => {
       await sendViaSendGrid(mailOptions);
       await sendViaSendGrid(autoReplyOptions);
       diagnostics.providerUsed = 'sendgrid-api';
-      return res.status(200).json({ success: true, message: 'Message sent via SendGrid API', transport: diagnostics.providerUsed, diagnostics });
+      const payload = { success: true, message: 'Message sent via SendGrid API', transport: diagnostics.providerUsed };
+      if (process.env.NODE_ENV !== 'production') payload.diagnostics = diagnostics;
+      return res.status(200).json(payload);
     } catch (e) {
       diagnostics.attempts.push({ provider: 'sendgrid-api', send_failed: true, error: e?.message || String(e) });
       // Fall through to SMTP attempts
@@ -159,13 +189,17 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     if (!smtpReady) throw new Error('No email transport available (SMTP unavailable and SendGrid failed).');
     await transporter.sendMail(mailOptions);
     await transporter.sendMail(autoReplyOptions);
-    res.status(200).json({ success: true, message: 'Message sent via SMTP', transport: diagnostics.providerUsed, diagnostics });
+    const payload = { success: true, message: 'Message sent via SMTP', transport: diagnostics.providerUsed };
+    if (process.env.NODE_ENV !== 'production') payload.diagnostics = diagnostics;
+    res.status(200).json(payload);
   } catch (error) {
     diagnostics.finalError = error?.message || String(error);
     diagnostics.finalErrorCode = error?.code;
     diagnostics.finalErrorResponse = error?.response?.body || error?.response;
-    console.error('Email send error diagnostics:', JSON.stringify(diagnostics, null, 2));
-    res.status(500).json({ success: false, message: 'Failed to send email. Please try again later or contact us directly at info@jobbridgeafrica.org', diagnostics });
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Email send error diagnostics:', JSON.stringify(diagnostics, null, 2));
+    }
+    res.status(500).json({ success: false, message: 'Failed to send email. Please try again later or contact us directly at info@jobbridgeafrica.org' });
   }
 });
 
