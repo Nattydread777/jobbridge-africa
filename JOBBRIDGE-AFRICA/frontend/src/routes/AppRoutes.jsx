@@ -9,6 +9,7 @@ import Contact from "../pages/Contact";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
 import TeamManagement from "../pages/admin/TeamManagement";
+import UserAdmin from "../pages/admin/UserAdmin";
 
 const AppRoutes = () => (
   <Router>
@@ -23,6 +24,7 @@ const AppRoutes = () => (
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/admin/team" element={<TeamManagement />} />
+        <Route path="/admin/users" element={<UserAdmin />} />
       </Routes>
     </main>
     <Footer />

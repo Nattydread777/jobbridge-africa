@@ -156,45 +156,48 @@ const About = () => {
           </div>
         ) : null}
 
-        <div className="space-y-4">
-          <div>
-            <h3 className="font-semibold">
-              Nathaniel Usikpedo (Nigeria) — Founder, Project Manager & Software
-              Developer
-            </h3>
-            <p>
-              A certified MERN Full‑Stack Developer and SDG&nbsp;8 advocate,
-              Nathaniel leads the strategic and technical direction of JobBridge
-              Africa.
-            </p>
+        {!loadingTeam && teamMembers.length === 0 && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold">
+                Nathaniel Usikpedo (Nigeria) — Founder, Project Manager &
+                Software Developer
+              </h3>
+              <p>
+                A certified MERN Full‑Stack Developer and SDG&nbsp;8 advocate,
+                Nathaniel leads the strategic and technical direction of
+                JobBridge Africa.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold">
+                Barr. Nathaniel‑Usikpedo Oghogho (Nigeria) — Legal Adviser
+              </h3>
+              <p>
+                Ensures transparent operations, ethical compliance, and data
+                protection best practices.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold">
+                Dedan Okware (Kenya) — Module Lead, MERN Stack Specialization,
+                PLP
+              </h3>
+              <p>
+                A mentor and early contributor who guided software architecture
+                and development best practices.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold">PLP Africa</h3>
+              <p>
+                We acknowledge the continued support of PLP Africa, whose
+                mission to empower one million African youth with tech skills
+                inspires our work.
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-semibold">
-              Barr. Nathaniel‑Usikpedo Oghogho (Nigeria) — Legal Adviser
-            </h3>
-            <p>
-              Ensures transparent operations, ethical compliance, and data
-              protection best practices.
-            </p>
-          </div>
-          <div>
-            <h3 className="font-semibold">
-              Dedan Okware (Kenya) — Module Lead, MERN Stack Specialization, PLP
-            </h3>
-            <p>
-              A mentor and early contributor who guided software architecture
-              and development best practices.
-            </p>
-          </div>
-          <div>
-            <h3 className="font-semibold">PLP Africa</h3>
-            <p>
-              We acknowledge the continued support of PLP Africa, whose mission
-              to empower one million African youth with tech skills inspires our
-              work.
-            </p>
-          </div>
-        </div>
+        )}
       </section>
 
       <section className="mb-10">
