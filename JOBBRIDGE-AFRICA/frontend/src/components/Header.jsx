@@ -33,7 +33,7 @@ const Header = () => {
             <img
               src="/logo.png"
               alt="JobBridge Africa Logo"
-              className="w-16 h-16 md:w-20 md:h-20"
+              className="w-20 h-20 md:w-24 md:h-24"
             />
             <h1 className="text-2xl md:text-3xl font-black uppercase tracking-wide">
               JOBBRIDGE AFRICA
@@ -46,8 +46,8 @@ const Header = () => {
               to="/"
               className={({ isActive }) =>
                 isActive
-                  ? "font-semibold border-b-2 border-white pb-1"
-                  : "hover:text-gray-200 transition"
+                  ? "font-semibold border-b-2 border-white pb-1 cursor-pointer"
+                  : "hover:text-gray-200 transition cursor-pointer"
               }
             >
               Home
@@ -56,8 +56,8 @@ const Header = () => {
               to="/jobs"
               className={({ isActive }) =>
                 isActive
-                  ? "font-semibold border-b-2 border-white pb-1"
-                  : "hover:text-gray-200 transition"
+                  ? "font-semibold border-b-2 border-white pb-1 cursor-pointer"
+                  : "hover:text-gray-200 transition cursor-pointer"
               }
             >
               Find Jobs
@@ -66,8 +66,8 @@ const Header = () => {
               to="/employers"
               className={({ isActive }) =>
                 isActive
-                  ? "font-semibold border-b-2 border-white pb-1"
-                  : "hover:text-gray-200 transition"
+                  ? "font-semibold border-b-2 border-white pb-1 cursor-pointer"
+                  : "hover:text-gray-200 transition cursor-pointer"
               }
             >
               For Employers
@@ -76,8 +76,8 @@ const Header = () => {
               to="/about"
               className={({ isActive }) =>
                 isActive
-                  ? "font-semibold border-b-2 border-white pb-1"
-                  : "hover:text-gray-200 transition"
+                  ? "font-semibold border-b-2 border-white pb-1 cursor-pointer"
+                  : "hover:text-gray-200 transition cursor-pointer"
               }
             >
               About
@@ -86,8 +86,8 @@ const Header = () => {
               to="/contact"
               className={({ isActive }) =>
                 isActive
-                  ? "font-semibold border-b-2 border-white pb-1"
-                  : "hover:text-gray-200 transition"
+                  ? "font-semibold border-b-2 border-white pb-1 cursor-pointer"
+                  : "hover:text-gray-200 transition cursor-pointer"
               }
             >
               Contact
@@ -98,13 +98,13 @@ const Header = () => {
           <div className="hidden md:flex space-x-3">
             <NavLink
               to="/login"
-              className="px-4 py-2 bg-white/90 text-primary rounded-md hover:bg-white transition font-semibold"
+              className="px-4 py-2 bg-white/90 text-primary rounded-md hover:bg-white transition font-semibold cursor-pointer"
             >
               Login
             </NavLink>
             <NavLink
               to="/register"
-              className="px-4 py-2 bg-accent text-white rounded-md hover:bg-red-700 transition font-semibold"
+              className="px-4 py-2 bg-accent text-white rounded-md hover:bg-red-700 transition font-semibold cursor-pointer"
             >
               Sign Up
             </NavLink>
@@ -113,7 +113,7 @@ const Header = () => {
           {/* Mobile Hamburger Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden text-white p-2 hover:bg-white/10 rounded transition"
+            className="md:hidden text-white p-2 hover:bg-white/10 rounded transition cursor-pointer"
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? (
@@ -156,7 +156,7 @@ const Header = () => {
             <NavLink
               to="/"
               className={({ isActive }) =>
-                `block px-4 py-2 rounded transition ${
+                `block px-4 py-2 rounded transition cursor-pointer ${
                   isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"
                 }`
               }
@@ -166,7 +166,7 @@ const Header = () => {
             <NavLink
               to="/jobs"
               className={({ isActive }) =>
-                `block px-4 py-2 rounded transition ${
+                `block px-4 py-2 rounded transition cursor-pointer ${
                   isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"
                 }`
               }
@@ -176,7 +176,7 @@ const Header = () => {
             <NavLink
               to="/employers"
               className={({ isActive }) =>
-                `block px-4 py-2 rounded transition ${
+                `block px-4 py-2 rounded transition cursor-pointer ${
                   isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"
                 }`
               }
@@ -186,7 +186,7 @@ const Header = () => {
             <NavLink
               to="/about"
               className={({ isActive }) =>
-                `block px-4 py-2 rounded transition ${
+                `block px-4 py-2 rounded transition cursor-pointer ${
                   isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"
                 }`
               }
@@ -196,7 +196,7 @@ const Header = () => {
             <NavLink
               to="/contact"
               className={({ isActive }) =>
-                `block px-4 py-2 rounded transition ${
+                `block px-4 py-2 rounded transition cursor-pointer ${
                   isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"
                 }`
               }
@@ -206,13 +206,13 @@ const Header = () => {
             <div className="flex flex-col space-y-2 pt-2 border-t border-white/20">
               <NavLink
                 to="/login"
-                className="px-4 py-2 bg-white/90 text-primary rounded-md hover:bg-white transition font-semibold text-center"
+                className="px-4 py-2 bg-white/90 text-primary rounded-md hover:bg-white transition font-semibold text-center cursor-pointer"
               >
                 Login
               </NavLink>
               <NavLink
                 to="/register"
-                className="px-4 py-2 bg-accent text-white rounded-md hover:bg-red-700 transition font-semibold text-center"
+                className="px-4 py-2 bg-accent text-white rounded-md hover:bg-red-700 transition font-semibold text-center cursor-pointer"
               >
                 Sign Up
               </NavLink>
