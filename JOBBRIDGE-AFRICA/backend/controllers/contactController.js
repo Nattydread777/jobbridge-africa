@@ -51,6 +51,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
   if (preferSendGrid) {
     try {
       const sendGridRequest = async (mailData) => {
+        console.log('SendGrid: Sending to', mailData.to, 'from', mailData.from);
         const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
           method: 'POST',
           headers: {
@@ -66,8 +67,9 @@ const sendContactEmail = asyncHandler(async (req, res) => {
           }),
         });
         if (!response.ok) {
-          const error = await response.text();
-          throw new Error(`SendGrid API error: ${response.status} ${error}`);
+          const errorText = await response.text();
+          console.error('SendGrid API error:', response.status, errorText);
+          throw new Error(`SendGrid API error: ${response.status} ${errorText}`);
         }
         return response;
       };
