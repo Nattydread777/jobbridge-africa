@@ -60,7 +60,8 @@ const sendContactEmail = asyncHandler(async (req, res) => {
       await sgMail.send({ to: autoReplyOptions.to, from: autoReplyOptions.from, subject: autoReplyOptions.subject, html: autoReplyOptions.html, replyTo: autoReplyOptions.replyTo });
       return res.status(200).json({ success: true, message: 'Message sent via SendGrid (preferred)', transport: diagnostics.providerUsed, diagnostics });
     } catch (e) {
-      diagnostics.attempts.push({ provider: 'sendgrid', init: false, error: e?.message || String(e) });
+      console.error('SendGrid send error:', e?.message || String(e));
+      diagnostics.attempts.push({ provider: 'sendgrid', send_failed: true, error: e?.message || String(e), code: e?.code });
       // fallthrough to SMTP
     }
   }
@@ -177,7 +178,9 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     res.status(200).json({ success: true, message: 'Message sent successfully', transport: diagnostics.providerUsed, diagnostics });
   } catch (error) {
     diagnostics.finalError = error?.message || String(error);
-    console.error('Email send error diagnostics:', diagnostics);
+    diagnostics.finalErrorCode = error?.code;
+    diagnostics.finalErrorResponse = error?.response?.body || error?.response;
+    console.error('Email send error diagnostics:', JSON.stringify(diagnostics, null, 2));
     res.status(500).json({ success: false, message: 'Failed to send email. Please try again later or contact us directly at info@jobbridgeafrica.org', diagnostics });
   }
 });
