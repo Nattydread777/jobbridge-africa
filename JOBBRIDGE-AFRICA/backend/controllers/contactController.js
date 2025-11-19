@@ -191,14 +191,20 @@ export { sendContactEmail };
 // @route   GET /api/contact/health
 // @access  Public (read-only)
 export const checkEmailHealth = asyncHandler(async (req, res) => {
+  // Debug: Log environment variable status
+  const hasSendGridKey = Boolean(process.env.SENDGRID_API_KEY);
+  console.log('SENDGRID_API_KEY present:', hasSendGridKey);
+  console.log('NODE_ENV:', process.env.NODE_ENV);
+  
   // Prefer SendGrid health check in production when an API key is present
   if (process.env.SENDGRID_API_KEY) {
     try {
       const { default: SG } = await import('@sendgrid/mail');
       SG.setApiKey(process.env.SENDGRID_API_KEY);
-      return res.json({ ok: true, using: 'sendgrid', results: [{ provider: 'sendgrid', ok: true }] });
+      return res.json({ ok: true, using: 'sendgrid', results: [{ provider: 'sendgrid', ok: true, debug: { hasSendGridKey, nodeEnv: process.env.NODE_ENV } }] });
     } catch (e) {
-      // Fall through to SMTP checks
+      console.error('SendGrid health check failed:', e.message);
+      return res.json({ ok: false, using: 'sendgrid_failed', error: e.message, results: [{ provider: 'sendgrid', ok: false, error: e.message }] });
     }
   }
   const port = Number(process.env.EMAIL_PORT || 587);
