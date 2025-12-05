@@ -118,12 +118,20 @@ This mapping will evolve as we implement learning integrations, mentorship, and 
 Job seeker
 
 - Register/Login
-- Edit profile: basic info, education, experience, skills
-- Profile photo upload (Cloudinary)
-- Resume upload (stored in Cloudinary via application submission flow)
-- Completion status across Dashboard/Profile pages
-- Browse jobs, view details, apply with resume; view "My Applications"
-- AI Matching page (API stub ready; returns recommended jobs via `/api/ai/match`)
+
+### Recent Additions (2025)
+
+- Professional UI/UX overhaul: standardized fonts, headings, buttons, and layout for a modern, accessible experience
+- Interactive Dashboard: AI-powered features for job seekers
+  - Resume Analyzer: Upload resume, receive AI feedback and improvement tips
+  - Smart Job Alerts: Set preferences, receive personalized job alerts
+  - Interview Preparation Bot: Get AI-generated interview questions for your target roles
+  - Skill Gap Analysis: Identify missing skills, get actionable course/certification recommendations, track progress
+  - Chat Assistant (coming soon): AI-powered career Q&A and support
+- Employer Dashboard: Candidate ranking and analytics (in progress)
+- Backend: New endpoints for all AI features (`/api/ai/analyze-resume`, `/api/ai/job-alerts`, `/api/ai/interview-questions`, `/api/ai/skill-gap`, `/api/ai/chat-assistant`, `/api/ai/rank-candidates`)
+- Improved error handling and feedback for all user actions
+- About page refactored for professionalism and clarity
 
 Employer
 
@@ -563,6 +571,15 @@ npm run lint
   - Point API base to your backend domain (update `src/services/api.js` or use env)
 - Cloudinary
   - Ensure the configured Cloudinary account and folder conventions exist
+
+### Vercel & Render Deployment
+
+- Frontend is deployed on Vercel; backend is deployed on Render.
+- Set `VITE_API_BASE` in Vercel to your Render backend URL (not localhost).
+- Ensure CORS and cookies are enabled for cross-origin authentication.
+- Push changes to GitHub to trigger redeploys on Vercel/Render.
+
+**Note:** Local changes are not visible online until pushed and deployed.
 
 ---
 
