@@ -35,7 +35,7 @@ const Header = () => {
               alt="JobBridge Africa Logo"
               className="w-20 h-20 md:w-24 md:h-24"
             />
-            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-wide">
+            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-wide text-primary">
               JOBBRIDGE AFRICA
             </h1>
           </div>

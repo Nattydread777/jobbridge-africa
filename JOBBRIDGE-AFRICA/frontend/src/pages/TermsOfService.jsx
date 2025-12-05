@@ -2,16 +2,16 @@ const TermsOfService = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-6">
+        <h1 className="text-3xl md:text-5xl font-extrabold text-primary mb-6">
           Terms of Service
         </h1>
-        <p className="text-sm text-gray-600 mb-8">
+        <p className="text-base md:text-lg text-gray-700 mb-8">
           Last Updated: November 13, 2025
         </p>
 
-        <div className="space-y-8 text-gray-700">
+        <div className="space-y-8 text-gray-800">
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+            <h2 className="text-2xl md:text-4xl font-bold mb-4 text-black">
               1. Acceptance of Terms
             </h2>
             <p className="mb-4">
@@ -50,7 +50,7 @@ const TermsOfService = () => {
               3. User Accounts
             </h2>
 
-            <h3 className="text-xl font-medium text-gray-800 mb-3">
+            <h3 className="text-xl font-bold text-black mb-3">
               3.1 Account Creation
             </h3>
             <ul className="list-disc pl-6 space-y-2 mb-4">
