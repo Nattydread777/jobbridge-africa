@@ -56,9 +56,9 @@ const Jobs = () => {
         const message = err.response?.data?.message
           || (err.request
             ? "We couldn’t reach the jobs service. Check your connection and try again."
-            : err.message || "Jobs could not be loaded. Please try again.");
-        setJobs([]);
-        setError(message);
+            : err.message || "Jobs could not be loaded. Please try again."            );
+            setJobs([]);
+            setError(message);
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -122,7 +122,6 @@ const Jobs = () => {
       <p className="mb-6 inline-flex rounded-full bg-amber-100 px-4 py-2 text-sm font-semibold text-terracotta-dark">
         UN SDG 8 · Decent Work and Economic Growth · Africa-first matching
       </p>
-
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Filters Sidebar */}
         <aside className="lg:col-span-1 space-y-6">

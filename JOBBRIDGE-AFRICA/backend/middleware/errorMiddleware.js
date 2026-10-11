@@ -1,3 +1,5 @@
+import mongoose from 'mongoose';
+
 export const notFound = (req, res, next) => {
   const error = new Error(`Not Found - ${req.originalUrl}`);
   res.status(404);
@@ -21,6 +23,14 @@ export const errorHandler = (err, req, res, next) => {
   if (err.code === 11000) {
     message = 'Duplicate field value entered';
     statusCode = 400;
+  }
+
+  if (
+    mongoose.connection.readyState !== 1 &&
+    /^(Mongoose|Mongo)/.test(err.name)
+  ) {
+    message = 'Database is temporarily unavailable. Please retry shortly.';
+    statusCode = 503;
   }
 
   res.status(statusCode).json({

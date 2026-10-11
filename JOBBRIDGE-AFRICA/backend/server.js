@@ -8,6 +8,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import morgan from 'morgan';
+import mongoose from 'mongoose';
 
 // Internal modules
 import connectDB from './config/db.js'; // MUST include .js extension
@@ -29,19 +30,14 @@ const requiredEnvVars = [
   'JWT_SECRET',
   'JWT_EXPIRE',
   'COOKIE_EXPIRE',
-  'CLOUDINARY_CLIENT_NAME',
-  'CLOUDINARY_CLIENT_API',
-  'CLOUDINARY_CLIENT_SECRET',
 ];
 
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 if (missingEnvVars.length > 0) {
   console.error('❌ Missing required environment variables:', missingEnvVars.join(', '));
+  console.error('Copy backend/.env.example to backend/.env and configure the listed values.');
   process.exit(1);
 }
-
-// Start scheduled external job syncs only after MongoDB is ready.
-connectDB().then(scheduleDailyJobIngestion);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -71,8 +67,6 @@ const limiter = rateLimit({
   max: 100, // limit each IP to 100 requests per windowMs
   message: 'Too many requests from this IP, please try again later.',
 });
-app.use('/api/', limiter);
-
 // Stricter rate limit for auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -98,7 +92,12 @@ const allowedOrigins = (() => {
     }
     return ['https://www.jobbridgeafrica.org'];
   }
-  return ['http://localhost:5173', 'http://localhost:5174'];
+  return [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5174',
+  ];
 })();
 
 // Robust CORS configuration with dynamic origin checking
@@ -120,20 +119,10 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.use('/api/', limiter);
 app.use(express.json({ limit: '1mb' })); // Allows parsing of raw JSON data
 app.use(express.urlencoded({ extended: true })); // Allows parsing of form data
 app.use(cookieParser()); // Enables reading cookies
-
-// -------------------
-// API Routes
-// -------------------
-app.use('/api/auth', authLimiter, authRoutes); // Assuming you export routes as default from authRoutes.js
-app.use('/api/jobs', jobRoutes); // Assuming you export routes as default from jobRoutes.js
-app.use('/api/applications', applicationRoutes); // Application submission and management
-app.use('/api/ai', aiRoutes); // AI matching
-app.use('/api/contact', contactLimiter, contactRoutes); // Contact form
-app.use('/api/team', teamRoutes); // Team member management
-app.use('/api/users', userAdminRoutes); // Admin user management
 
 // -------------------
 // Health Check Endpoints
@@ -150,8 +139,10 @@ app.get('/', (req, res) => {
 
 // Detailed health check for monitoring
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK',
+  const databaseConnected = mongoose.connection.readyState === 1;
+  res.status(databaseConnected ? 200 : 503).json({
+    status: databaseConnected ? 'OK' : 'unavailable',
+    database: databaseConnected ? 'connected' : 'disconnected',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
@@ -159,15 +150,52 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK',
+  const databaseConnected = mongoose.connection.readyState === 1;
+  res.status(databaseConnected ? 200 : 503).json({
+    status: databaseConnected ? 'OK' : 'unavailable',
+    database: databaseConnected ? 'connected' : 'disconnected',
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });
 });
 
+const requireDatabase = (req, res, next) => {
+  if (mongoose.connection.readyState === 1) return next();
+  return res.status(503).json({
+    message: 'Database is temporarily unavailable. Please retry shortly.',
+    database: 'disconnected',
+  });
+};
+
+// -------------------
+// API Routes
+// -------------------
+app.use('/api/auth', requireDatabase, authLimiter, authRoutes);
+app.use('/api/jobs', requireDatabase, jobRoutes);
+app.use('/api/applications', requireDatabase, applicationRoutes);
+app.use('/api/ai', requireDatabase, aiRoutes);
+app.use('/api/contact', contactLimiter, contactRoutes);
+app.use('/api/team', requireDatabase, teamRoutes);
+app.use('/api/users', requireDatabase, userAdminRoutes);
+
 // Error Handling Middleware (must be last)
 app.use(notFound);
 app.use(errorHandler);
 
-app.listen(PORT, () => console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`));
+const startServer = async () => {
+  await connectDB();
+  scheduleDailyJobIngestion();
+
+  await new Promise((resolve, reject) => {
+    const server = app.listen(PORT, () => {
+      console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+      resolve();
+    });
+    server.once('error', reject);
+  });
+};
+
+startServer().catch((error) => {
+  console.error('Server startup failed:', error.message);
+  process.exit(1);
+});
