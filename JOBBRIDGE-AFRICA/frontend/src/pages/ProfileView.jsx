@@ -1,9 +1,10 @@
 import { useAuth } from "../context/AuthContext";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 const ProfileView = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = async () => {
     try {
@@ -88,7 +89,12 @@ const ProfileView = () => {
 
           {/* Name & Title */}
           <div className="mt-4">
-            <h1 className="text-3xl font-bold text-gray-900">{user.name}</h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-3xl font-bold text-gray-900">{user.name}</h1>
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">
+                {user.role === "job_seeker" ? "JobBridge Candidate" : user.role === "employer" ? "Employer Account" : "Administrator"}
+              </span>
+            </div>
             <p className="text-xl text-gray-600 mt-1">
               {user.role === "job_seeker"
                 ? "Job Seeker"
@@ -108,6 +114,12 @@ const ProfileView = () => {
               </p>
             )}
           </div>
+          {location.state?.notice && (
+            <div role="status" className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+              {location.state.notice}{" "}
+              <Link to="/profile" className="font-bold underline">Go to profile settings</Link>
+            </div>
+          )}
 
           {/* Profile Completion Indicator for Job Seekers */}
           {user.role === "job_seeker" && (

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import heroImg from "../assets/hero.jpg";
-import locations from "../data/africaLocations";
+import locations from "../data/jobLocations";
 
 const Home = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -166,10 +166,10 @@ const Home = () => {
                       <select
                         value={country}
                         onChange={(e) => setCountry(e.target.value)}
-                        aria-label="African country or global remote"
+                        aria-label="Country, region, or global remote"
                         className="w-full p-1.5 md:p-2 rounded bg-white/80 text-gray-800 text-sm md:text-base"
                       >
-                        <option value="">All African countries</option>
+                        <option value="">All locations</option>
                         {locations.map((loc) => (
                           <option key={loc.country} value={loc.country}>
                             {loc.country}

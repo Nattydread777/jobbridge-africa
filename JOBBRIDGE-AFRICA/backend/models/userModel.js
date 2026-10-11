@@ -20,10 +20,12 @@ const userSchema = new mongoose.Schema({
     ],
   },
   country: { type: String },
-  bio: { type: String, maxlength: 300 },
+  phone: { type: String, trim: true },
+  bio: { type: String, maxlength: 1200 },
   profileImageUrl: { type: String },
   profileImagePublicId: { type: String },
   resumeUrl: { type: String },
+  resumePublicId: { type: String },
   education: [{
     school: String,
     degree: String,

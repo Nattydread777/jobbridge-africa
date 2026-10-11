@@ -18,11 +18,8 @@ const EmployerDashboard = () => {
   const fetchMyJobs = async () => {
     try {
       setLoading(true);
-      // Get all jobs and filter by current user as employer
-      const response = await api.get("/jobs");
-      const jobs = Array.isArray(response.data) ? response.data : response.data.jobs || [];
-      const userJobs = jobs.filter((job) => job.employer === user._id);
-      setMyJobs(userJobs);
+      const response = await api.get("/jobs/my-postings");
+      setMyJobs(response.data.jobs || []);
       setError("");
     } catch (error) {
       console.error("Error fetching jobs:", error);
@@ -180,6 +177,15 @@ const EmployerDashboard = () => {
                         <p className="text-gray-600 text-sm">
                           {application.applicant.email}
                         </p>
+                        {application.applicant.phone && (
+                          <p className="text-gray-600 text-sm">Phone: {application.applicant.phone}</p>
+                        )}
+                        {application.applicant.country && (
+                          <p className="text-gray-600 text-sm">Location: {application.applicant.country}</p>
+                        )}
+                        {application.applicant.bio && (
+                          <p className="mt-2 text-sm text-gray-700">{application.applicant.bio}</p>
+                        )}
                         <p className="text-gray-500 text-xs mt-1">
                           Applied:{" "}
                           {new Date(application.createdAt).toLocaleDateString()}
@@ -212,6 +218,43 @@ const EmployerDashboard = () => {
                           {application.coverLetter}
                         </p>
                       </div>
+                    )}
+
+                    {application.applicant.skills?.length > 0 && (
+                      <div className="mb-3">
+                        <p className="mb-1 text-sm font-semibold text-gray-700">Skills</p>
+                        <div className="flex flex-wrap gap-2">
+                          {application.applicant.skills.map((skill) => (
+                            <span key={skill} className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900">{skill}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {application.applicant.education?.length > 0 && (
+                      <div className="mb-3">
+                        <p className="mb-1 text-sm font-semibold text-gray-700">Education</p>
+                        {application.applicant.education.map((item, index) => (
+                          <p key={`${item.school}-${index}`} className="text-sm text-gray-600">
+                            {[item.degree, item.field, item.school, item.endYear].filter(Boolean).join(" · ")}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {application.applicant.experience?.length > 0 && (
+                      <div className="mb-3">
+                        <p className="mb-1 text-sm font-semibold text-gray-700">Experience</p>
+                        {application.applicant.experience.map((item, index) => (
+                          <p key={`${item.company}-${index}`} className="text-sm text-gray-600">
+                            {[item.position, item.company, item.startDate, item.endDate].filter(Boolean).join(" · ")}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+
+                    {application.resumeUrl && (
+                      <a href={application.resumeUrl} target="_blank" rel="noopener noreferrer" className="mb-3 inline-flex font-semibold text-primary hover:underline">
+                        View applicant resume ↗
+                      </a>
                     )}
 
                     {application.resumeUrl && (

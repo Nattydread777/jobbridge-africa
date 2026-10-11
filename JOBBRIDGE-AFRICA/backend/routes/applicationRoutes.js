@@ -11,13 +11,6 @@ import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Configure multer for file upload
-const storage = multer.diskStorage({
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  }
-});
-
 const fileFilter = (req, file, cb) => {
   // Accept PDF and Word documents only
   const allowedTypes = [
@@ -34,9 +27,9 @@ const fileFilter = (req, file, cb) => {
 };
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+  limits: { fileSize: 10 * 1024 * 1024 }
 });
 
 // Routes

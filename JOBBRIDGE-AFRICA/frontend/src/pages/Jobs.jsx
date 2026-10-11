@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation, useSearchParams, Link } from "react-router-dom";
 import api from "../services/api";
 import JobCard from "../components/JobCard";
-import locations from "../data/africaLocations";
+import locations from "../data/jobLocations";
 
 const Jobs = () => {
   const [jobs, setJobs] = useState([]);
@@ -145,7 +145,7 @@ const Jobs = () => {
               onChange={(e) => handleFilterChange("country", e.target.value)}
               className="w-full p-2 border rounded mb-2"
             >
-              <option value="">All African countries</option>
+              <option value="">All locations</option>
               {locations.map((loc) => (
                 <option key={loc.country} value={loc.country}>
                   {loc.country}

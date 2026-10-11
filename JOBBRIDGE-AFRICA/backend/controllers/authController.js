@@ -4,7 +4,10 @@ import generateToken from '../utils/generateToken.js';
 import cloudinary from '../config/cloudinary.js';
 
 export const registerUser = asyncHandler(async (req, res) => {
-  const { name, email, password, role, companyName } = req.body;
+  const {
+    name, email, password, role, companyName, country, phone, bio,
+    skills, education, experience,
+  } = req.body;
 
   if (!name || !email || !password || !role) {
     res.status(400);
@@ -17,7 +20,26 @@ export const registerUser = asyncHandler(async (req, res) => {
     throw new Error('User already exists');
   }
 
-  const user = await User.create({ name, email, password, role, companyName });
+  if (!['job_seeker', 'employer'].includes(role)) {
+    res.status(400);
+    throw new Error('Choose a valid account type.');
+  }
+
+  const user = await User.create({
+    name: name.trim(),
+    email: email.trim().toLowerCase(),
+    password,
+    role,
+    companyName,
+    ...(role === 'job_seeker' && {
+      country,
+      phone,
+      bio,
+      skills: Array.isArray(skills) ? skills.slice(0, 100) : [],
+      education: Array.isArray(education) ? education.slice(0, 20) : [],
+      experience: Array.isArray(experience) ? experience.slice(0, 20) : [],
+    }),
+  });
 
   if (user) {
     generateToken(res, user._id);
@@ -26,6 +48,13 @@ export const registerUser = asyncHandler(async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      country: user.country,
+      phone: user.phone,
+      bio: user.bio,
+      skills: user.skills,
+      education: user.education,
+      experience: user.experience,
+      resumeUrl: user.resumeUrl,
     });
   } else {
     res.status(400);
@@ -64,14 +93,16 @@ export const getUserProfile = asyncHandler(async (req, res) => {
       email: req.user.email,
       role: req.user.role,
       country: req.user.country,
+      phone: req.user.phone,
       bio: req.user.bio,
       resumeUrl: req.user.resumeUrl,
+      resumePublicId: req.user.resumePublicId,
       profileImageUrl: req.user.profileImageUrl,
       profileImagePublicId: req.user.profileImagePublicId,
       companyName: req.user.companyName,
-  education: req.user.education,
-  experience: req.user.experience,
-  skills: req.user.skills,
+      education: req.user.education,
+      experience: req.user.experience,
+      skills: req.user.skills,
     });
   } else {
     res.status(404);
@@ -86,14 +117,15 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
     user.name = req.body.name || user.name;
     user.email = req.body.email || user.email;
     user.country = req.body.country || user.country;
-    user.bio = req.body.bio || user.bio;
+    user.phone = req.body.phone ?? user.phone;
+    user.bio = req.body.bio ?? user.bio;
     user.resumeUrl = req.body.resumeUrl || user.resumeUrl;
     user.profileImageUrl = req.body.profileImageUrl || user.profileImageUrl;
     user.profileImagePublicId = req.body.profileImagePublicId || user.profileImagePublicId;
     
-  if (req.body.education !== undefined) user.education = req.body.education;
-  if (req.body.experience !== undefined) user.experience = req.body.experience;
-  if (req.body.skills !== undefined) user.skills = req.body.skills;
+    if (req.body.education !== undefined) user.education = req.body.education;
+    if (req.body.experience !== undefined) user.experience = req.body.experience;
+    if (req.body.skills !== undefined) user.skills = req.body.skills;
     
     if (user.role === 'employer') {
       user.companyName = req.body.companyName || user.companyName;
@@ -111,19 +143,61 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
       email: updatedUser.email,
       role: updatedUser.role,
       country: updatedUser.country,
+      phone: updatedUser.phone,
       bio: updatedUser.bio,
       resumeUrl: updatedUser.resumeUrl,
+      resumePublicId: updatedUser.resumePublicId,
       profileImageUrl: updatedUser.profileImageUrl,
       profileImagePublicId: updatedUser.profileImagePublicId,
       companyName: updatedUser.companyName,
-  education: updatedUser.education,
-  experience: updatedUser.experience,
-  skills: updatedUser.skills,
+      education: updatedUser.education,
+      experience: updatedUser.experience,
+      skills: updatedUser.skills,
     });
+
   } else {
     res.status(404);
     throw new Error('User not found');
   }
+});
+
+export const uploadResume = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    res.status(400);
+    throw new Error('Choose a resume file to upload.');
+  }
+
+  const result = await new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder: 'jobbridge/resumes', resource_type: 'raw' },
+      (error, uploaded) => (error ? reject(error) : resolve(uploaded)),
+    );
+    stream.end(req.file.buffer);
+  });
+
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+  const previousPublicId = user.resumePublicId;
+  user.resumeUrl = result.secure_url;
+  user.resumePublicId = result.public_id;
+  await user.save();
+
+  if (previousPublicId) {
+    try {
+      await cloudinary.uploader.destroy(previousPublicId, { resource_type: 'raw' });
+    } catch (error) {
+      console.error('Could not remove previous resume from Cloudinary:', error.message);
+    }
+  }
+
+  res.status(200).json({
+    resumeUrl: user.resumeUrl,
+    resumePublicId: user.resumePublicId,
+    message: 'Resume uploaded successfully.',
+  });
 });
 
 export const uploadProfileImage = asyncHandler(async (req, res) => {

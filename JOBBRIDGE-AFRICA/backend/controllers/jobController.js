@@ -56,17 +56,24 @@ export const getJobs = asyncHandler(async (req, res) => {
   }
 
   const worldwideCountry = String(country || '').toLowerCase() === 'worldwide';
-  const locationFilter = location || city || (worldwideCountry ? '' : country);
   if (worldwideCountry) {
     filters.push({ isWorldwideRemote: true });
   }
-  if (locationFilter) {
-    const escapedLocation = escapeRegex(String(locationFilter).trim());
+  const locationTerms = location
+    ? [{ value: location, includeWorldwideRemote: false }]
+    : [
+      { value: city, includeWorldwideRemote: false },
+      ...(!worldwideCountry ? [{ value: country, includeWorldwideRemote: true }] : []),
+    ];
+  for (const term of locationTerms.filter(({ value }) => value)) {
+    const escapedLocation = escapeRegex(String(term.value).trim());
     filters.push({
       $or: [
         { location: { $regex: escapedLocation, $options: 'i' } },
         { locationRestriction: { $regex: escapedLocation, $options: 'i' } },
-        ...(country ? [{ $and: [{ isRemote: true }, { isWorldwideRemote: true }] }] : []),
+        ...(term.includeWorldwideRemote
+          ? [{ $and: [{ isRemote: true }, { isWorldwideRemote: true }] }]
+          : []),
       ],
     });
   }
@@ -239,6 +246,11 @@ export const getJobs = asyncHandler(async (req, res) => {
     totalPages: Math.ceil(total / pageSize),
     nextCursor,
   });
+});
+
+export const getEmployerJobs = asyncHandler(async (req, res) => {
+  const jobs = await Job.find({ postedBy: req.user._id }).sort({ createdAt: -1 });
+  res.status(200).json({ jobs, total: jobs.length });
 });
 
 // @desc    Get single job by ID (public)

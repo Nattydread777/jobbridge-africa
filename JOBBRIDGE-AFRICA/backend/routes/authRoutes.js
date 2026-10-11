@@ -8,7 +8,8 @@ import {
     getUserProfile,
     updateUserProfile,
   uploadProfileImage,
-  bootstrapAdmin
+    uploadResume,
+    bootstrapAdmin
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -28,6 +29,20 @@ const upload = multer({
     }
   },
 });
+const resumeUpload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
+    ];
+    if (allowedTypes.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Resume must be a PDF, DOC, DOCX, or TXT file.'));
+  },
+});
 
 // Public Routes
 router.post('/register', registerUser);
@@ -40,5 +55,6 @@ router.post('/logout', logoutUser);
 router.get('/me', protect, getUserProfile); // Uses the 'protect' middleware to ensure a user is logged in
 router.put('/profile', protect, updateUserProfile); // Update user profile
 router.post('/upload-profile-image', protect, upload.single('profileImage'), uploadProfileImage); // Upload profile image
+router.post('/upload-resume', protect, resumeUpload.single('resume'), uploadResume);
 
 export default router;

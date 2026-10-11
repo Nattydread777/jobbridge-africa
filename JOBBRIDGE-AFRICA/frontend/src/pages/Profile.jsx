@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../services/api";
-import africaLocations from "../data/africaLocations";
+import africaLocations from "../data/jobLocations";
+import { extractResumeText, parseResumeText } from "../utils/resumeParser";
 
 // Common skills database for AI matching
 const COMMON_SKILLS = [
@@ -165,7 +166,6 @@ const Profile = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("photo");
   const [resumeFile, setResumeFile] = useState(null);
-  const [profileImage, setProfileImage] = useState(null);
   const [profileImagePreview, setProfileImagePreview] = useState(
     user?.profileImageUrl || null
   );
@@ -207,122 +207,49 @@ const Profile = () => {
     }
   }, [user]);
 
-  // Mock function to simulate resume parsing
-  const parseResume = (fileName) => {
-    // In production, this would call a backend API that uses:
-    // - OCR for PDF/images
-    // - NLP for text extraction
-    // - Pattern matching for skills, education, experience
-
-    // Mock data based on common resume patterns
-    const mockParsedData = {
-      phone: "+234 123 456 7890",
-      location: "Lagos, Nigeria",
-      summary:
-        "Experienced software developer with 5+ years in full-stack development. Passionate about building scalable web applications and mentoring junior developers.",
-      skills: [
-        "JavaScript",
-        "React",
-        "Node.js",
-        "MongoDB",
-        "Express",
-        "TypeScript",
-        "Git",
-        "Agile/Scrum",
-      ],
-      education: [
-        {
-          school: "University of Lagos",
-          degree: "Bachelor of Science",
-          field: "Computer Science",
-          startYear: "2015",
-          endYear: "2019",
-        },
-      ],
-      experience: [
-        {
-          company: "Tech Solutions Ltd",
-          position: "Senior Full-Stack Developer",
-          location: "Lagos, Nigeria",
-          startDate: "2021-01",
-          endDate: "",
-          description:
-            "Lead developer for e-commerce platform serving 50k+ users. Implemented microservices architecture, reducing load time by 40%.",
-        },
-        {
-          company: "StartUp Hub",
-          position: "Junior Developer",
-          location: "Lagos, Nigeria",
-          startDate: "2019-06",
-          endDate: "2020-12",
-          description:
-            "Developed responsive web applications using React and Node.js. Collaborated with design team on UI/UX improvements.",
-        },
-      ],
-    };
-
-    return mockParsedData;
-  };
-
   const handleResumeUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
-      const allowedTypes = [
-        "application/pdf",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      ];
-      if (!allowedTypes.includes(file.type)) {
-        alert("Please upload a PDF or Word document");
-        return;
-      }
-
-      // Validate file size (5MB max)
-      if (file.size > 5 * 1024 * 1024) {
-        alert("File size must be less than 5MB");
-        return;
-      }
-
       setResumeFile(file);
       setParsing(true);
 
       try {
-        // Upload resume to backend (will be stored in Cloudinary)
+        const parsedData = parseResumeText(await extractResumeText(file));
+        const nextProfile = {
+          ...profile,
+          name: parsedData.name || profile.name,
+          email: parsedData.email || profile.email,
+          phone: parsedData.phone || profile.phone,
+          bio: parsedData.bio || profile.bio,
+          skills: [...new Set([...profile.skills, ...parsedData.skills])],
+          education: parsedData.education.length ? parsedData.education : profile.education,
+          experience: parsedData.experience.length ? parsedData.experience : profile.experience,
+        };
+        setProfile(nextProfile);
         const formData = new FormData();
         formData.append("resume", file);
-
-        // For now, we'll simulate the upload. In production, add resume upload endpoint
-        // const uploadResponse = await api.post('/auth/upload-resume', formData);
-        // const resumeUrl = uploadResponse.data.resumeUrl;
-
-        // Simulate upload and get URL
-        const resumeUrl = URL.createObjectURL(file);
-
-        // Update user profile with resume URL
+        await api.post("/auth/upload-resume", formData);
         await api.put("/auth/profile", {
-          resumeUrl: resumeUrl,
+          name: nextProfile.name,
+          email: nextProfile.email,
+          phone: nextProfile.phone,
+          country: nextProfile.country,
+          bio: nextProfile.bio,
+          skills: nextProfile.skills,
+          education: nextProfile.education,
+          experience: nextProfile.experience,
         });
-
-        // Refresh user data from server
         await refreshUser();
-
-        // Simulate parsing delay
-        setTimeout(() => {
-          // Don't auto-fill with mock data - just confirm upload
-          setParsing(false);
-          alert(
-            `✅ Resume uploaded successfully!\n\nYour resume has been saved. Please fill in your profile details manually in the tabs below.`
-          );
-
-          // Switch to basic info tab
-          setActiveTab("basic");
-        }, 2000);
+        setActiveTab("basic");
+        alert("Resume uploaded and readable profile details were prefilled. Review and save your profile.");
       } catch (error) {
         console.error("Error uploading resume:", error);
-        alert(error.response?.data?.message || "Failed to upload resume");
+        alert(error.response?.data?.message || error.message || "Failed to upload or read resume");
+        setResumeFile(null);
         setParsing(false);
+        return;
       }
+      setParsing(false);
     }
   };
 
@@ -348,7 +275,6 @@ const Profile = () => {
         return;
       }
 
-      setProfileImage(file);
       setProfileImagePreview(URL.createObjectURL(file));
       setUploadingImage(true);
 
@@ -466,6 +392,7 @@ const Profile = () => {
       await api.put("/auth/profile", {
         name: profile.name,
         email: profile.email,
+        phone: profile.phone,
         country: profile.country,
         bio: profile.bio,
         education: profile.education,
@@ -734,7 +661,6 @@ const Profile = () => {
                   <button
                     onClick={() => {
                       if (confirm("Remove profile photo?")) {
-                        setProfileImage(null);
                         setProfileImagePreview(null);
                       }
                     }}
@@ -841,7 +767,7 @@ const Profile = () => {
               <input
                 type="file"
                 id="resume-upload"
-                accept=".pdf,.doc,.docx"
+                accept=".pdf,.docx,.txt"
                 onChange={handleResumeUpload}
                 disabled={parsing}
                 className="hidden"
@@ -859,7 +785,7 @@ const Profile = () => {
                     : "Click to upload your resume"}
                 </p>
                 <p className="text-sm text-gray-500">
-                  Supported formats: PDF, DOC, DOCX (Max 5MB)
+                  Supported formats: PDF, DOCX, TXT (up to 10MB)
                 </p>
               </label>
             </div>

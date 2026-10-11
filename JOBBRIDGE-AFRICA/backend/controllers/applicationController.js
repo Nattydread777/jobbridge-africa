@@ -1,7 +1,9 @@
 import asyncHandler from 'express-async-handler';
 import Application from '../models/Application.js';
 import Job from '../models/Job.js';
+import User from '../models/userModel.js';
 import cloudinary from '../config/cloudinary.js';
+import { sendEmployerApplicationNotification } from '../services/emailService.js';
 
 // @desc    Submit job application
 // @route   POST /api/applications
@@ -43,40 +45,73 @@ export const submitApplication = asyncHandler(async (req, res) => {
     throw new Error('You have already applied for this job');
   }
 
-  // Check if resume file was uploaded
-  if (!req.file) {
+  const applicant = await User.findById(req.user._id);
+  if (!applicant || applicant.role !== 'job_seeker') {
+    res.status(403);
+    throw new Error('Only job seekers can apply for jobs.');
+  }
+  if (!req.file && !applicant.resumeUrl) {
     res.status(400);
-    throw new Error('Resume/CV is required');
+    throw new Error('Upload a resume to your profile or attach one to this application.');
   }
 
+  let resumeUrl = applicant.resumeUrl;
+  let resumePublicId;
   try {
-    // Upload resume to Cloudinary
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: 'jobbridge_resumes',
-      resource_type: 'auto',
-      format: 'pdf' // Convert to PDF if possible
-    });
+    if (req.file) {
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: 'jobbridge/application-resumes', resource_type: 'raw' },
+          (error, uploaded) => (error ? reject(error) : resolve(uploaded)),
+        );
+        stream.end(req.file.buffer);
+      });
+      resumeUrl = result.secure_url;
+      resumePublicId = result.public_id;
+    }
 
-    // Create application
     const application = await Application.create({
       job: jobId,
       applicant: req.user._id,
       coverLetter: coverLetter || '',
-      resumeUrl: result.secure_url,
-      resumePublicId: result.public_id
+      resumeUrl,
+      resumePublicId,
     });
 
-    // Populate job and applicant details
     await application.populate('job', 'title companyName location');
-    await application.populate('applicant', 'name email');
+    await application.populate('applicant', 'name email phone country bio skills education experience');
+
+    let notificationSent = false;
+    const employer = await User.findById(job.postedBy).select('name email');
+    const recipient = job.applicationEmail || employer?.email;
+    try {
+      if (!employer?.email && !job.applicationEmail) {
+        throw new Error('No employer notification email is available.');
+      }
+      await sendEmployerApplicationNotification({
+        recipient,
+        job,
+        applicant,
+        application,
+      });
+      notificationSent = true;
+    } catch (notificationError) {
+      console.error(`Application ${application._id} saved, but employer email failed:`, notificationError.message);
+    }
 
     res.status(201).json({
       message: 'Application submitted successfully',
-      application
+      application,
+      notificationSent,
     });
   } catch (error) {
-    res.status(500);
-    throw new Error('Failed to upload resume. Please try again.');
+    if (error.code === 11000) {
+      res.status(409);
+      throw new Error('You have already applied for this job.');
+    }
+    if (error.statusCode) res.status(error.statusCode);
+    else res.status(500);
+    throw new Error(error.message || 'Failed to submit application. Please try again.');
   }
 });
 
@@ -110,7 +145,7 @@ export const getJobApplications = asyncHandler(async (req, res) => {
   }
 
   const applications = await Application.find({ job: jobId })
-    .populate('applicant', 'name email')
+    .populate('applicant', 'name email phone country bio skills education experience resumeUrl')
     .sort('-createdAt');
 
   res.status(200).json(applications);
@@ -170,7 +205,7 @@ export const deleteApplication = asyncHandler(async (req, res) => {
   // Delete resume from Cloudinary
   if (application.resumePublicId) {
     try {
-      await cloudinary.uploader.destroy(application.resumePublicId);
+      await cloudinary.uploader.destroy(application.resumePublicId, { resource_type: 'raw' });
     } catch (error) {
       console.error('Error deleting resume from Cloudinary:', error);
     }

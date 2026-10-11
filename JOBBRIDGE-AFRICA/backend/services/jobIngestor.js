@@ -5,24 +5,7 @@ const HIMALAYAS_API = 'https://himalayas.app/jobs/api';
 const PAGE_SIZE = 20;
 const REQUEST_DELAY_MS = 500;
 const SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
-const AFRICAN_COUNTRIES = [
-  'Algeria', 'Angola', 'Benin', 'Botswana', 'Burkina Faso', 'Burundi',
-  'Cabo Verde', 'Cameroon', 'Central African Republic', 'Chad', 'Comoros',
-  'Democratic Republic of the Congo', 'Djibouti', 'Egypt', 'Equatorial Guinea',
-  'Eritrea', 'Eswatini', 'Ethiopia', 'Gabon', 'Gambia', 'Ghana', 'Guinea',
-  'Guinea-Bissau', 'Ivory Coast', 'Cote d’Ivoire', 'Kenya', 'Lesotho', 'Liberia',
-  'Libya', 'Madagascar', 'Malawi', 'Mali', 'Mauritania', 'Mauritius', 'Morocco',
-  'Mozambique', 'Namibia', 'Niger', 'Nigeria', 'Republic of the Congo', 'Rwanda',
-  'Sao Tome and Principe', 'Senegal', 'Seychelles', 'Sierra Leone', 'Somalia',
-  'South Africa', 'South Sudan', 'Sudan', 'Tanzania', 'Togo', 'Tunisia', 'Uganda',
-  'Zambia', 'Zimbabwe',
-];
-const AFRICA_COUNTRY_PATTERN = new RegExp(
-  `\\b(?:${AFRICAN_COUNTRIES.map((country) => country.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`,
-  'i',
-);
 const WORLDWIDE_PATTERN = /\b(worldwide|global(?:ly)?|anywhere|any location|africa)\b/i;
-const EXCLUDED_FROM_AFRICA_PATTERN = /\b(?:excluding|except|excludes?|not available in|not eligible in|not open to|outside(?: of)?)\s+(?:the\s+)?africa\b|\bafrica\b[^.;]{0,30}\b(?:excluded|not eligible|not available)\b/i;
 
 const pause = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -69,11 +52,6 @@ const normalizeJob = (job) => {
     job.locationRestriction || job.locationRestrictions || job.location,
   );
   const restrictionScope = `${locationRestriction} ${asText(job.location)}`;
-  const excludesAfrica = EXCLUDED_FROM_AFRICA_PATTERN.test(restrictionScope);
-  const africaAccessible = !excludesAfrica && (
-    WORLDWIDE_PATTERN.test(restrictionScope)
-    || AFRICA_COUNTRY_PATTERN.test(restrictionScope)
-  );
   const rawPubDate = job.pubDate;
   const pubDateValue = typeof rawPubDate === 'number' && rawPubDate < 1e12
     ? rawPubDate * 1000
@@ -88,7 +66,6 @@ const normalizeJob = (job) => {
     || /\b(on[- ]?site|office[- ]based)\b/i.test(asText(job.workplaceType || job.locationType))) {
     return null;
   }
-  if (!africaAccessible) return null;
   let applicationLink;
   try {
     const parsedApplicationUrl = new URL(applicationUrl);
@@ -114,7 +91,7 @@ const normalizeJob = (job) => {
     sourceProvider: 'himalayas',
     isDirectPosting: false,
     isRemote: true,
-    isWorldwideRemote: !excludesAfrica && WORLDWIDE_PATTERN.test(restrictionScope),
+    isWorldwideRemote: WORLDWIDE_PATTERN.test(restrictionScope),
     title,
     companyName,
     companySlug,
@@ -123,7 +100,7 @@ const normalizeJob = (job) => {
     pubDate: safePubDate,
     applicationLink,
     locationRestriction,
-    location: locationRestriction || 'Worldwide remote',
+    location: locationRestriction || 'Remote',
     jobType: normalizeJobType(job.employmentType || job.jobType),
     seniority,
     salary,
@@ -213,7 +190,7 @@ export const ingestHimalayasJobs = async () => {
     }
   } while (cursor);
 
-  console.info(`Himalayas sync complete: fetched ${fetched}, upserted ${upserted}, skipped ${skipped}`);
+  console.info(`Global remote sync complete: fetched ${fetched}, upserted ${upserted}, skipped ${skipped}`);
   return { fetched, upserted, skipped };
 };
 
@@ -228,7 +205,7 @@ export const scheduleDailyJobIngestion = () => {
       try {
         await ingestHimalayasJobs();
       } catch (error) {
-        console.error('Scheduled Himalayas job sync failed:', error);
+        console.error('Scheduled global remote job sync failed:', error);
       }
     };
     run();
@@ -237,5 +214,5 @@ export const scheduleDailyJobIngestion = () => {
 
   const timer = setTimeout(startDailyInterval, nextRun.getTime() - now.getTime());
   timer.unref();
-  console.info(`Himalayas job sync scheduled for ${nextRun.toISOString()}`);
+  console.info(`Global remote job sync scheduled for ${nextRun.toISOString()}`);
 };

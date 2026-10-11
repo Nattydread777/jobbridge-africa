@@ -27,28 +27,10 @@ const JobDetails = () => {
       .then((res) => {
         setJob(res.data);
         setLoading(false);
-        // Auto-open modal if hash is #apply and user is authenticated
+        // Auto-open the application form when arriving from a listing CTA.
         const isDirectPosting = res.data.source === "employer"
           || (res.data.source == null && res.data.isDirectPosting !== false);
         if (isDirectPosting && location.hash === "#apply" && isAuthenticated && user) {
-          // Check profile completion before auto-opening
-          if (user.role === "job_seeker") {
-            if (
-              !user.profileImageUrl ||
-              !user.resumeUrl ||
-              !user.country ||
-              !user.bio
-            ) {
-              if (
-                window.confirm(
-                  "Please complete your profile (upload photo, upload resume, add country and bio) before applying.\n\nGo to profile now?"
-                )
-              ) {
-                navigate("/profile");
-              }
-              return;
-            }
-          }
           setShowApplicationModal(true);
         }
       })
@@ -67,43 +49,9 @@ const JobDetails = () => {
       return;
     }
 
-    // Check if job seeker has completed profile
-    if (user.role === "job_seeker") {
-      // Check if user has uploaded a profile photo
-      if (!user.profileImageUrl) {
-        if (
-          window.confirm(
-            "Please upload your profile photo before applying for jobs.\n\nWould you like to go to your profile now?"
-          )
-        ) {
-          navigate("/profile");
-        }
-        return;
-      }
-
-      // Check if user has uploaded a resume
-      if (!user.resumeUrl) {
-        if (
-          window.confirm(
-            "Please complete your profile and upload your resume before applying for jobs.\n\nWould you like to go to your profile now?"
-          )
-        ) {
-          navigate("/profile");
-        }
-        return;
-      }
-
-      // Check if user has filled basic info
-      if (!user.country || !user.bio) {
-        if (
-          window.confirm(
-            "Please complete your profile information (country and bio) before applying for jobs.\n\nWould you like to go to your profile now?"
-          )
-        ) {
-          navigate("/profile");
-        }
-        return;
-      }
+    if (user.role !== "job_seeker") {
+      alert("Only job seeker accounts can apply through JobBridge.");
+      return;
     }
 
     setShowApplicationModal(true);
@@ -122,19 +70,18 @@ const JobDetails = () => {
         alert("Please upload a PDF or Word document for your resume");
         return;
       }
-      // Validate file size (5MB max)
-      if (file.size > 5 * 1024 * 1024) {
-        alert("Resume file size must be less than 5MB");
+      if (file.size > 10 * 1024 * 1024) {
+        alert("Resume file size must be less than 10MB");
         return;
       }
-      setApplicationData({ ...applicationData, resume: file });
+      setApplicationData((current) => ({ ...current, resume: file }));
     }
   };
 
   const handleSubmitApplication = async (e) => {
     e.preventDefault();
 
-    if (!applicationData.resume) {
+    if (!applicationData.resume && !user?.resumeUrl) {
       alert("Please upload your resume/CV");
       return;
     }
@@ -142,24 +89,23 @@ const JobDetails = () => {
     setSubmitting(true);
 
     try {
-      // Send application to backend with FormData
-      const formData = new FormData();
-      formData.append("jobId", id);
-      formData.append("coverLetter", applicationData.coverLetter);
-      formData.append("resume", applicationData.resume);
-
-      const response = await api.post("/applications", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      const body = applicationData.resume ? new FormData() : {
+        jobId: id,
+        coverLetter: applicationData.coverLetter,
+      };
+      if (applicationData.resume) {
+        body.append("jobId", id);
+        body.append("coverLetter", applicationData.coverLetter);
+        body.append("resume", applicationData.resume);
+      }
+      const { data } = await api.post("/applications", body);
 
       setApplied(true);
       setShowApplicationModal(false);
       setSubmitting(false);
-      alert(
-        "✅ Application submitted successfully!\n\nThe employer will review your application and contact you via email."
-      );
+      alert(data.notificationSent
+        ? "✅ Application submitted successfully!\n\nThe employer has been notified and can review your profile and resume."
+        : "✅ Your application was saved. Email notification could not be delivered, but the employer can review it in their dashboard.");
       // Redirect to My Jobs page
       navigate("/my-jobs");
     } catch (err) {
@@ -303,13 +249,18 @@ const JobDetails = () => {
                   <label className="block text-sm font-medium mb-2">
                     Resume/CV <span className="text-red-500">*</span>
                   </label>
+                  {user?.resumeUrl && !applicationData.resume && (
+                    <div className="mb-3 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                      <span className="text-sm text-emerald-900">Use the resume saved on your profile</span>
+                      <a href={user.resumeUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-emerald-800 underline">Preview</a>
+                    </div>
+                  )}
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                     <input
                       type="file"
                       id="resume-upload"
                       accept=".pdf,.doc,.docx"
                       onChange={handleFileChange}
-                      required
                       className="hidden"
                     />
                     <label
@@ -320,10 +271,10 @@ const JobDetails = () => {
                       <p className="text-sm font-medium mb-1">
                         {applicationData.resume
                           ? `Selected: ${applicationData.resume.name}`
-                          : "Click to upload your resume/CV"}
+                          : user?.resumeUrl ? "Choose a different resume (optional)" : "Click to upload your resume/CV"}
                       </p>
                       <p className="text-xs text-gray-500">
-                        Supported formats: PDF, DOC, DOCX (Max 5MB)
+                        Supported formats: PDF, DOC, DOCX (Max 10MB). Your saved profile resume is used by default.
                       </p>
                     </label>
                   </div>
@@ -362,6 +313,10 @@ const JobDetails = () => {
                   <p className="text-sm text-gray-700">
                     <strong>Email:</strong> {user?.email}
                   </p>
+                  {user?.phone && <p className="text-sm text-gray-700"><strong>Phone:</strong> {user.phone}</p>}
+                  {user?.country && <p className="text-sm text-gray-700"><strong>Country:</strong> {user.country}</p>}
+                  {user?.bio && <p className="mt-2 text-sm text-gray-700"><strong>Summary:</strong> {user.bio}</p>}
+                  {user?.skills?.length > 0 && <p className="mt-2 text-sm text-gray-700"><strong>Skills:</strong> {user.skills.join(", ")}</p>}
                   <p className="text-xs text-gray-500 mt-2">
                     This information will be sent to the employer along with
                     your application.
