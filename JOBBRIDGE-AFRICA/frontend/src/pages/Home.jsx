@@ -18,17 +18,16 @@ const Home = () => {
   const handleSearch = (e) => {
     e.preventDefault();
     const params = new URLSearchParams();
-    if (searchTerm) params.set("search", searchTerm);
+    if (searchTerm.trim()) params.set("q", searchTerm.trim());
     if (country) params.set("country", country);
-    if (city) params.set("city", city);
+    if (city && country !== "Worldwide") params.set("city", city);
+    if (country === "Worldwide") params.set("isRemote", "true");
     if (jobType && jobType !== "All") params.set("jobType", jobType);
-    navigate(`/jobs?${params.toString()}`);
+    navigate(`/jobs${params.size ? `?${params.toString()}` : ""}`);
   };
 
   useEffect(() => {
-    // when country changes, reset city to first in list
-    const entry = locations.find((l) => l.country === country);
-    setCity(entry?.cities?.[0] || "");
+    setCity("");
   }, [country]);
 
   // Auto-rotate carousel
@@ -144,7 +143,7 @@ const Home = () => {
                     ))}
                   </div>
 
-                  <div className="grid grid-cols-1 gap-1.5 mb-1.5 md:mb-0 md:grid-cols-3 md:gap-4">
+                  <div className="grid grid-cols-1 gap-1.5 mb-1.5 md:mb-0 md:grid-cols-4 md:gap-4">
                     <label className="flex items-center md:border-r md:border-gray-300 md:pr-4">
                       <span className="sr-only">Job title or keyword</span>
                       <span
@@ -167,23 +166,28 @@ const Home = () => {
                       <select
                         value={country}
                         onChange={(e) => setCountry(e.target.value)}
+                        aria-label="African country or global remote"
                         className="w-full p-1.5 md:p-2 rounded bg-white/80 text-gray-800 text-sm md:text-base"
                       >
+                        <option value="">All African countries</option>
                         {locations.map((loc) => (
                           <option key={loc.country} value={loc.country}>
                             {loc.country}
                           </option>
                         ))}
+                        <option value="Worldwide">Worldwide / Global Remote</option>
                       </select>
                     </div>
 
-                    <div>
-                      <label className="sr-only">City</label>
+                    <div className={country === "Worldwide" ? "hidden" : ""}>
                       <select
                         value={city}
                         onChange={(e) => setCity(e.target.value)}
+                        aria-label="City"
+                        disabled={country === "Worldwide" || !country}
                         className="w-full p-1.5 md:p-2 rounded bg-white/80 text-gray-800 text-sm md:text-base"
                       >
+                        <option value="">All cities</option>
                         {locations
                           .find((l) => l.country === country)
                           ?.cities?.map((c) => (
@@ -429,18 +433,7 @@ const Home = () => {
         <p className="rounded-full bg-white px-4 py-2">
           Advancing UN SDG 8: Decent Work and Economic Growth
         </p>
-        <p>
-          Remote job listings sourced from{" "}
-          <a
-            href="https://himalayas.app/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold text-terracotta underline"
-          >
-            Himalayas
-          </a>
-          . Powered by Himalayas.
-        </p>
+        <p>Worldwide remote listings curated through our Global Partner Feeds.</p>
         <Link to="/pricing" className="font-bold text-terracotta underline">
           View plans
         </Link>

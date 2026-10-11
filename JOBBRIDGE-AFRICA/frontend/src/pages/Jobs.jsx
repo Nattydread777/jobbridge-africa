@@ -8,6 +8,7 @@ const Jobs = () => {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [retryKey, setRetryKey] = useState(0);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0, nextCursor: null });
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -27,10 +28,12 @@ const Jobs = () => {
   const { search } = useLocation();
 
   useEffect(() => {
+    const controller = new AbortController();
     setLoading(true);
+    setError("");
     const params = search || "";
     api
-      .get(`/jobs${params}`)
+      .get(`/jobs${params}`, { signal: controller.signal })
       .then((res) => {
         const data = res.data;
         setJobs(Array.isArray(data) ? data : data.jobs || []);
@@ -44,24 +47,37 @@ const Jobs = () => {
         setLoading(false);
       })
       .catch((err) => {
-        console.error(err);
-        setError(err.response?.data?.message || "Failed to load jobs. Please try again.");
-        setLoading(false);
+        if (err.code === "ERR_CANCELED") return;
+        console.error("Failed to load jobs:", err);
+        const message = err.response?.data?.message
+          || (err.request
+            ? "We couldn’t reach the jobs service. Check your connection and try again."
+            : "Jobs could not be loaded. Please try again.");
+        setError(message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
       });
-  }, [search]);
+    return () => controller.abort();
+  }, [search, retryKey]);
 
   const handleFilterChange = (key, value) => {
     const newFilters = {
       ...filters,
       [key]: value,
       ...(key === "country" ? { city: "" } : {}),
+      ...(key === "country" && value === "Worldwide" ? { isRemote: "true" } : {}),
+      ...(key === "country" && value !== "Worldwide" && filters.country === "Worldwide"
+        ? { isRemote: "" }
+        : {}),
     };
     setFilters(newFilters);
 
     // Update URL params
     const params = new URLSearchParams();
     Object.entries(newFilters).forEach(([k, v]) => {
-      if (v && k !== "experience") params.set(k, v);
+      if (!v || k === "experience") return;
+      params.set(k === "search" ? "q" : k, v);
     });
     if (newFilters.experience) {
       const seniority = {
@@ -86,20 +102,17 @@ const Jobs = () => {
     <div className="max-w-7xl mx-auto p-6">
       {/* Back to Dashboard Link */}
       <Link
-        to="/dashboard"
+        to="/"
         className="text-primary hover:underline mb-4 inline-flex items-center gap-2 font-medium"
       >
-        <span>←</span> Back to Dashboard
+          <span>←</span> Back to Home
       </Link>
 
       <h1 className="text-3xl font-bold mb-2 text-charcoal">Find Your Dream Job</h1>
       <p className="mb-6 text-sm text-stone-600">
         JobBridge Africa prioritizes direct African employer opportunities and uses global feeds as
         enrichment. Direct roles use our candidate matching and application flow; worldwide roles
-        link to the employer&apos;s official site. Remote listings are credited to{" "}
-        <a href="https://himalayas.app/" target="_blank" rel="noopener noreferrer" className="font-semibold text-terracotta underline">
-          Himalayas
-        </a>.
+        link to the employer&apos;s official site.
       </p>
       <p className="mb-6 inline-flex rounded-full bg-amber-100 px-4 py-2 text-sm font-semibold text-terracotta-dark">
         UN SDG 8 · Decent Work and Economic Growth · Africa-first matching
@@ -128,14 +141,15 @@ const Jobs = () => {
               onChange={(e) => handleFilterChange("country", e.target.value)}
               className="w-full p-2 border rounded mb-2"
             >
-              <option value="">All Countries</option>
+              <option value="">All African countries</option>
               {locations.map((loc) => (
                 <option key={loc.country} value={loc.country}>
                   {loc.country}
                 </option>
               ))}
+              <option value="Worldwide">Worldwide / Global Remote</option>
             </select>
-            {filters.country && (
+            {filters.country && filters.country !== "Worldwide" && (
               <select
                 value={filters.city}
                 onChange={(e) => handleFilterChange("city", e.target.value)}
@@ -272,9 +286,22 @@ const Jobs = () => {
             Available Jobs {!loading && `(${pagination.total})`}
           </h2>
           {error ? (
-            <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-700">{error}</p>
+            <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800">
+              <h3 className="font-bold">Jobs are temporarily unavailable</h3>
+              <p className="mt-1 text-sm">{error}</p>
+              <button
+                type="button"
+                onClick={() => setRetryKey((key) => key + 1)}
+                className="mt-4 rounded-lg bg-terracotta px-4 py-2 font-semibold text-white hover:bg-terracotta-dark"
+              >
+                Try again
+              </button>
+            </div>
           ) : loading ? (
-            <p className="text-gray-600">Loading jobs...</p>
+            <div role="status" aria-live="polite" className="flex items-center gap-3 rounded-2xl bg-white p-6 text-stone-700 shadow-sm">
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-stone-300 border-t-terracotta" aria-hidden="true" />
+              Loading opportunities…
+            </div>
           ) : jobs.length === 0 ? (
             <p className="text-gray-600">No jobs available at the moment.</p>
           ) : (

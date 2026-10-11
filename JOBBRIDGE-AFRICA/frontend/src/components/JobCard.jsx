@@ -31,9 +31,7 @@ const JobCard = ({ job }) => {
       ) : (
         <p className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-terracotta-dark">
           {job.isWorldwideRemote ? "Worldwide remote" : "Africa-accessible remote"}
-          {job.sourceProvider === "himalayas" || job.source === "himalayas"
-            ? " · Powered by Himalayas"
-            : " · External listing"}
+          {" · Global Partner Feed"}
         </p>
       )}
       <p className="text-sm text-gray-600 mt-1">{job.jobType}</p>

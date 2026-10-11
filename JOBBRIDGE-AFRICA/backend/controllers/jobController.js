@@ -55,7 +55,11 @@ export const getJobs = asyncHandler(async (req, res) => {
     });
   }
 
-  const locationFilter = location || city || country;
+  const worldwideCountry = String(country || '').toLowerCase() === 'worldwide';
+  const locationFilter = location || city || (worldwideCountry ? '' : country);
+  if (worldwideCountry) {
+    filters.push({ isWorldwideRemote: true });
+  }
   if (locationFilter) {
     const escapedLocation = escapeRegex(String(locationFilter).trim());
     filters.push({

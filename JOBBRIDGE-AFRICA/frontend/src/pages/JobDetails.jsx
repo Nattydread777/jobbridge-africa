@@ -2,6 +2,7 @@ import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
+import PageBreadcrumb from "../components/PageBreadcrumb";
 
 const JobDetails = () => {
   const { id } = useParams();
@@ -179,12 +180,7 @@ const JobDetails = () => {
 
   return (
     <section className="max-w-4xl mx-auto p-6">
-      <Link
-        to="/jobs"
-        className="text-primary hover:underline mb-4 inline-block"
-      >
-        ← Back to Jobs
-      </Link>
+      <PageBreadcrumb to="/jobs" label="Back to Jobs" />
 
       <div className="bg-white rounded-lg shadow-md p-8">
         <h1 className="text-4xl font-bold text-primary mb-2">{job.title}</h1>
@@ -202,8 +198,7 @@ const JobDetails = () => {
         {job.source !== "employer" && job.isDirectPosting !== true && (
           <p className="mb-6 rounded-lg bg-amber-50 p-4 text-sm text-amber-950">
             This is an external {job.isWorldwideRemote ? "worldwide remote" : "Africa-accessible remote"} listing
-            {job.sourceProvider === "himalayas" || job.source === "himalayas" ? " powered by Himalayas" : ""}.
-            Applications are handled on the official employer career site.
+            from our Worldwide Remote Network. Applications are handled on the official employer career site.
           </p>
         )}
 

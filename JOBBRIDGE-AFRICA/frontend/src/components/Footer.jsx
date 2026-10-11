@@ -185,17 +185,7 @@ const Footer = () => {
 
         <div className="mt-10 flex flex-col gap-2 border-t border-white/10 pt-6 text-sm text-gray-400 sm:flex-row sm:items-center sm:justify-between">
           <p>Connecting African talent to decent work — advancing UN SDG 8.</p>
-          <p>
-            Remote listings powered by{" "}
-            <a
-              href="https://himalayas.app/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-primary hover:underline"
-            >
-              Himalayas
-            </a>
-          </p>
+          <p>Worldwide remote roles via our Global Partner Feeds.</p>
         </div>
 
         {/* Bottom bar */}

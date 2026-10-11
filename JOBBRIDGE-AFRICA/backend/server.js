@@ -44,7 +44,7 @@ if (missingEnvVars.length > 0) {
 connectDB().then(scheduleDailyJobIngestion);
 
 const app = express();
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 5000;
 
 // Trust Render/Proxy so secure cookies work correctly
 app.set('trust proxy', 1);
