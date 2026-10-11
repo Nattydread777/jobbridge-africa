@@ -13,10 +13,11 @@ const Jobs = () => {
 
   // Filter states
   const [filters, setFilters] = useState({
-    search: searchParams.get("search") || "",
+    search: searchParams.get("search") || searchParams.get("q") || "",
     country: searchParams.get("country") || "",
     city: searchParams.get("city") || "",
     jobType: searchParams.get("jobType") || "",
+    isRemote: searchParams.get("isRemote") || "",
     salary: searchParams.get("salary") || "",
     datePosted: searchParams.get("datePosted") || "",
     experience: searchParams.get("experience") || "",
@@ -50,7 +51,11 @@ const Jobs = () => {
   }, [search]);
 
   const handleFilterChange = (key, value) => {
-    const newFilters = { ...filters, [key]: value };
+    const newFilters = {
+      ...filters,
+      [key]: value,
+      ...(key === "country" ? { city: "" } : {}),
+    };
     setFilters(newFilters);
 
     // Update URL params
@@ -89,15 +94,32 @@ const Jobs = () => {
 
       <h1 className="text-3xl font-bold mb-2 text-charcoal">Find Your Dream Job</h1>
       <p className="mb-6 text-sm text-stone-600">
-        Browse local and remote roles. Remote listings are credited to{" "}
+        JobBridge Africa prioritizes direct African employer opportunities and uses global feeds as
+        enrichment. Direct roles use our candidate matching and application flow; worldwide roles
+        link to the employer&apos;s official site. Remote listings are credited to{" "}
         <a href="https://himalayas.app/" target="_blank" rel="noopener noreferrer" className="font-semibold text-terracotta underline">
           Himalayas
         </a>.
+      </p>
+      <p className="mb-6 inline-flex rounded-full bg-amber-100 px-4 py-2 text-sm font-semibold text-terracotta-dark">
+        UN SDG 8 · Decent Work and Economic Growth · Africa-first matching
       </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Filters Sidebar */}
         <aside className="lg:col-span-1 space-y-6">
+          <div className="bg-white p-4 rounded-lg shadow">
+            <label htmlFor="job-search" className="mb-2 block font-bold">Search jobs</label>
+            <input
+              id="job-search"
+              type="search"
+              value={filters.search}
+              onChange={(event) => handleFilterChange("search", event.target.value)}
+              placeholder="Title, company, or keyword"
+              className="w-full rounded border p-2"
+            />
+          </div>
+
           {/* Location Filter */}
           <div className="bg-white p-4 rounded-lg shadow">
             <h3 className="font-bold mb-3">📍 Location</h3>
@@ -191,6 +213,20 @@ const Jobs = () => {
               <option value="Contract">Contract</option>
               <option value="Remote">Remote</option>
               <option value="Internship">Internship</option>
+            </select>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow">
+            <label htmlFor="remote-filter" className="mb-3 block font-bold">Work location</label>
+            <select
+              id="remote-filter"
+              value={filters.isRemote}
+              onChange={(event) => handleFilterChange("isRemote", event.target.value)}
+              className="w-full rounded border p-2"
+            >
+              <option value="">Remote and on-site</option>
+              <option value="true">Remote</option>
+              <option value="false">On-site / hybrid</option>
             </select>
           </div>
 

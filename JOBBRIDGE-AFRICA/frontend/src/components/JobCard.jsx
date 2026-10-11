@@ -5,6 +5,8 @@ import { useAuth } from "../context/AuthContext";
 const JobCard = ({ job }) => {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const isDirectPosting = job.source === "employer"
+    || (job.source == null && job.isDirectPosting !== false);
 
   const handleApply = () => {
     if (!isAuthenticated) {
@@ -22,9 +24,16 @@ const JobCard = ({ job }) => {
       <p className="text-sm text-text mt-1">
         {job.companyName} – {job.location}
       </p>
-      {job.source === "himalayas" && (
+      {isDirectPosting ? (
+        <p className="mt-2 inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-900">
+          Direct employer · JobBridge matching
+        </p>
+      ) : (
         <p className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-terracotta-dark">
-          Powered by Himalayas
+          {job.isWorldwideRemote ? "Worldwide remote" : "Africa-accessible remote"}
+          {job.sourceProvider === "himalayas" || job.source === "himalayas"
+            ? " · Powered by Himalayas"
+            : " · External listing"}
         </p>
       )}
       <p className="text-sm text-gray-600 mt-1">{job.jobType}</p>
@@ -43,23 +52,23 @@ const JobCard = ({ job }) => {
         >
           View Details →
         </Link>
-        {job.source === "himalayas" && job.applicationLink ? (
+        {!isDirectPosting && job.applicationLink ? (
           <a
             href={job.applicationLink}
             target="_blank"
             rel="noopener noreferrer"
             className="rounded bg-accent px-4 py-2 font-semibold text-white transition hover:bg-red-700"
           >
-            Apply on Himalayas
+            Apply on official site
           </a>
-        ) : (
+        ) : isDirectPosting ? (
           <button
             onClick={handleApply}
             className="rounded bg-accent px-4 py-2 font-semibold text-white transition hover:bg-red-700"
           >
             Apply Now
           </button>
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -75,6 +84,9 @@ JobCard.propTypes = {
     salaryRange: PropTypes.string,
     description: PropTypes.string.isRequired,
     source: PropTypes.string,
+    sourceProvider: PropTypes.string,
+    isDirectPosting: PropTypes.bool,
+    isWorldwideRemote: PropTypes.bool,
     applicationLink: PropTypes.string,
   }).isRequired,
 };

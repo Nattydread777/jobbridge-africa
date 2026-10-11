@@ -19,7 +19,21 @@ const jobSchema = new mongoose.Schema({
   applicationEmail: { type: String },
   postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   isApproved: { type: Boolean, default: true },
-  source: { type: String, enum: ['employer', 'himalayas'], default: 'employer' },
+  source: { type: String, enum: ['employer', 'himalayas', 'aggregated'], default: 'employer' },
+  sourceProvider: { type: String, default: '' },
+  isDirectPosting: {
+    type: Boolean,
+    default: function isDirectPostingBySource() {
+      return this.source === 'employer';
+    },
+  },
+  isRemote: {
+    type: Boolean,
+    default: function isRemoteBySource() {
+      return this.source !== 'employer' || this.jobType === 'Remote';
+    },
+  },
+  isWorldwideRemote: { type: Boolean, default: false },
   sourceKey: { type: String, unique: true, sparse: true },
   companySlug: { type: String, default: '' },
   excerpt: { type: String, default: '' },

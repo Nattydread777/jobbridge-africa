@@ -83,13 +83,15 @@ export const optimizeCv = asyncHandler(async (req, res) => {
   });
 });
 
-// Heuristic AI-like scoring using user profile vs jobs
-// Weights can be tuned later or replaced with an ML model
+// Seven-factor matching score; weights total 1.0.
 const SCORE_WEIGHTS = {
-  skills: 0.6,
+  skills: 0.3,
+  experience: 0.15,
   location: 0.2,
-  recency: 0.15,
-  jobType: 0.05,
+  workArrangement: 0.1,
+  salary: 0.08,
+  recency: 0.1,
+  africaFirst: 0.07,
 };
 
 // Extract skill-like tokens from text (very simple heuristic)
@@ -100,6 +102,33 @@ const extractTokens = (text) => {
     .replace(/[^a-z0-9+#+.\-\s]/g, ' ')
     .split(/\s+/)
     .filter(Boolean);
+};
+
+const experienceYearsFor = (user) => {
+  const totalMilliseconds = (user.experience || []).reduce((total, entry) => {
+    const start = new Date(entry.startDate);
+    const end = entry.endDate && !/present|current/i.test(entry.endDate)
+      ? new Date(entry.endDate)
+      : new Date();
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return total;
+    return total + (end.getTime() - start.getTime());
+  }, 0);
+  if (totalMilliseconds === 0) return null;
+  return totalMilliseconds / (1000 * 60 * 60 * 24 * 365.25);
+};
+
+const seniorityScore = (experienceYears, seniority) => {
+  const level = String(seniority || '').toLowerCase();
+  if (!level || experienceYears === null) return 0.5;
+  if (/entry|junior|graduate|intern/.test(level)) return experienceYears <= 2 ? 1 : 0.4;
+  if (/mid|intermediate/.test(level)) return experienceYears >= 2 && experienceYears <= 7 ? 1 : 0.5;
+  if (/senior|lead|principal|executive/.test(level)) return experienceYears >= 5 ? 1 : 0.3;
+  return 0.5;
+};
+
+const salaryScore = (job) => {
+  const salary = String(job.salary || job.salaryRange || '');
+  return salary && !/^competitive$/i.test(salary) ? 0.75 : 0.4;
 };
 
 export const getAiMatches = asyncHandler(async (req, res) => {
@@ -120,36 +149,48 @@ export const getAiMatches = asyncHandler(async (req, res) => {
   // Prepare profile features
   const userSkills = Array.isArray(user.skills) ? user.skills.map(s => String(s).toLowerCase()) : [];
   const userCountry = (user.country || '').toLowerCase();
+  const experienceYears = experienceYearsFor(user);
+  const bio = (user.bio || '').toLowerCase();
+  const userPrefersRemote = /\bremote\b/.test(bio);
 
   const scored = jobs.map((job) => {
-    let score = 0;
-
-    // Skills score: overlap of user skills with job text (title + description + requirements)
-    const jobText = `${job.title} ${job.description || ''} ${job.requirements || ''}`;
+    const jobText = `${job.title} ${job.description || ''} ${job.requirements || ''} ${(job.tags || []).join(' ')}`;
     const tokens = extractTokens(jobText);
     const tokenSet = new Set(tokens);
-    const matches = userSkills.filter(s => tokenSet.has(s.toLowerCase()));
-    const skillScore = userSkills.length > 0 ? matches.length / Math.max(userSkills.length, 1) : 0;
-
-    // Location score: simple country substring match
-    const locScore = userCountry && job.location ? (job.location.toLowerCase().includes(userCountry) ? 1 : 0) : 0;
-
-    // Recency score: newer jobs score higher (0..1 over ~30 days)
+    const matchedSkills = userSkills.filter((skill) => tokenSet.has(skill));
+    const skillScore = userSkills.length ? matchedSkills.length / userSkills.length : 0;
+    const locationText = `${job.location || ''} ${job.locationRestriction || ''}`.toLowerCase();
+    const locationScore = userCountry
+      ? (locationText.includes(userCountry) ? 1 : (job.isWorldwideRemote ? 0.85 : 0))
+      : (job.isWorldwideRemote ? 0.75 : 0.5);
+    const remoteScore = userPrefersRemote
+      ? (job.isRemote || job.isWorldwideRemote || job.jobType === 'Remote' ? 1 : 0.35)
+      : (job.isRemote || job.isWorldwideRemote || job.jobType === 'Remote' ? 0.7 : 1);
     const daysOld = (Date.now() - new Date(job.createdAt).getTime()) / (1000 * 60 * 60 * 24);
     const recencyScore = Math.max(0, Math.min(1, 1 - daysOld / 30));
+    const isAfricanDirectPosting = job.source === 'employer'
+      && job.isDirectPosting !== false
+      && /\b(africa|algeria|angola|benin|botswana|burkina faso|burundi|cabo verde|cameroon|central african republic|chad|comoros|democratic republic of the congo|djibouti|egypt|equatorial guinea|eritrea|eswatini|ethiopia|gabon|gambia|ghana|guinea|guinea-bissau|ivory coast|kenya|lesotho|liberia|libya|madagascar|malawi|mali|mauritania|mauritius|morocco|mozambique|namibia|niger|nigeria|republic of the congo|rwanda|sao tome and principe|senegal|seychelles|sierra leone|somalia|south africa|south sudan|sudan|tanzania|togo|tunisia|uganda|zambia|zimbabwe)\b/i
+        .test(`${job.location || ''} ${job.locationRestriction || ''}`);
+    const breakdown = {
+      skills: skillScore,
+      experience: seniorityScore(experienceYears, job.seniority),
+      location: locationScore,
+      workArrangement: remoteScore,
+      salary: salaryScore(job),
+      recency: recencyScore,
+      africaFirst: isAfricanDirectPosting ? 1 : (job.source === 'employer' ? 0.7 : 0.4),
+    };
+    const score = Object.entries(SCORE_WEIGHTS)
+      .reduce((sum, [factor, weight]) => sum + weight * breakdown[factor], 0);
 
-    // Job type preference: if user wrote a hint in bio, very light weight
-    const bio = (user.bio || '').toLowerCase();
-    const jt = (job.jobType || '').toLowerCase();
-    const jtScore = (bio.includes('remote') && jt.includes('remote')) ? 1 : 0;
-
-    score =
-      SCORE_WEIGHTS.skills * skillScore +
-      SCORE_WEIGHTS.location * locScore +
-      SCORE_WEIGHTS.recency * recencyScore +
-      SCORE_WEIGHTS.jobType * jtScore;
-
-    return { job, score: Number(score.toFixed(4)) };
+    return {
+      job,
+      score: Number(score.toFixed(4)),
+      matchBreakdown: Object.fromEntries(
+        Object.entries(breakdown).map(([factor, value]) => [factor, Number(value.toFixed(3))]),
+      ),
+    };
   })
   .sort((a, b) => b.score - a.score)
   .slice(0, 20);

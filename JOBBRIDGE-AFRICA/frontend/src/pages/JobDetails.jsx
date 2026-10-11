@@ -27,7 +27,9 @@ const JobDetails = () => {
         setJob(res.data);
         setLoading(false);
         // Auto-open modal if hash is #apply and user is authenticated
-        if (location.hash === "#apply" && isAuthenticated && user) {
+        const isDirectPosting = res.data.source === "employer"
+          || (res.data.source == null && res.data.isDirectPosting !== false);
+        if (isDirectPosting && location.hash === "#apply" && isAuthenticated && user) {
           // Check profile completion before auto-opening
           if (user.role === "job_seeker") {
             if (
@@ -57,6 +59,7 @@ const JobDetails = () => {
   }, [id, location.hash, isAuthenticated, user, navigate]);
 
   const handleApplyClick = () => {
+    if (job && job.source !== "employer" && job.isDirectPosting !== true) return;
     if (!isAuthenticated) {
       alert("Please login to apply for jobs");
       navigate("/login");
@@ -196,6 +199,13 @@ const JobDetails = () => {
             </span>
           )}
         </div>
+        {job.source !== "employer" && job.isDirectPosting !== true && (
+          <p className="mb-6 rounded-lg bg-amber-50 p-4 text-sm text-amber-950">
+            This is an external {job.isWorldwideRemote ? "worldwide remote" : "Africa-accessible remote"} listing
+            {job.sourceProvider === "himalayas" || job.source === "himalayas" ? " powered by Himalayas" : ""}.
+            Applications are handled on the official employer career site.
+          </p>
+        )}
 
         <div className="mb-6">
           <h2 className="text-2xl font-bold mb-3">Job Description</h2>
@@ -242,17 +252,32 @@ const JobDetails = () => {
         )}
 
         <div className="flex gap-4">
-          <button
-            onClick={handleApplyClick}
-            disabled={applied}
-            className={`px-8 py-3 rounded font-semibold transition ${
-              applied
-                ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                : "bg-accent text-white hover:bg-red-700"
-            }`}
-          >
-            {applied ? "Applied ✓" : "Apply Now"}
-          </button>
+          {job.source !== "employer" && job.isDirectPosting !== true ? (
+            job.applicationLink ? (
+              <a
+                href={job.applicationLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded bg-accent px-8 py-3 font-semibold text-white transition hover:bg-red-700"
+              >
+                Apply on official site
+              </a>
+            ) : (
+              <p className="text-sm text-gray-600">The external application link is unavailable.</p>
+            )
+          ) : (
+            <button
+              onClick={handleApplyClick}
+              disabled={applied}
+              className={`px-8 py-3 rounded font-semibold transition ${
+                applied
+                  ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                  : "bg-accent text-white hover:bg-red-700"
+              }`}
+            >
+              {applied ? "Applied ✓" : "Apply through JobBridge"}
+            </button>
+          )}
           <Link
             to="/jobs"
             className="px-8 py-3 rounded font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300 transition"

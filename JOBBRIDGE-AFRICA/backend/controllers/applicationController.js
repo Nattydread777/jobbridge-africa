@@ -21,6 +21,11 @@ export const submitApplication = asyncHandler(async (req, res) => {
     throw new Error('Job not found');
   }
 
+  if (job.source !== 'employer' || job.isDirectPosting === false) {
+    res.status(400);
+    throw new Error('This listing is external. Apply through the official employer career site.');
+  }
+
   // Check if job is expired
   if (job.expiryDate && new Date() > new Date(job.expiryDate)) {
     res.status(400);

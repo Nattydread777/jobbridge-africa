@@ -474,7 +474,7 @@ Auth (`/api/auth`)
 
 Jobs (`/api/jobs`)
 
-- GET `/` — Public paginated list (filter by `q`/`search`, `location`, `employmentType`/`jobType`, `seniority`; supports `page`, `cursor`, and `limit`; returns `jobs`, `nextCursor`, `total`, and `totalPages`)
+- GET `/` — Unified, Africa-first paginated list (filter by `q`/`search`, `country`/`location`, `jobType`, `isRemote`, and `seniority`; supports `page`, `cursor`, and `limit`; direct African employer roles rank ahead of enriched listings)
 - GET `/:id` — Job detail
 - POST `/` — Create job (employer only)
 - PUT `/:id` — Update job (employer only)
@@ -493,7 +493,7 @@ AI (`/api/ai`)
 - GET `/match` — Get recommended jobs for current user (protected)
 - POST `/optimize-cv` — Rule-based CV and job-description keyword comparison using `cvText` and `jobDescription` (10 requests/hour per IP)
 
-Himalayas jobs synchronize at 02:00 UTC daily after MongoDB connects. Run `cd backend; npm run ingest:jobs` for a one-off sync. The importer requests at most 20 records per page, follows `nextCursor`, and upserts with a stable source key. External applications open at Himalayas and carry source attribution.
+Himalayas listings are background enrichment, not the primary source of jobs. The importer accepts remote roles whose location restrictions include worldwide/global/Africa or an African country, labels them as aggregated external listings, and upserts with a stable source key without replacing employer postings. The daily sync is scheduled at 02:00 UTC after MongoDB connects. Run `cd backend; npm run ingest:jobs` for a one-off sync. External applications open on the official career site.
 
 ---
 
