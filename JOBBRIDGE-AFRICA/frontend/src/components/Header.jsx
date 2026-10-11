@@ -29,16 +29,21 @@ const Header = () => {
     <header className={`${base} ${elevatedStyles}`}>
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-3">
+          <NavLink
+            to="/"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-label="JobBridge Africa home"
+            className="flex min-w-0 items-center space-x-2 md:space-x-3"
+          >
             <img
               src="/logo.png"
-              alt="JobBridge Africa Logo"
-              className="w-20 h-20 md:w-24 md:h-24"
+              alt=""
+              className="h-14 w-14 shrink-0 md:h-20 md:w-20"
             />
-            <h1 className="text-2xl md:text-3xl font-black uppercase tracking-wide text-primary">
+            <span className="text-lg font-black uppercase tracking-wide text-primary sm:text-xl md:text-3xl">
               JOBBRIDGE AFRICA
-            </h1>
-          </div>
+            </span>
+          </NavLink>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex space-x-6 items-center text-white">
@@ -137,9 +142,12 @@ const Header = () => {
 
           {/* Mobile Hamburger Button */}
           <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            type="button"
+            onClick={() => setMobileMenuOpen((open) => !open)}
             className="md:hidden text-white p-2 hover:bg-white/10 rounded transition cursor-pointer"
             aria-label="Toggle menu"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-navigation"
           >
             {mobileMenuOpen ? (
               // Close icon
@@ -177,9 +185,10 @@ const Header = () => {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <nav className="md:hidden mt-4 pb-4 border-t border-white/20 pt-4 space-y-3 bg-charcoal">
+          <nav id="mobile-navigation" className="md:hidden mt-4 pb-4 border-t border-white/20 pt-4 space-y-3 bg-charcoal">
             <NavLink
               to="/"
+              onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) =>
                 `block px-4 py-2 rounded transition cursor-pointer ${
                   isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"
@@ -190,6 +199,7 @@ const Header = () => {
             </NavLink>
             <NavLink
               to="/jobs"
+              onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) =>
                 `block px-4 py-2 rounded transition cursor-pointer ${
                   isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"
@@ -200,6 +210,7 @@ const Header = () => {
             </NavLink>
             <NavLink
               to="/sdg-impact"
+              onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) =>
                 `block px-4 py-2 rounded transition ${isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"}`
               }
@@ -208,17 +219,19 @@ const Header = () => {
             </NavLink>
             <NavLink
               to="/ai-cv-tool"
+              onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) =>
                 `block px-4 py-2 rounded transition ${isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"}`
               }
             >
               AI CV Tool
             </NavLink>
-            <a href="/#royal-merchant" className="block px-4 py-2 rounded hover:bg-white/10">
+            <a href="/#royal-merchant" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 rounded hover:bg-white/10">
               Royal Merchant loans
             </a>
             <NavLink
               to="/employers"
+              onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) =>
                 `block px-4 py-2 rounded transition cursor-pointer ${
                   isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"
@@ -229,6 +242,7 @@ const Header = () => {
             </NavLink>
             <NavLink
               to="/about"
+              onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) =>
                 `block px-4 py-2 rounded transition cursor-pointer ${
                   isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"
@@ -239,6 +253,7 @@ const Header = () => {
             </NavLink>
             <NavLink
               to="/contact"
+              onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) =>
                 `block px-4 py-2 rounded transition cursor-pointer ${
                   isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"
@@ -250,18 +265,21 @@ const Header = () => {
             <div className="flex flex-col space-y-2 pt-2 border-t border-white/20">
               <NavLink
                 to="/pricing"
+                onClick={() => setMobileMenuOpen(false)}
                 className="px-4 py-2 bg-amber-400 text-charcoal rounded-md hover:bg-amber-300 transition font-bold text-center"
               >
                 Upgrade to Pro
               </NavLink>
               <NavLink
                 to="/login"
+                onClick={() => setMobileMenuOpen(false)}
                 className="px-4 py-2 bg-white/90 text-primary rounded-md hover:bg-white transition font-semibold text-center cursor-pointer"
               >
                 Login
               </NavLink>
               <NavLink
                 to="/register"
+                onClick={() => setMobileMenuOpen(false)}
                 className="px-4 py-2 bg-terracotta text-white rounded-md hover:bg-terracotta-dark transition font-semibold text-center cursor-pointer"
               >
                 Sign Up

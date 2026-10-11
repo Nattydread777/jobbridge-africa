@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../services/api";
+import PageBreadcrumb from "../components/PageBreadcrumb";
 
 const Contact = () => {
   const [formData, setFormData] = useState({
@@ -10,7 +11,6 @@ const Contact = () => {
   });
   const [status, setStatus] = useState({ type: "", message: "" });
   const [loading, setLoading] = useState(false);
-  const [captchaReady, setCaptchaReady] = useState(false);
   const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
 
   useEffect(() => {
@@ -23,13 +23,6 @@ const Contact = () => {
     s.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
     s.async = true;
     s.defer = true;
-    s.onload = () => {
-      if (window.grecaptcha?.ready) {
-        window.grecaptcha.ready(() => setCaptchaReady(true));
-      } else {
-        setCaptchaReady(true);
-      }
-    };
     document.body.appendChild(s);
   }, [siteKey]);
 
@@ -75,10 +68,11 @@ const Contact = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 px-4 pb-12 sm:px-6 lg:px-8">
+      <PageBreadcrumb />
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="mb-12 pt-8 text-center">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Contact Us</h1>
           <p className="text-lg text-gray-600">
             Have questions or feedback? We'd love to hear from you. Send us a

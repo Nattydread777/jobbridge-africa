@@ -36,23 +36,28 @@ const Jobs = () => {
       .get(`/jobs${params}`, { signal: controller.signal })
       .then((res) => {
         const data = res.data;
-        setJobs(Array.isArray(data) ? data : data.jobs || []);
+        const loadedJobs = Array.isArray(data) ? data : data?.jobs;
+        if (!Array.isArray(loadedJobs)) {
+          throw new Error("The jobs service returned an unexpected response.");
+        }
+        setJobs(loadedJobs);
         setPagination({
           page: data.page || 1,
           totalPages: data.totalPages || 1,
-          total: data.total ?? data.length ?? 0,
+          total: data.total ?? loadedJobs.length,
           nextCursor: data.nextCursor || null,
         });
         setError("");
         setLoading(false);
       })
       .catch((err) => {
-        if (err.code === "ERR_CANCELED") return;
+        if (controller.signal.aborted || err.code === "ERR_CANCELED") return;
         console.error("Failed to load jobs:", err);
         const message = err.response?.data?.message
           || (err.request
             ? "We couldn’t reach the jobs service. Check your connection and try again."
-            : "Jobs could not be loaded. Please try again.");
+            : err.message || "Jobs could not be loaded. Please try again.");
+        setJobs([]);
         setError(message);
       })
       .finally(() => {
@@ -291,7 +296,11 @@ const Jobs = () => {
               <p className="mt-1 text-sm">{error}</p>
               <button
                 type="button"
-                onClick={() => setRetryKey((key) => key + 1)}
+                onClick={() => {
+                  setError("");
+                  setLoading(true);
+                  setRetryKey((key) => key + 1);
+                }}
                 className="mt-4 rounded-lg bg-terracotta px-4 py-2 font-semibold text-white hover:bg-terracotta-dark"
               >
                 Try again

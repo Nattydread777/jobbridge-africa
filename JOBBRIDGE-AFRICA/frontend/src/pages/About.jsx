@@ -1,26 +1,6 @@
-import { useEffect, useState } from "react";
-import api from "../services/api";
 import PageBreadcrumb from "../components/PageBreadcrumb";
 
 const About = () => {
-  const [teamMembers, setTeamMembers] = useState([]);
-  const [loadingTeam, setLoadingTeam] = useState(true);
-
-  useEffect(() => {
-    const fetchTeamMembers = async () => {
-      try {
-        const { data } = await api.get("/team");
-        setTeamMembers(data);
-      } catch (error) {
-        console.error("Failed to fetch team members:", error);
-      } finally {
-        setLoadingTeam(false);
-      }
-    };
-
-    fetchTeamMembers();
-  }, []);
-
   return (
     <main className="w-full px-4 pb-16 text-slate-800 sm:px-6 md:px-10 xl:px-14">
       <PageBreadcrumb />

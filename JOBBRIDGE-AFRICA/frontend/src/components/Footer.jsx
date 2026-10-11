@@ -122,9 +122,12 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
+                <Link
+                  to="/employer-dashboard"
+                  className="hover:text-primary transition-colors"
+                >
                   Browse Candidates
-                </a>
+                </Link>
               </li>
               <li>
                 <Link to="/pricing" className="hover:text-primary transition-colors">
@@ -132,9 +135,12 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
+                <Link
+                  to="/employers"
+                  className="hover:text-primary transition-colors"
+                >
                   Employer Resources
-                </a>
+                </Link>
               </li>
             </ul>
           </div>

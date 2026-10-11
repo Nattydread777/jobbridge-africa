@@ -3,7 +3,80 @@ import { Link } from "react-router-dom";
 import api from "../services/api";
 import PageBreadcrumb from "./PageBreadcrumb";
 
-const MAX_INPUT_LENGTH = 25000;
+const extractResumeText = async (file) => {
+  const extension = file.name.split(".").pop()?.toLowerCase();
+
+  if (extension === "docx") {
+    const { unzipSync } = await import("fflate");
+    const docxFiles = unzipSync(new Uint8Array(await file.arrayBuffer()));
+    const documentXml = docxFiles["word/document.xml"];
+    if (!documentXml) {
+      throw new Error("This DOCX file could not be opened. Please paste your CV text.");
+    }
+    const parsedXml = new DOMParser().parseFromString(
+      new TextDecoder().decode(documentXml),
+      "application/xml",
+    );
+    if (parsedXml.querySelector("parsererror")) {
+      throw new Error("This DOCX file could not be read. Please paste your CV text.");
+    }
+    return Array.from(parsedXml.getElementsByTagNameNS("*", "p"))
+      .map((paragraph) =>
+        Array.from(paragraph.getElementsByTagNameNS("*", "t"))
+          .map((textNode) => textNode.textContent || "")
+          .join(""),
+      )
+      .join("\n");
+  }
+
+  if (extension === "pdf") {
+    const [{ getDocument, GlobalWorkerOptions }, workerModule] = await Promise.all([
+      import("pdfjs-dist/legacy/build/pdf.mjs"),
+      import("pdfjs-dist/legacy/build/pdf.worker.mjs?url"),
+    ]);
+    GlobalWorkerOptions.workerSrc = workerModule.default;
+    const document = await getDocument({
+      data: new Uint8Array(await file.arrayBuffer()),
+    }).promise;
+    try {
+      const pageText = [];
+      for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+        const page = await document.getPage(pageNumber);
+        const content = await page.getTextContent();
+        pageText.push(
+          content.items
+            .map((item) => ("str" in item ? item.str : ""))
+            .filter(Boolean)
+            .join(" "),
+        );
+      }
+      return pageText.join("\n");
+    } finally {
+      await document.destroy();
+    }
+  }
+
+  if (!["txt", "md", "csv", "html", "htm", "rtf"].includes(extension)) {
+    throw new Error("Choose a .txt, .md, .csv, .html, .rtf, .docx, or .pdf file.");
+  }
+
+  const rawText = await file.text();
+  if (extension === "html" || extension === "htm") {
+    const parsed = new DOMParser().parseFromString(rawText, "text/html");
+    parsed.querySelectorAll("script, style").forEach((node) => node.remove());
+    return parsed.body.textContent || "";
+  }
+  if (extension === "rtf") {
+    return rawText
+      .replace(/\\'[0-9a-f]{2}/gi, " ")
+      .replace(/\\[a-z]+-?\d* ?/gi, " ")
+      .replace(/[{}]/g, " ")
+      .replace(/\s+/g, " ");
+  }
+  return rawText;
+};
+
+const MAX_INPUT_LENGTH = 100000;
 
 const CvOptimizerModal = ({ onClose }) => {
   const [cvText, setCvText] = useState("");
@@ -11,6 +84,7 @@ const CvOptimizerModal = ({ onClose }) => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [readingFile, setReadingFile] = useState(false);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -23,16 +97,30 @@ const CvOptimizerModal = ({ onClose }) => {
   const handleFile = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (file.size > MAX_INPUT_LENGTH) {
-      setError("Please choose a plain-text CV file smaller than 25 KB.");
-      event.target.value = "";
-      return;
-    }
+    setError("");
+    setReadingFile(true);
     try {
-      setCvText(await file.text());
-      setError("");
-    } catch {
-      setError("The selected file could not be read. Please paste your CV text.");
+      const extractedText = await extractResumeText(file);
+      if (!extractedText.trim()) {
+        throw new Error(
+          "No selectable text was found. For scanned documents, please paste your CV text instead.",
+        );
+      }
+      if (extractedText.length > MAX_INPUT_LENGTH) {
+        throw new Error(
+          `This document contains more than ${MAX_INPUT_LENGTH.toLocaleString()} characters. Paste a shorter CV excerpt to continue.`,
+        );
+      }
+      setCvText(extractedText);
+    } catch (fileError) {
+      console.error("Failed to read uploaded CV:", fileError);
+      setError(
+        fileError.message ||
+          "The selected file could not be read. Please paste your CV text instead.",
+      );
+    } finally {
+      setReadingFile(false);
+      event.target.value = "";
     }
   };
 
@@ -124,12 +212,13 @@ const CvOptimizerModal = ({ onClose }) => {
             </span>
           </label>
 
-          <label className="w-fit cursor-pointer rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-charcoal hover:bg-stone-100">
-            Upload plain-text CV (.txt)
+          <label className={`w-fit rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-charcoal hover:bg-stone-100 ${readingFile ? "cursor-wait opacity-70" : "cursor-pointer"}`}>
+            {readingFile ? "Reading your document..." : "Upload CV (TXT, DOCX, PDF, or text formats)"}
             <input
               type="file"
-              accept=".txt,text/plain"
+              accept=".txt,.md,.csv,.html,.htm,.rtf,.docx,.pdf,text/plain,text/markdown,text/csv,text/html,application/rtf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
               onChange={handleFile}
+              disabled={readingFile}
               className="sr-only"
             />
           </label>

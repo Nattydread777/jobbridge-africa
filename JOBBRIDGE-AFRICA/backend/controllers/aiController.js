@@ -1,7 +1,7 @@
 import asyncHandler from 'express-async-handler';
 import Job from '../models/Job.js';
 
-const CV_INPUT_LIMIT = 25000;
+const CV_INPUT_LIMIT = 100000;
 const STOP_WORDS = new Set([
   'about', 'after', 'also', 'and', 'are', 'for', 'from', 'have', 'into', 'job',
   'our', 'over', 'role', 'that', 'the', 'their', 'this', 'through', 'with', 'you',
