@@ -22,8 +22,8 @@ const Header = () => {
 
   const base =
     "fixed top-0 inset-x-0 z-50 transition-all duration-300 backdrop-blur-md";
-  const transparent = "bg-gray-900/30";
-  const elevatedStyles = elevated ? "shadow-md bg-gray-900/50" : transparent;
+  const transparent = "bg-charcoal/80";
+  const elevatedStyles = elevated ? "shadow-md bg-charcoal/95" : transparent;
 
   return (
     <header className={`${base} ${elevatedStyles}`}>
@@ -63,6 +63,25 @@ const Header = () => {
               Find Jobs
             </NavLink>
             <NavLink
+              to="/sdg-impact"
+              className={({ isActive }) =>
+                isActive ? "font-semibold border-b-2 border-white pb-1" : "hover:text-gray-200 transition"
+              }
+            >
+              Mission
+            </NavLink>
+            <NavLink
+              to="/ai-cv-tool"
+              className={({ isActive }) =>
+                isActive ? "font-semibold border-b-2 border-white pb-1" : "hover:text-gray-200 transition"
+              }
+            >
+              AI CV Tool
+            </NavLink>
+            <a href="/#royal-merchant" className="hover:text-gray-200 transition">
+              Upskilling loans
+            </a>
+            <NavLink
               to="/employers"
               className={({ isActive }) =>
                 isActive
@@ -97,6 +116,12 @@ const Header = () => {
           {/* Desktop Auth Buttons */}
           <div className="hidden md:flex space-x-3">
             <NavLink
+              to="/pricing"
+              className="px-4 py-2 bg-amber-400 text-charcoal rounded-md hover:bg-amber-300 transition font-bold"
+            >
+              Upgrade to Pro
+            </NavLink>
+            <NavLink
               to="/login"
               className="px-4 py-2 bg-white/90 text-primary rounded-md hover:bg-white transition font-semibold cursor-pointer"
             >
@@ -104,7 +129,7 @@ const Header = () => {
             </NavLink>
             <NavLink
               to="/register"
-              className="px-4 py-2 bg-accent text-white rounded-md hover:bg-red-700 transition font-semibold cursor-pointer"
+              className="px-4 py-2 bg-terracotta text-white rounded-md hover:bg-terracotta-dark transition font-semibold cursor-pointer"
             >
               Sign Up
             </NavLink>
@@ -152,7 +177,7 @@ const Header = () => {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <nav className="md:hidden mt-4 pb-4 border-t border-white/20 pt-4 space-y-3 bg-gradient-to-r from-green-600 to-green-700">
+          <nav className="md:hidden mt-4 pb-4 border-t border-white/20 pt-4 space-y-3 bg-charcoal">
             <NavLink
               to="/"
               className={({ isActive }) =>
@@ -173,6 +198,25 @@ const Header = () => {
             >
               Find Jobs
             </NavLink>
+            <NavLink
+              to="/sdg-impact"
+              className={({ isActive }) =>
+                `block px-4 py-2 rounded transition ${isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"}`
+              }
+            >
+              Mission (SDG 8)
+            </NavLink>
+            <NavLink
+              to="/ai-cv-tool"
+              className={({ isActive }) =>
+                `block px-4 py-2 rounded transition ${isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"}`
+              }
+            >
+              AI CV Tool
+            </NavLink>
+            <a href="/#royal-merchant" className="block px-4 py-2 rounded hover:bg-white/10">
+              Royal Merchant loans
+            </a>
             <NavLink
               to="/employers"
               className={({ isActive }) =>
@@ -205,6 +249,12 @@ const Header = () => {
             </NavLink>
             <div className="flex flex-col space-y-2 pt-2 border-t border-white/20">
               <NavLink
+                to="/pricing"
+                className="px-4 py-2 bg-amber-400 text-charcoal rounded-md hover:bg-amber-300 transition font-bold text-center"
+              >
+                Upgrade to Pro
+              </NavLink>
+              <NavLink
                 to="/login"
                 className="px-4 py-2 bg-white/90 text-primary rounded-md hover:bg-white transition font-semibold text-center cursor-pointer"
               >
@@ -212,7 +262,7 @@ const Header = () => {
               </NavLink>
               <NavLink
                 to="/register"
-                className="px-4 py-2 bg-accent text-white rounded-md hover:bg-red-700 transition font-semibold text-center cursor-pointer"
+                className="px-4 py-2 bg-terracotta text-white rounded-md hover:bg-terracotta-dark transition font-semibold text-center cursor-pointer"
               >
                 Sign Up
               </NavLink>

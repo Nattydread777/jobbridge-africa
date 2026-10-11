@@ -23,6 +23,8 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import UploadResume from "./pages/UploadResume";
 import CareerResources from "./pages/CareerResources";
+import Pricing from "./pages/Pricing";
+import AICvTool from "./pages/AICvTool";
 
 function App() {
   return (
@@ -59,6 +61,8 @@ function App() {
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/upload-resume" element={<UploadResume />} />
               <Route path="/career-resources" element={<CareerResources />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/ai-cv-tool" element={<AICvTool />} />
             </Routes>
           </main>
           <Footer />

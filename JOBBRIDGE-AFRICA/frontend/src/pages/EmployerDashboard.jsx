@@ -20,7 +20,8 @@ const EmployerDashboard = () => {
       setLoading(true);
       // Get all jobs and filter by current user as employer
       const response = await api.get("/jobs");
-      const userJobs = response.data.filter((job) => job.employer === user._id);
+      const jobs = Array.isArray(response.data) ? response.data : response.data.jobs || [];
+      const userJobs = jobs.filter((job) => job.employer === user._id);
       setMyJobs(userJobs);
       setError("");
     } catch (error) {

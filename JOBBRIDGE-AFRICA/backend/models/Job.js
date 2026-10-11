@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const jobSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
   companyName: { type: String, required: true },
-  company: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  company: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   location: { type: String, required: true },
   jobType: {
     type: String,
@@ -17,8 +17,19 @@ const jobSchema = new mongoose.Schema({
   benefits: { type: String },
   expiryDate: { type: Date, required: true }, // Job application deadline
   applicationEmail: { type: String },
-  postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   isApproved: { type: Boolean, default: true },
+  source: { type: String, enum: ['employer', 'himalayas'], default: 'employer' },
+  sourceKey: { type: String, unique: true, sparse: true },
+  companySlug: { type: String, default: '' },
+  excerpt: { type: String, default: '' },
+  applicationLink: { type: String, default: '' },
+  locationRestriction: { type: String, default: '' },
+  seniority: { type: String, default: '' },
+  salary: { type: String, default: '' },
+  categories: { type: [String], default: [] },
+  tags: { type: [String], default: [] },
+  pubDate: { type: Date },
 }, { timestamps: true });
 
 // Virtual property to check if job is expired

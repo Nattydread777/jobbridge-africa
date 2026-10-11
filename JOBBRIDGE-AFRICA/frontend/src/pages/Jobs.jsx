@@ -7,6 +7,8 @@ import locations from "../data/africaLocations";
 const Jobs = () => {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0, nextCursor: null });
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Filter states
@@ -29,11 +31,20 @@ const Jobs = () => {
     api
       .get(`/jobs${params}`)
       .then((res) => {
-        setJobs(res.data);
+        const data = res.data;
+        setJobs(Array.isArray(data) ? data : data.jobs || []);
+        setPagination({
+          page: data.page || 1,
+          totalPages: data.totalPages || 1,
+          total: data.total ?? data.length ?? 0,
+          nextCursor: data.nextCursor || null,
+        });
+        setError("");
         setLoading(false);
       })
       .catch((err) => {
         console.error(err);
+        setError(err.response?.data?.message || "Failed to load jobs. Please try again.");
         setLoading(false);
       });
   }, [search]);
@@ -45,8 +56,18 @@ const Jobs = () => {
     // Update URL params
     const params = new URLSearchParams();
     Object.entries(newFilters).forEach(([k, v]) => {
-      if (v) params.set(k, v);
+      if (v && k !== "experience") params.set(k, v);
     });
+    if (newFilters.experience) {
+      const seniority = {
+        entry: "entry",
+        mid: "mid",
+        senior: "senior",
+      }[newFilters.experience];
+      if (seniority) params.set("seniority", seniority);
+      if (newFilters.experience === "internship") params.set("jobType", "Internship");
+    }
+    params.set("page", "1");
     setSearchParams(params);
   };
 
@@ -55,10 +76,6 @@ const Jobs = () => {
     alert(`Subscribed with email: ${email}`);
     setEmail("");
   };
-
-  if (loading) {
-    return <div className="p-6 text-center">Loading jobs...</div>;
-  }
 
   return (
     <div className="max-w-7xl mx-auto p-6">
@@ -70,7 +87,13 @@ const Jobs = () => {
         <span>←</span> Back to Dashboard
       </Link>
 
-      <h1 className="text-3xl font-bold mb-6">Find Your Dream Job</h1>
+      <h1 className="text-3xl font-bold mb-2 text-charcoal">Find Your Dream Job</h1>
+      <p className="mb-6 text-sm text-stone-600">
+        Browse local and remote roles. Remote listings are credited to{" "}
+        <a href="https://himalayas.app/" target="_blank" rel="noopener noreferrer" className="font-semibold text-terracotta underline">
+          Himalayas
+        </a>.
+      </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Filters Sidebar */}
@@ -210,16 +233,53 @@ const Jobs = () => {
         {/* Jobs List */}
         <main className="lg:col-span-3">
           <h2 className="text-2xl font-bold mb-4">
-            Available Jobs {jobs.length > 0 && `(${jobs.length})`}
+            Available Jobs {!loading && `(${pagination.total})`}
           </h2>
-          {jobs.length === 0 ? (
+          {error ? (
+            <p role="alert" className="rounded-lg bg-red-50 p-4 text-red-700">{error}</p>
+          ) : loading ? (
+            <p className="text-gray-600">Loading jobs...</p>
+          ) : jobs.length === 0 ? (
             <p className="text-gray-600">No jobs available at the moment.</p>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2">
-              {jobs.map((job) => (
-                <JobCard key={job._id} job={job} />
-              ))}
-            </div>
+            <>
+              <div className="grid gap-6 md:grid-cols-2">
+                {jobs.map((job) => (
+                  <JobCard key={job._id} job={job} />
+                ))}
+              </div>
+              {pagination.totalPages > 1 && (
+                <nav aria-label="Job pages" className="mt-8 flex items-center justify-center gap-4">
+                  <button
+                    type="button"
+                    disabled={pagination.page <= 1}
+                    onClick={() => {
+                      const params = new URLSearchParams(searchParams);
+                      params.set("page", String(pagination.page - 1));
+                      setSearchParams(params);
+                    }}
+                    className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-stone-600">
+                    Page {pagination.page} of {pagination.totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={pagination.page >= pagination.totalPages}
+                    onClick={() => {
+                      const params = new URLSearchParams(searchParams);
+                      params.set("page", String(pagination.page + 1));
+                      setSearchParams(params);
+                    }}
+                    className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </nav>
+              )}
+            </>
           )}
         </main>
       </div>

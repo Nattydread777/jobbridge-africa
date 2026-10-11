@@ -1,6 +1,88 @@
 import asyncHandler from 'express-async-handler';
 import Job from '../models/Job.js';
 
+const CV_INPUT_LIMIT = 25000;
+const STOP_WORDS = new Set([
+  'about', 'after', 'also', 'and', 'are', 'for', 'from', 'have', 'into', 'job',
+  'our', 'over', 'role', 'that', 'the', 'their', 'this', 'through', 'with', 'you',
+  'your', 'will', 'work', 'years', 'year',
+]);
+const KEYWORD_DISPLAY_NAMES = {
+  api: 'API',
+  aws: 'AWS',
+  css: 'CSS',
+  html: 'HTML',
+  javascript: 'JavaScript',
+  nodejs: 'Node.js',
+  'node.js': 'Node.js',
+  react: 'React',
+  sql: 'SQL',
+  typescript: 'TypeScript',
+  ui: 'UI',
+  ux: 'UX',
+};
+
+const normalizeToken = (value) => value.toLowerCase().replace(/[^a-z0-9+#.]/g, '');
+const displayKeyword = (keyword) =>
+  KEYWORD_DISPLAY_NAMES[keyword] || `${keyword[0].toUpperCase()}${keyword.slice(1)}`;
+const extractKeywords = (text) => [...new Set(
+  text
+    .split(/\s+/)
+    .map(normalizeToken)
+    .filter((token) => token.length > 2 && !STOP_WORDS.has(token)),
+)];
+const refineBullet = (line) => line
+  .replace(/^(responsible for|duties included|tasked with|in charge of)\s+/i, 'Managed ')
+  .replace(/^(helped with|assisted in)\s+/i, 'Supported ')
+  .replace(/^worked on\s+/i, 'Contributed to ');
+
+export const optimizeCv = asyncHandler(async (req, res) => {
+  const cvText = typeof req.body?.cvText === 'string' ? req.body.cvText.trim() : '';
+  const jobDescription = typeof req.body?.jobDescription === 'string'
+    ? req.body.jobDescription.trim()
+    : '';
+
+  if (!cvText || !jobDescription) {
+    res.status(400);
+    throw new Error('CV text and target job description are required');
+  }
+  if (cvText.length > CV_INPUT_LIMIT || jobDescription.length > CV_INPUT_LIMIT) {
+    res.status(413);
+    throw new Error(`CV text and job description must each be ${CV_INPUT_LIMIT} characters or fewer`);
+  }
+
+  const cvLower = cvText.toLowerCase();
+  const keywords = extractKeywords(jobDescription);
+  const matched = keywords.filter((keyword) => cvLower.includes(keyword));
+  const missing = keywords.filter((keyword) => !cvLower.includes(keyword)).slice(0, 20);
+  const sourceLines = cvText
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^\s*[-*•]\s*/, '').trim())
+    .filter((line) => line.length >= 20);
+  const enhancedBulletPoints = sourceLines
+    .map((line) => ({
+      line,
+      score: matched.filter((keyword) => line.toLowerCase().includes(keyword)).length,
+    }))
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 5)
+    .map(({ line }) => refineBullet(line));
+  const evidence = matched.slice(0, 8);
+  const summary = evidence.length
+    ? `CV evidence relevant to this role includes ${evidence.map(displayKeyword).join(', ')}. Use these verified skills and experience to lead your professional summary.`
+    : 'No direct keyword matches were found. Review the skills gap below and only add relevant experience that you can verify.';
+
+  res.status(200).json({
+    summary,
+    skillsGap: {
+      matched: matched.map(displayKeyword),
+      missing: missing.map(displayKeyword),
+    },
+    enhancedBulletPoints,
+    note: 'This is a keyword-based drafting aid, not generative AI. Verify every suggestion and do not add skills or achievements that are not supported by your experience.',
+  });
+});
+
 // Heuristic AI-like scoring using user profile vs jobs
 // Weights can be tuned later or replaced with an ML model
 const SCORE_WEIGHTS = {

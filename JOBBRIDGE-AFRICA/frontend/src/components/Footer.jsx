@@ -127,9 +127,9 @@ const Footer = () => {
                 </a>
               </li>
               <li>
-                <a href="#" className="hover:text-primary transition-colors">
+                <Link to="/pricing" className="hover:text-primary transition-colors">
                   Pricing Plans
-                </a>
+                </Link>
               </li>
               <li>
                 <a href="#" className="hover:text-primary transition-colors">
@@ -181,6 +181,21 @@ const Footer = () => {
               <p>📧 info@jobbridgeafrica.org</p>
             </div>
           </div>
+        </div>
+
+        <div className="mt-10 flex flex-col gap-2 border-t border-white/10 pt-6 text-sm text-gray-400 sm:flex-row sm:items-center sm:justify-between">
+          <p>Connecting African talent to decent work — advancing UN SDG 8.</p>
+          <p>
+            Remote listings powered by{" "}
+            <a
+              href="https://himalayas.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-primary hover:underline"
+            >
+              Himalayas
+            </a>
+          </p>
         </div>
 
         {/* Bottom bar */}

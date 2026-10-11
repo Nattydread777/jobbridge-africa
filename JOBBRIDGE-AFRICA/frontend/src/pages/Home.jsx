@@ -388,6 +388,64 @@ const Home = () => {
         </div>
       </section>
 
+      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-12 md:grid-cols-2 md:px-8">
+        <article className="rounded-3xl bg-charcoal p-8 text-white shadow-lg">
+          <p className="text-sm font-bold uppercase tracking-[0.16em] text-amber-300">
+            Skills meet opportunity
+          </p>
+          <h2 className="mt-3 text-3xl font-black">Refine your CV for the role you want</h2>
+          <p className="mt-3 text-stone-300">
+            Get an ATS-focused summary, see potential keyword gaps, and surface relevant experience.
+          </p>
+          <Link
+            to="/ai-cv-tool"
+            className="mt-6 inline-flex rounded-xl bg-amber-400 px-5 py-3 font-bold text-charcoal hover:bg-amber-300"
+          >
+            Open CV Refinisher
+          </Link>
+        </article>
+        <article
+          id="royal-merchant"
+          className="scroll-mt-28 rounded-3xl bg-amber-100 p-8 text-charcoal shadow-lg"
+        >
+          <p className="text-sm font-bold uppercase tracking-[0.16em] text-terracotta">
+            Educational financing partner
+          </p>
+          <h2 className="mt-3 text-3xl font-black">Royal Merchant MPCS</h2>
+          <p className="mt-3 leading-relaxed text-stone-700">
+            Royal Merchant MPCS is featured as JobBridge Africa&apos;s lending backbone, supporting
+            access to micro-loans and short-course funding for job-ready upskilling.
+          </p>
+          <Link
+            to="/career-resources"
+            className="mt-6 inline-flex rounded-xl bg-terracotta px-5 py-3 font-bold text-white hover:bg-terracotta-dark"
+          >
+            Explore career resources
+          </Link>
+        </article>
+      </section>
+
+      <section className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-4 px-6 pb-12 text-sm text-stone-600 md:flex-row md:items-center md:px-8">
+        <p className="rounded-full bg-white px-4 py-2">
+          Advancing UN SDG 8: Decent Work and Economic Growth
+        </p>
+        <p>
+          Remote job listings sourced from{" "}
+          <a
+            href="https://himalayas.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-terracotta underline"
+          >
+            Himalayas
+          </a>
+          . Powered by Himalayas.
+        </p>
+        <Link to="/pricing" className="font-bold text-terracotta underline">
+          View plans
+        </Link>
+      </section>
+
       {/* Stats Section */}
       <section
         ref={statsRef}

@@ -474,7 +474,7 @@ Auth (`/api/auth`)
 
 Jobs (`/api/jobs`)
 
-- GET `/` — Public list (filter by `search`, `country`, `city`, `jobType`)
+- GET `/` — Public paginated list (filter by `q`/`search`, `location`, `employmentType`/`jobType`, `seniority`; supports `page`, `cursor`, and `limit`; returns `jobs`, `nextCursor`, `total`, and `totalPages`)
 - GET `/:id` — Job detail
 - POST `/` — Create job (employer only)
 - PUT `/:id` — Update job (employer only)
@@ -491,6 +491,9 @@ Applications (`/api/applications`)
 AI (`/api/ai`)
 
 - GET `/match` — Get recommended jobs for current user (protected)
+- POST `/optimize-cv` — Rule-based CV and job-description keyword comparison using `cvText` and `jobDescription` (10 requests/hour per IP)
+
+Himalayas jobs synchronize at 02:00 UTC daily after MongoDB connects. Run `cd backend; npm run ingest:jobs` for a one-off sync. The importer requests at most 20 records per page, follows `nextCursor`, and upserts with a stable source key. External applications open at Himalayas and carry source attribution.
 
 ---
 
@@ -503,6 +506,8 @@ AI (`/api/ai`)
 - Profile: `/profile` (editor), `/profile-view` (viewer)
 - Jobs: `/jobs`, `/jobs/:id`, `/post-job`, `/my-jobs`
 - AI Matching: `/ai-matching`
+- CV Refinisher: `/ai-cv-tool`
+- Pricing: `/pricing` (billing is not connected yet)
 
 ---
 
@@ -517,7 +522,7 @@ User
 
 Job
 
-- Fields: `title, companyName, company (User ref), location, jobType, salaryRange, description, requirements, responsibilities, benefits, expiryDate, applicationEmail, postedBy`
+- Fields: employer jobs plus attributed Himalayas listings (`source`, `sourceKey`, `companySlug`, `excerpt`, `applicationLink`, `locationRestriction`, `seniority`, `salary`, `categories`, `tags`, `pubDate`)
 
 Application
 

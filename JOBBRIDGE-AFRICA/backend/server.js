@@ -19,6 +19,7 @@ import contactRoutes from './routes/contactRoutes.js'; // Contact form routes
 import teamRoutes from './routes/teamRoutes.js'; // Team member routes
 import userAdminRoutes from './routes/userAdminRoutes.js'; // Admin user management
 import { notFound, errorHandler } from './middleware/errorMiddleware.js'; // MUST include .js extension
+import { scheduleDailyJobIngestion } from './services/jobIngestor.js';
 
 // -------------------
 // Environment Validation
@@ -39,8 +40,8 @@ if (missingEnvVars.length > 0) {
   process.exit(1);
 }
 
-// Connect to the database
-connectDB(); 
+// Start scheduled external job syncs only after MongoDB is ready.
+connectDB().then(scheduleDailyJobIngestion);
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -119,7 +120,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(express.json()); // Allows parsing of raw JSON data
+app.use(express.json({ limit: '1mb' })); // Allows parsing of raw JSON data
 app.use(express.urlencoded({ extended: true })); // Allows parsing of form data
 app.use(cookieParser()); // Enables reading cookies
 
