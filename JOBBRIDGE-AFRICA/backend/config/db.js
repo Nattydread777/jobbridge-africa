@@ -6,7 +6,10 @@ const connectDB = async () => {
       'MONGO_URI is required. Configure a live MongoDB connection in backend/.env.',
     );
   }
-  if (!process.env.MONGO_URI.startsWith('mongodb://')) {
+  if (
+    process.env.NODE_ENV !== 'production' &&
+    !process.env.MONGO_URI.startsWith('mongodb://')
+  ) {
     throw new Error(
       'MONGO_URI must use the standard mongodb:// seed-list format. Get the direct connection string from MongoDB Atlas > Connect > Drivers.',
     );
