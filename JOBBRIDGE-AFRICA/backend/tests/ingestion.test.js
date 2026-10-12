@@ -15,6 +15,7 @@ import {
   normalizeRemoteJob,
 } from '../services/remoteApiIngestor.js';
 import {
+  MYJOBMAG_TARGETS,
   normalizeMyJobMagListing,
   parseMyJobMagListings,
 } from '../services/localAggregatorScraper.js';
@@ -293,23 +294,35 @@ test('normalizes remote API jobs with provider attribution and validates the Job
 test('parses MyJobMag agency listings and normalizes attribution for the Job model', () => {
   const html = `
     <main class="jobs">
-      <article class="job-listing">
-        <h2><a href="/job/senior-accountant-123">Senior Accountant</a></h2>
-        <div class="company-name">Acme Recruitment</div>
-        <span class="job-location">Lagos, Nigeria</span>
-        <p class="job-summary">Manage financial reporting and monthly accounts.</p>
-      </article>
-      <article class="job-listing">
-        <h2><a href="/job/operations-manager-456">Operations Manager</a></h2>
-        <div class="company-name">Bridge Talent Partners</div>
-        <span class="job-location">Abuja, Nigeria</span>
-        <p class="job-description">Lead day-to-day operations across the business.</p>
-      </article>
+      <li class="job-list-li">
+        <div class="job-info">
+          <h2><a href="/job/senior-accountant-123">Senior Accountant</a></h2>
+          <div class="company-name">Acme Recruitment</div>
+          <span class="job-location">Lagos, Nigeria</span>
+          <p class="job-desc">Manage financial reporting and monthly accounts.</p>
+        </div>
+      </li>
+      <li class="job-list-li">
+        <div class="job-info">
+          <h2><a href="/job/operations-manager-456">Operations Manager</a></h2>
+          <div class="company">at Bridge Talent Partners</div>
+          <div class="job-details"><span>Abuja, Nigeria</span></div>
+          <p>Lead day-to-day operations across the business.</p>
+        </div>
+      </li>
+      <li class="job-list-li">
+        <div class="job-info">
+          <h2><a href="/job/consultant-789">Consultant</a></h2>
+          <span>at Generic Agency in Ibadan</span>
+          <div class="job-details"><span>Ibadan, Nigeria</span></div>
+          <p class="job-desc">Advise clients on business transformation.</p>
+        </div>
+      </li>
       <a href="/job/senior-accountant-123">Duplicate listing link</a>
     </main>
   `;
   const listings = parseMyJobMagListings(html);
-  assert.equal(listings.length, 2);
+  assert.equal(listings.length, 3);
   assert.deepEqual(listings[0], {
     title: 'Senior Accountant',
     companyName: 'Acme Recruitment',
@@ -317,6 +330,15 @@ test('parses MyJobMag agency listings and normalizes attribution for the Job mod
     description: 'Manage financial reporting and monthly accounts.',
     detailUrl: 'https://www.myjobmag.com/job/senior-accountant-123',
   });
+  assert.deepEqual(MYJOBMAG_TARGETS.map(({ url }) => url), [
+    'https://www.myjobmag.com/jobs-by-title/outsourcing',
+    'https://www.myjobmag.com/jobs-by-industry/consulting-specialized-services',
+  ]);
+  assert.equal(listings[1].companyName, 'Bridge Talent Partners');
+  assert.equal(listings[1].location, 'Abuja, Nigeria');
+  assert.equal(listings[1].description, 'Lead day-to-day operations across the business.');
+  assert.equal(listings[2].companyName, 'Generic Agency');
+  assert.equal(listings[2].location, 'Ibadan, Nigeria');
 
   const normalized = normalizeMyJobMagListing(listings[0]);
   assert.equal(normalized.source, 'aggregated');

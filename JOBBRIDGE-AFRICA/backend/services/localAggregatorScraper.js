@@ -3,7 +3,16 @@ import { createHash } from 'node:crypto';
 import { load } from 'cheerio';
 import Job from '../models/Job.js';
 
-const MYJOBMAG_LISTING_URL = 'https://www.myjobmag.com/jobs-by-title/recruitment-agency';
+export const MYJOBMAG_TARGETS = [
+  {
+    category: 'outsourcing',
+    url: 'https://www.myjobmag.com/jobs-by-title/outsourcing',
+  },
+  {
+    category: 'consulting-specialized-services',
+    url: 'https://www.myjobmag.com/jobs-by-industry/consulting-specialized-services',
+  },
+];
 const REQUEST_TIMEOUT_MS = 20000;
 const DAILY_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const USER_AGENT = 'JobBridgeAfrica-JobAggregator/1.0 (+https://www.jobbridgeafrica.org)';
@@ -33,64 +42,47 @@ const firstText = ($container, selectors) => {
   return '';
 };
 
-const getListingCard = ($, anchor) => {
-  let card = $(anchor).parent();
-  for (let depth = 0; depth < 6 && card.length; depth += 1) {
-    const title = firstText(card, ['h2', 'h3', 'h4']) || textOf($(anchor));
-    const companyName = firstText(card, [
-      '[itemprop="hiringOrganization"]',
-      '[itemprop="name"]',
-      '.company-name',
-      '.company',
-      '.job-company',
-      '[class*="company"]',
-      '[data-company]',
-    ]) || card.attr('data-company') || '';
-    const location = firstText(card, [
-      '[itemprop="jobLocation"]',
-      '.location',
-      '.job-location',
-      '[class*="location"]',
-      '[data-location]',
-    ]) || card.attr('data-location') || '';
-    const description = firstText(card, [
-      '[itemprop="description"]',
-      '.job-description',
-      '.job-summary',
-      '.summary',
-      '.excerpt',
-      '[class*="description"]',
-      '[class*="summary"]',
-    ]) || textOf(card)
-      .replace(title, '')
-      .replace(companyName, '')
-      .replace(location, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    if (title && (companyName || location || description.length > title.length)) {
-      return { title, companyName, location, description };
-    }
-    card = card.parent();
-  }
-  return null;
+const companyFromText = (value) => {
+  const match = value.match(/\bat\s+(.+?)(?=\s+(?:in|located|posted|$)|$)/i);
+  return match?.[1]?.trim().replace(/[.,;|]+$/, '') || '';
 };
 
-export const parseMyJobMagListings = (html, baseUrl = MYJOBMAG_LISTING_URL) => {
+export const parseMyJobMagListings = (html, baseUrl = MYJOBMAG_TARGETS[0].url) => {
   const $ = load(html);
   const listings = [];
   const seenUrls = new Set();
 
-  $('a[href]').each((_, anchor) => {
-    const url = detailUrl($(anchor).attr('href'), baseUrl);
+  $('.job-info, li.job-list-li').each((_, container) => {
+    const card = $(container);
+    const anchor = card.find('h2 a, .job-info h2 a').first();
+    if (!anchor.length) return;
+    const url = detailUrl(anchor.attr('href'), baseUrl);
     if (!url || !/(?:^|\/)jobs?\/[^/]+/i.test(new URL(url).pathname) || seenUrls.has(url)) return;
 
-    const details = getListingCard($, anchor);
-    if (!details?.title || !details.companyName || !details.description) return;
+    const title = textOf(anchor);
+    const companyText = firstText(card, [
+      '.job-info .company-name',
+      '.company-name',
+      '.job-info .company',
+      '.company',
+    ]);
+    const companyName = companyText.replace(/^at\s+/i, '') || companyFromText(textOf(card));
+    const location = firstText(card, [
+      '.job-info .job-location',
+      '.job-location',
+      '.job-details span',
+    ]);
+    const description = firstText(card, [
+      '.job-desc',
+      '.job-info p',
+    ]);
+    if (!title || !companyName || !description) return;
     seenUrls.add(url);
     listings.push({
-      ...details,
-      location: details.location || 'Nigeria',
+      title,
+      companyName,
+      location: location || 'Nigeria',
+      description,
       detailUrl: url,
     });
   });
@@ -104,7 +96,7 @@ export const normalizeMyJobMagListing = (listing) => {
   const companyName = String(listing.companyName || '').trim();
   const description = String(listing.description || '').trim();
   const location = String(listing.location || 'Nigeria').trim();
-  const listingUrl = detailUrl(listing.detailUrl || listing.sourceUrl || '', MYJOBMAG_LISTING_URL);
+  const listingUrl = detailUrl(listing.detailUrl || listing.sourceUrl || '', MYJOBMAG_TARGETS[0].url);
   if (!title || !companyName || !description || !listingUrl) return null;
 
   const sourceKey = createHash('sha256').update(listingUrl.toLowerCase()).digest('hex');
@@ -136,44 +128,63 @@ export const normalizeMyJobMagListing = (listing) => {
 };
 
 export const ingestMyJobMagListings = async () => {
-  const response = await axios.get(MYJOBMAG_LISTING_URL, {
-    headers: {
-      Accept: 'text/html,application/xhtml+xml',
-      'User-Agent': USER_AGENT,
-    },
-    timeout: REQUEST_TIMEOUT_MS,
-    maxContentLength: 5 * 1024 * 1024,
-    maxBodyLength: 5 * 1024 * 1024,
-  });
-  if (typeof response.data !== 'string') {
-    throw new Error('MyJobMag returned an unexpected non-HTML response.');
+  const listingsByCategory = [];
+  for (const target of MYJOBMAG_TARGETS) {
+    try {
+      const response = await axios.get(target.url, {
+        headers: {
+          Accept: 'text/html,application/xhtml+xml',
+          'User-Agent': USER_AGENT,
+        },
+        timeout: REQUEST_TIMEOUT_MS,
+        maxContentLength: 5 * 1024 * 1024,
+        maxBodyLength: 5 * 1024 * 1024,
+      });
+      if (typeof response.data !== 'string') {
+        throw new Error('MyJobMag returned an unexpected non-HTML response.');
+      }
+      const listings = parseMyJobMagListings(response.data, target.url);
+      console.info(`MyJobMag ${target.category}: parsed ${listings.length} listings.`);
+      listingsByCategory.push(...listings);
+    } catch (error) {
+      console.error(`MyJobMag ${target.category} fetch failed:`, error.message);
+    }
   }
 
-  const listings = parseMyJobMagListings(response.data);
+  const listings = [...new Map(listingsByCategory.map((listing) => [
+    listing.detailUrl,
+    listing,
+  ])).values()];
   let upserted = 0;
   for (const listing of listings) {
     const normalized = normalizeMyJobMagListing(listing);
     if (!normalized) continue;
     const { sourceKey, ...fields } = normalized;
-    const existingQuery = {
-      source: 'aggregated',
-      $or: [
-        { sourceKey },
-        { sourceUrl: fields.sourceUrl },
-        { applicationLink: fields.applicationLink, sourceName: 'MyJobMag' },
-      ],
-    };
     try {
-      const result = await Job.updateOne(
-        existingQuery,
-        { $set: { ...fields, sourceKey, lastSeenAt: new Date() } },
-        { upsert: true, runValidators: true },
-      );
+      const existing = await Job.findOne({ sourceUrl: fields.sourceUrl }).select('_id sourceKey');
+      const update = {
+        ...fields,
+        lastSeenAt: new Date(),
+        ...(existing?.sourceKey ? {} : { sourceKey }),
+      };
+      const result = existing
+        ? await Job.updateOne(
+          { _id: existing._id },
+          { $set: update },
+          { runValidators: true },
+        )
+        : await Job.updateOne(
+          { sourceKey },
+          { $set: { ...update, sourceKey } },
+          { upsert: true, runValidators: true },
+        );
       if (result.upsertedCount || result.modifiedCount) upserted += 1;
     } catch (error) {
       if (error.code !== 11000) throw error;
+      const duplicate = await Job.findOne({ sourceUrl: fields.sourceUrl }).select('_id');
+      if (!duplicate) throw error;
       const retry = await Job.updateOne(
-        { sourceKey, source: 'aggregated' },
+        { _id: duplicate._id },
         { $set: { ...fields, lastSeenAt: new Date() } },
         { runValidators: true },
       );
