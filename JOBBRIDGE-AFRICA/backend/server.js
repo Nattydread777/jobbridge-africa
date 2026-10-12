@@ -19,8 +19,9 @@ import aiRoutes from './routes/aiRoutes.js'; // AI routes
 import contactRoutes from './routes/contactRoutes.js'; // Contact form routes
 import teamRoutes from './routes/teamRoutes.js'; // Team member routes
 import userAdminRoutes from './routes/userAdminRoutes.js'; // Admin user management
+import employerRoutes from './routes/employerRoutes.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js'; // MUST include .js extension
-import { scheduleDailyJobIngestion } from './services/jobIngestor.js';
+import { scheduleCareerScrapes } from './services/careerScraperService.js';
 
 // -------------------
 // Environment Validation
@@ -177,6 +178,7 @@ app.use('/api/ai', requireDatabase, aiRoutes);
 app.use('/api/contact', contactLimiter, contactRoutes);
 app.use('/api/team', requireDatabase, teamRoutes);
 app.use('/api/users', requireDatabase, userAdminRoutes);
+app.use('/api/employers', requireDatabase, employerRoutes);
 
 // Error Handling Middleware (must be last)
 app.use(notFound);
@@ -184,7 +186,7 @@ app.use(errorHandler);
 
 const startServer = async () => {
   await connectDB();
-  scheduleDailyJobIngestion();
+  scheduleCareerScrapes();
 
   await new Promise((resolve, reject) => {
     const server = app.listen(PORT, () => {
