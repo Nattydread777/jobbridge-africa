@@ -23,6 +23,7 @@ import employerRoutes from './routes/employerRoutes.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js'; // MUST include .js extension
 import { scheduleCareerScrapes } from './services/careerScraperService.js';
 import { scheduleRemoteApiIngestion } from './services/remoteApiIngestor.js';
+import { scheduleMyJobMagScrapes } from './services/localAggregatorScraper.js';
 
 // -------------------
 // Environment Validation
@@ -189,6 +190,7 @@ const startServer = async () => {
   await connectDB();
   scheduleCareerScrapes();
   scheduleRemoteApiIngestion();
+  scheduleMyJobMagScrapes();
 
   await new Promise((resolve, reject) => {
     const server = app.listen(PORT, () => {

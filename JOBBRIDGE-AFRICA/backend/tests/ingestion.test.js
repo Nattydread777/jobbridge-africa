@@ -14,6 +14,10 @@ import {
   isWorldwideOnly,
   normalizeRemoteJob,
 } from '../services/remoteApiIngestor.js';
+import {
+  normalizeMyJobMagListing,
+  parseMyJobMagListings,
+} from '../services/localAggregatorScraper.js';
 
 const employer = {
   _id: '64c000000000000000000001',
@@ -284,4 +288,43 @@ test('normalizes remote API jobs with provider attribution and validates the Job
   assert.equal(Job.schema.path('workplaceType').defaultValue.call(null), 'on-site');
   assert.equal(Job.schema.path('isDirectPosting').defaultValue.call(null), true);
   assert.equal(Job.schema.path('isRemote').defaultValue.call(null), false);
+});
+
+test('parses MyJobMag agency listings and normalizes attribution for the Job model', () => {
+  const html = `
+    <main class="jobs">
+      <article class="job-listing">
+        <h2><a href="/job/senior-accountant-123">Senior Accountant</a></h2>
+        <div class="company-name">Acme Recruitment</div>
+        <span class="job-location">Lagos, Nigeria</span>
+        <p class="job-summary">Manage financial reporting and monthly accounts.</p>
+      </article>
+      <article class="job-listing">
+        <h2><a href="/job/operations-manager-456">Operations Manager</a></h2>
+        <div class="company-name">Bridge Talent Partners</div>
+        <span class="job-location">Abuja, Nigeria</span>
+        <p class="job-description">Lead day-to-day operations across the business.</p>
+      </article>
+      <a href="/job/senior-accountant-123">Duplicate listing link</a>
+    </main>
+  `;
+  const listings = parseMyJobMagListings(html);
+  assert.equal(listings.length, 2);
+  assert.deepEqual(listings[0], {
+    title: 'Senior Accountant',
+    companyName: 'Acme Recruitment',
+    location: 'Lagos, Nigeria',
+    description: 'Manage financial reporting and monthly accounts.',
+    detailUrl: 'https://www.myjobmag.com/job/senior-accountant-123',
+  });
+
+  const normalized = normalizeMyJobMagListing(listings[0]);
+  assert.equal(normalized.source, 'aggregated');
+  assert.equal(normalized.sourceName, 'MyJobMag');
+  assert.equal(normalized.sourceProvider, 'myjobmag');
+  assert.equal(normalized.sourceUrl, listings[0].detailUrl);
+  assert.equal(normalized.applicationLink, listings[0].detailUrl);
+  assert.equal(normalized.location, 'Lagos, Nigeria');
+  const modelJob = new Job(normalized);
+  assert.equal(modelJob.validateSync(), undefined);
 });
