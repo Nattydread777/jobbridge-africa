@@ -10,6 +10,10 @@ import {
   normalizeSchemaJobPosting,
   parseCrawlerTargets,
 } from '../services/careerScraperService.js';
+import {
+  isWorldwideOnly,
+  normalizeRemoteJob,
+} from '../services/remoteApiIngestor.js';
 
 const employer = {
   _id: '64c000000000000000000001',
@@ -175,4 +179,73 @@ test('provides direct career-page URLs when a domain sitemap is missing', () => 
     'https://workforcegroup.com/careers/',
     'https://workforcegroup.com/jobs/',
   ]);
+});
+
+test('accepts only worldwide or unrestricted remote locations for remote API ingestion', () => {
+  for (const location of [
+    '',
+    'Worldwide',
+    'Worldwide only',
+    'Anywhere',
+    'Global',
+    'Remote',
+    'Remote only',
+    'Fully remote',
+    'Remote - Worldwide',
+  ]) {
+    assert.equal(isWorldwideOnly(location), true, `${location} should be accepted`);
+  }
+
+  for (const location of [
+    'US-only',
+    'United States',
+    'Remote - UK only',
+    'Europe only',
+    'Canada',
+    'Australia',
+    'Remote - Worldwide except Nigeria',
+    'EMEA',
+  ]) {
+    assert.equal(isWorldwideOnly(location), false, `${location} should be rejected`);
+  }
+});
+
+test('normalizes remote API jobs with provider attribution and validates the Job model', () => {
+  const applyUrl = 'https://company.example/apply/role-42';
+  const listingUrl = 'https://himalayas.app/jobs/role-42';
+  const normalized = normalizeRemoteJob('Himalayas', {
+    id: 'role-42',
+    company_name: 'Example Company',
+    company_slug: 'example-company',
+    title: 'Senior React Engineer',
+    description: 'Build accessible products for a global team.',
+    locationRestrictions: 'Worldwide',
+    url: listingUrl,
+    applicationLink: applyUrl,
+    employmentType: 'Full-time',
+    publication_date: new Date().toISOString(),
+    categories: ['Engineering'],
+  });
+
+  assert.ok(normalized);
+  assert.equal(normalized.source, 'aggregated');
+  assert.equal(normalized.sourceProvider, 'himalayas');
+  assert.equal(normalized.sourceName, 'Himalayas');
+  assert.equal(normalized.sourceUrl, listingUrl);
+  assert.equal(normalized.applicationLink, applyUrl);
+  assert.equal(normalized.isDirectPosting, false);
+  assert.equal(normalized.isWorldwideRemote, true);
+
+  const modelJob = new Job(normalized);
+  assert.equal(modelJob.validateSync(), undefined);
+  assert.equal(modelJob.sourceName, 'Himalayas');
+  assert.equal(modelJob.sourceUrl, listingUrl);
+
+  assert.equal(normalizeRemoteJob('Remotive', {
+    company_name: 'Restricted Company',
+    title: 'Engineer',
+    description: 'Not globally available.',
+    candidate_required_location: 'United States',
+    url: 'https://remotive.com/remote-jobs/restricted-role',
+  }), null);
 });

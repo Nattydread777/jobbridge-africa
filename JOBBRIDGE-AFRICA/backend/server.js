@@ -22,6 +22,7 @@ import userAdminRoutes from './routes/userAdminRoutes.js'; // Admin user managem
 import employerRoutes from './routes/employerRoutes.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js'; // MUST include .js extension
 import { scheduleCareerScrapes } from './services/careerScraperService.js';
+import { scheduleRemoteApiIngestion } from './services/remoteApiIngestor.js';
 
 // -------------------
 // Environment Validation
@@ -187,6 +188,7 @@ app.use(errorHandler);
 const startServer = async () => {
   await connectDB();
   scheduleCareerScrapes();
+  scheduleRemoteApiIngestion();
 
   await new Promise((resolve, reject) => {
     const server = app.listen(PORT, () => {

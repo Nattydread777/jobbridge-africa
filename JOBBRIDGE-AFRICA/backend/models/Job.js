@@ -30,6 +30,8 @@ const jobSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
   source: { type: String, enum: ['employer', 'himalayas', 'aggregated'], default: 'employer' },
   sourceProvider: { type: String, default: '' },
+  sourceName: { type: String, default: '' },
+  sourceUrl: { type: String, default: '' },
   isDirectPosting: {
     type: Boolean,
     default: function isDirectPostingBySource() {
