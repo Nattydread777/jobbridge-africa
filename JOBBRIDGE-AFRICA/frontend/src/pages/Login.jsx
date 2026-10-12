@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import ForgotPasswordModal from "../components/ForgotPasswordModal";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -82,6 +84,13 @@ const Login = () => {
               className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
               required
             />
+            <button
+              type="button"
+              onClick={() => setForgotPasswordOpen(true)}
+              className="mt-2 block text-sm font-semibold text-amber-700 hover:underline"
+            >
+              Forgot password?
+            </button>
           </div>
           <button
             type="submit"
@@ -95,6 +104,12 @@ const Login = () => {
           </p>
         </form>
       </section>
+      {forgotPasswordOpen && (
+        <ForgotPasswordModal
+          initialEmail={email}
+          onClose={() => setForgotPasswordOpen(false)}
+        />
+      )}
     </main>
   );
 };

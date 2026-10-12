@@ -8,21 +8,31 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (character)
   "'": '&#39;',
 }[character]));
 
-export const sendEmployerApplicationNotification = async ({ recipient, job, applicant, application }) => {
-  if (!recipient) throw new Error('Employer notification recipient is not configured.');
-  if (!process.env.EMAIL_HOST || !process.env.EMAIL_FROM || !process.env.EMAIL_PASS) {
-    throw new Error('Email delivery is not configured (EMAIL_HOST, EMAIL_FROM, EMAIL_PASS).');
+const createTransporter = () => {
+  const emailFrom = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+  const emailHost = process.env.EMAIL_HOST || 'smtp.zoho.com';
+  if (!emailHost || !emailFrom || !process.env.EMAIL_PASS) {
+    throw new Error('Email delivery is not configured (EMAIL_USER/EMAIL_FROM and EMAIL_PASS are required).');
   }
 
-  const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: Number(process.env.EMAIL_PORT || 587),
-    secure: Number(process.env.EMAIL_PORT || 587) === 465,
+  const port = Number(process.env.EMAIL_PORT || 465);
+  return nodemailer.createTransport({
+    host: emailHost,
+    port,
+    secure: process.env.EMAIL_SECURE
+      ? process.env.EMAIL_SECURE === 'true'
+      : port === 465,
     auth: {
-      user: process.env.EMAIL_USER || process.env.EMAIL_FROM,
+      user: process.env.EMAIL_USER || emailFrom,
       pass: process.env.EMAIL_PASS,
     },
   });
+};
+
+export const sendEmployerApplicationNotification = async ({ recipient, job, applicant, application }) => {
+  if (!recipient) throw new Error('Employer notification recipient is not configured.');
+  const transporter = createTransporter();
+  const emailFrom = process.env.EMAIL_FROM || process.env.EMAIL_USER;
   const name = escapeHtml(applicant.name);
   const email = escapeHtml(applicant.email);
   const phone = escapeHtml(applicant.phone || 'Not provided');
@@ -51,7 +61,7 @@ export const sendEmployerApplicationNotification = async ({ recipient, job, appl
   const resumeUrl = escapeHtml(application.resumeUrl);
 
   return transporter.sendMail({
-    from: process.env.EMAIL_FROM,
+    from: emailFrom,
     to: recipient,
     subject: `New application: ${job.title} — ${applicant.name}`,
     text: [
@@ -75,5 +85,32 @@ export const sendEmployerApplicationNotification = async ({ recipient, job, appl
       <h3>Experience</h3><p>${experience.replace(/\n/g, '<br>')}</p>
       <p><strong>Resume:</strong> <a href="${resumeUrl}">View candidate resume</a></p>
       <h3>Cover letter</h3><p>${coverLetter.replace(/\n/g, '<br>')}</p>`,
+  });
+};
+
+export const sendPasswordResetEmail = async ({ recipient, name, resetUrl }) => {
+  if (!recipient || !resetUrl) {
+    throw new Error('Password reset email requires a recipient and reset URL.');
+  }
+  const transporter = createTransporter();
+  const safeName = escapeHtml(name || 'there');
+  const safeUrl = escapeHtml(resetUrl);
+
+  return transporter.sendMail({
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    to: recipient,
+    subject: 'Reset your JobBridge Africa password',
+    text: [
+      `Hello ${name || 'there'},`,
+      '',
+      'We received a request to reset the password for your JobBridge Africa account.',
+      `Use this link to choose a new password: ${resetUrl}`,
+      '',
+      'This link expires in 60 minutes and can only be used once. If you did not request this, you can ignore this email.',
+    ].join('\n'),
+    html: `<p>Hello ${safeName},</p>
+      <p>We received a request to reset the password for your JobBridge Africa account.</p>
+      <p><a href="${safeUrl}">Choose a new password</a></p>
+      <p>This link expires in 60 minutes and can only be used once. If you did not request this, you can ignore this email.</p>`,
   });
 };

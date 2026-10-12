@@ -5,6 +5,7 @@ const HIMALAYAS_API = 'https://himalayas.app/jobs/api';
 const PAGE_SIZE = 20;
 const REQUEST_DELAY_MS = 100;
 const SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const SYNC_RETRY_DELAY_MS = 15 * 60 * 1000;
 const ACTIVE_JOB_LOOKBACK_MS = 120 * 24 * 60 * 60 * 1000;
 const WORLDWIDE_PATTERN = /\b(worldwide|global(?:ly)?|anywhere|any location|africa)\b/i;
 
@@ -233,6 +234,8 @@ export const scheduleDailyJobIngestion = () => {
       await ingestHimalayasJobs();
     } catch (error) {
       console.error('Global job sync failed:', error);
+      const retryTimer = setTimeout(run, SYNC_RETRY_DELAY_MS);
+      retryTimer.unref();
     } finally {
       isRunning = false;
     }

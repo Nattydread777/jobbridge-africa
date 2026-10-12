@@ -4,6 +4,8 @@ import multer from 'multer';
 import { 
     registerUser, 
     loginUser, 
+    forgotPassword,
+    resetPassword,
     logoutUser,
     getUserProfile,
     updateUserProfile,
@@ -47,6 +49,8 @@ const resumeUpload = multer({
 // Public Routes
 router.post('/register', registerUser);
 router.post('/login', loginUser);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password/:token', resetPassword);
 // One-time bootstrap (no auth): requires ADMIN_SETUP_TOKEN and no existing admin
 router.post('/bootstrap-admin', bootstrapAdmin);
 

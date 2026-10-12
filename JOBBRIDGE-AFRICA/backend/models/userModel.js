@@ -26,6 +26,8 @@ const userSchema = new mongoose.Schema({
   profileImagePublicId: { type: String },
   resumeUrl: { type: String },
   resumePublicId: { type: String },
+  passwordResetToken: { type: String, select: false },
+  passwordResetExpires: { type: Date, select: false },
   education: [{
     school: String,
     degree: String,

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import ForgotPasswordModal from "../components/ForgotPasswordModal";
 import api from "../services/api";
 import africaLocations from "../data/jobLocations";
 import { extractResumeText, parseResumeText } from "../utils/resumeParser";
@@ -26,6 +27,7 @@ const Register = () => {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [hasRegistered, setHasRegistered] = useState(false);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const { register, refreshUser, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -188,6 +190,13 @@ const Register = () => {
           <div>
             <label htmlFor="register-password" className="mb-1.5 block text-sm font-semibold text-slate-700">Password</label>
             <input id="register-password" name="password" type="password" value={form.password} onChange={updateField} autoComplete="new-password" minLength={8} required className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-amber-500 focus:outline-none focus:ring-4 focus:ring-amber-100" />
+            <button
+              type="button"
+              onClick={() => setForgotPasswordOpen(true)}
+              className="mt-2 text-sm font-semibold text-amber-700 hover:underline"
+            >
+              Forgot password?
+            </button>
           </div>
           {form.role === "employer" ? (
             <div>
@@ -219,6 +228,12 @@ const Register = () => {
         </form>
         <p className="mt-5 text-center text-sm text-slate-600">Already have an account? <Link to="/login" className="font-bold text-amber-700 hover:underline">Sign in</Link></p>
       </section>
+      {forgotPasswordOpen && (
+        <ForgotPasswordModal
+          initialEmail={form.email}
+          onClose={() => setForgotPasswordOpen(false)}
+        />
+      )}
     </main>
   );
 };

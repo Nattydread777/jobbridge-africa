@@ -398,6 +398,7 @@ Notes
 - Cloudinary credentials are optional for local job browsing, but required for media and resume uploads and in production.
 - In development, the API allows Vite origins on `localhost` and `127.0.0.1` at ports 5173 and 5174. Set `ALLOWED_ORIGINS` to your frontend domains in production.
 - The frontend uses `VITE_API_URL` (or `VITE_API_BASE`) when configured and otherwise defaults to `http://localhost:4000/api`.
+- Password reset email requires SMTP credentials (`EMAIL_USER` and `EMAIL_PASS`). Set `EMAIL_FROM`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, and the public `FRONTEND_URL` for the deployed environment.
 
 Optional frontend `.env`
 
@@ -405,9 +406,9 @@ Optional frontend `.env`
 VITE_API_URL=http://localhost:4000/api
 ```
 
-### Email Configuration (Zoho + SendGrid Fallback)
+### Email Configuration
 
-Add these to `backend/.env` for production email delivery:
+Add these to `backend/.env` for SMTP email delivery and password reset links:
 
 ```
 # Primary SMTP (Zoho)
@@ -416,20 +417,14 @@ EMAIL_PORT=587            # use 465 for SSL if 587 blocked
 EMAIL_SECURE=false        # set true if using 465
 EMAIL_USER=info@jobbridgeafrica.org
 EMAIL_PASS=<zoho_app_password>
-
-# Optional SendGrid fallback (used automatically if SMTP fails)
-SENDGRID_API_KEY=<your_sendgrid_api_key>
+EMAIL_FROM=info@jobbridgeafrica.org
+FRONTEND_URL=https://www.jobbridgeafrica.org
 
 # CORS origins (comma-separated)
 ALLOWED_ORIGINS=https://www.jobbridgeafrica.org,https://jobbridge-africa.vercel.app
 ```
 
-How it works:
-
-- App first tries SMTP on the configured port (defaults to 587 STARTTLS).
-- Falls back to 465/SSL if verification fails.
-- If both fail and `SENDGRID_API_KEY` is present, switches to SendGrid.
-- Contact form responses include a `transport` field and diagnostics when failures occur.
+The reset endpoint returns a generic response whether or not an email address has an account. Reset tokens are stored as SHA-256 hashes, expire after 60 minutes, and are invalidated after use.
 
 Health check endpoint (SMTP connectivity only): `GET /api/contact/health`
 
@@ -474,6 +469,8 @@ Auth (`/api/auth`)
 
 - POST `/register` — Register
 - POST `/login` — Login (sets httpOnly JWT cookie)
+- POST `/forgot-password` — Request password reset instructions
+- POST `/reset-password/:token` — Set a new password using a single-use reset token
 - POST `/logout` — Logout (clears cookie)
 - GET `/me` — Current user profile (protected)
 - PUT `/profile` — Update profile fields (protected)
@@ -508,7 +505,7 @@ Himalayas listings are background enrichment, not the primary source of jobs. Th
 
 - `/` — Home
 - `/about`, `/contact`, `/sdg-impact`, `/pan-african-network`
-- Auth: `/login`, `/register`
+- Auth: `/login`, `/register`, `/reset-password/:token`
 - Dashboard: `/dashboard` (job seeker), `/employer-dashboard` (employer)
 - Profile: `/profile` (editor), `/profile-view` (viewer)
 - Jobs: `/jobs`, `/jobs/:id`, `/post-job`, `/my-jobs`

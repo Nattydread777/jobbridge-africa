@@ -10,6 +10,7 @@ import Employers from "./pages/Employers";
 import Contact from "./pages/Contact";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import MyJobs from "./pages/MyJobs";
 import Profile from "./pages/Profile";
@@ -42,6 +43,7 @@ function App() {
               <Route path="/contact" element={<Contact />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/reset-password/:token" element={<ResetPassword />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/profile-view" element={<ProfileView />} />
               <Route path="/my-jobs" element={<MyJobs />} />

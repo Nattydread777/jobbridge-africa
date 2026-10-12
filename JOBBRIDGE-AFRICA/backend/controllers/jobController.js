@@ -2,6 +2,7 @@ import asyncHandler from 'express-async-handler';
 import mongoose from 'mongoose';
 import Job from '../models/Job.js';
 import User from '../models/userModel.js';
+import { buildActiveJobFilter } from '../utils/jobFilters.js';
 
 const AFRICAN_LOCATION_PATTERN = '\\b(?:africa|algeria|angola|benin|botswana|burkina faso|burundi|cabo verde|cameroon|central african republic|chad|comoros|democratic republic of the congo|djibouti|egypt|equatorial guinea|eritrea|eswatini|ethiopia|gabon|gambia|ghana|guinea|guinea-bissau|ivory coast|kenya|lesotho|liberia|libya|madagascar|malawi|mali|mauritania|mauritius|morocco|mozambique|namibia|niger|nigeria|republic of the congo|rwanda|sao tome and principe|senegal|seychelles|sierra leone|somalia|south africa|south sudan|sudan|tanzania|togo|tunisia|uganda|zambia|zimbabwe)\\b';
 
@@ -45,10 +46,7 @@ export const getJobs = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('workplaceType must be remote, hybrid, or on-site');
   }
-  const filters = [
-    { expiryDate: { $gte: new Date() } },
-    { isApproved: true },
-  ];
+  const filters = [buildActiveJobFilter()];
   const keyword = String(q || search || '').trim();
 
   if (keyword) {

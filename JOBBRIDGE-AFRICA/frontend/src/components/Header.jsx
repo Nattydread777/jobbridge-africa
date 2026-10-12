@@ -27,26 +27,26 @@ const Header = () => {
 
   return (
     <header className={`${base} ${elevatedStyles}`}>
-      <div className="max-w-7xl mx-auto px-4 py-4">
+      <div className="mx-auto max-w-7xl px-4 py-2.5 sm:px-6">
         <div className="flex justify-between items-center">
           <NavLink
             to="/"
             onClick={() => setMobileMenuOpen(false)}
             aria-label="JobBridge Africa home"
-            className="flex min-w-0 items-center space-x-2 md:space-x-3"
+            className="flex min-w-0 items-center gap-2 md:gap-3"
           >
             <img
               src="/logo.png"
               alt=""
-              className="h-14 w-14 shrink-0 md:h-20 md:w-20"
+              className="h-10 w-10 shrink-0 md:h-12 md:w-12"
             />
-            <span className="text-lg font-black uppercase tracking-wide text-primary sm:text-xl md:text-3xl">
+            <span className="text-base font-extrabold uppercase tracking-wide text-primary sm:text-lg lg:text-xl">
               JOBBRIDGE AFRICA
             </span>
           </NavLink>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex space-x-6 items-center text-white">
+          <nav className="hidden items-center gap-4 text-sm font-medium text-white xl:flex 2xl:gap-5">
             <NavLink
               to="/"
               className={({ isActive }) =>
@@ -119,22 +119,22 @@ const Header = () => {
           </nav>
 
           {/* Desktop Auth Buttons */}
-          <div className="hidden md:flex space-x-3">
+          <div className="hidden shrink-0 items-center gap-2 xl:flex">
             <NavLink
               to="/pricing"
-              className="px-4 py-2 bg-amber-400 text-charcoal rounded-md hover:bg-amber-300 transition font-bold"
+              className="whitespace-nowrap rounded-lg bg-amber-400 px-3 py-2 text-sm font-semibold text-charcoal transition hover:bg-amber-300"
             >
               Upgrade to Pro
             </NavLink>
             <NavLink
               to="/login"
-              className="px-4 py-2 bg-white/90 text-primary rounded-md hover:bg-white transition font-semibold cursor-pointer"
+              className="whitespace-nowrap rounded-lg bg-white/90 px-3 py-2 text-sm font-semibold text-primary transition hover:bg-white"
             >
               Login
             </NavLink>
             <NavLink
               to="/register"
-              className="px-4 py-2 bg-terracotta text-white rounded-md hover:bg-terracotta-dark transition font-semibold cursor-pointer"
+              className="whitespace-nowrap rounded-lg bg-terracotta px-3 py-2 text-sm font-semibold text-white transition hover:bg-terracotta-dark"
             >
               Sign Up
             </NavLink>
@@ -144,7 +144,7 @@ const Header = () => {
           <button
             type="button"
             onClick={() => setMobileMenuOpen((open) => !open)}
-            className="md:hidden text-white p-2 hover:bg-white/10 rounded transition cursor-pointer"
+            className="rounded-lg p-2 text-white transition hover:bg-white/10 xl:hidden"
             aria-label="Toggle menu"
             aria-expanded={mobileMenuOpen}
             aria-controls="mobile-navigation"
@@ -185,7 +185,7 @@ const Header = () => {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <nav id="mobile-navigation" className="md:hidden mt-4 pb-4 border-t border-white/20 pt-4 space-y-3 bg-charcoal">
+          <nav id="mobile-navigation" className="mt-3 space-y-2 border-t border-white/20 bg-charcoal pb-3 pt-3 xl:hidden">
             <NavLink
               to="/"
               onClick={() => setMobileMenuOpen(false)}

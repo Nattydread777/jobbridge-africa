@@ -1,7 +1,9 @@
 import asyncHandler from 'express-async-handler';
+import { createHash, randomBytes } from 'node:crypto';
 import User from '../models/userModel.js';
 import generateToken from '../utils/generateToken.js';
 import cloudinary from '../config/cloudinary.js';
+import { sendPasswordResetEmail } from '../services/emailService.js';
 
 export const registerUser = asyncHandler(async (req, res) => {
   const {
@@ -78,6 +80,72 @@ export const loginUser = asyncHandler(async (req, res) => {
     res.status(401);
     throw new Error('Invalid email or password');
   }
+});
+
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    res.status(400);
+    throw new Error('Enter a valid email address.');
+  }
+
+  const user = await User.findOne({ email });
+  if (user) {
+    const resetToken = randomBytes(32).toString('hex');
+    user.passwordResetToken = createHash('sha256').update(resetToken).digest('hex');
+    user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
+    await user.save();
+
+    try {
+      const frontendUrl = process.env.FRONTEND_URL
+        || process.env.ALLOWED_ORIGINS?.split(',').map((origin) => origin.trim()).find(Boolean)
+        || 'http://localhost:5173';
+      const resetUrl = new URL(`/reset-password/${resetToken}`, frontendUrl).toString();
+      await sendPasswordResetEmail({
+        recipient: user.email,
+        name: user.name,
+        resetUrl,
+      });
+    } catch (error) {
+      user.passwordResetToken = undefined;
+      user.passwordResetExpires = undefined;
+      await user.save();
+      console.error('Password reset email delivery failed:', error.message);
+    }
+  }
+
+  res.status(200).json({
+    message: 'If an account exists for that email, password reset instructions will be sent shortly.',
+  });
+});
+
+export const resetPassword = asyncHandler(async (req, res) => {
+  const { token } = req.params;
+  const password = req.body?.password;
+  if (typeof token !== 'string' || !/^[a-f0-9]{64}$/i.test(token)) {
+    res.status(400);
+    throw new Error('This password reset link is invalid or has expired.');
+  }
+  if (typeof password !== 'string' || password.length < 8 || password.length > 128) {
+    res.status(400);
+    throw new Error('Your new password must be between 8 and 128 characters long.');
+  }
+
+  const hashedToken = createHash('sha256').update(token).digest('hex');
+  const user = await User.findOne({
+    passwordResetToken: hashedToken,
+    passwordResetExpires: { $gt: new Date() },
+  }).select('+passwordResetToken +passwordResetExpires');
+  if (!user) {
+    res.status(400);
+    throw new Error('This password reset link is invalid or has expired.');
+  }
+
+  user.password = password;
+  user.passwordResetToken = undefined;
+  user.passwordResetExpires = undefined;
+  await user.save();
+  res.status(200).json({ message: 'Your password has been reset. You can now sign in.' });
 });
 
 export const logoutUser = asyncHandler(async (req, res) => {

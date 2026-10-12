@@ -459,8 +459,18 @@ const Profile = () => {
           </Link>
         </div>
 
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold">Edit Profile</h1>
+        <div className="mb-8 flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-amber-50 text-2xl">
+              {user.profileImageUrl
+                ? <img src={user.profileImageUrl} alt="" className="h-full w-full object-cover" />
+                : <span aria-hidden="true">👤</span>}
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">{user.name}</h1>
+              <p className="mt-1 text-sm text-gray-500">Edit your professional profile</p>
+            </div>
+          </div>
 
           {/* Profile Completion Badge */}
           {user.role === "job_seeker" && (

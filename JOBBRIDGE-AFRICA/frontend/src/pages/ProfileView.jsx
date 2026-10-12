@@ -232,15 +232,15 @@ const ProfileView = () => {
     <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:py-10">
       <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="h-28 bg-gradient-to-r from-slate-900 via-slate-800 to-amber-600 sm:h-36" />
-        <div className="px-5 pb-6 sm:px-8">
-          <div className="-mt-12 flex flex-wrap items-end justify-between gap-4">
-            <div className="flex items-end gap-4">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-amber-50 text-4xl shadow-sm">
+        <div className="px-5 pb-6 pt-5 sm:px-8">
+          <div className="flex flex-wrap items-center justify-between gap-5">
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-amber-50 text-4xl shadow-sm sm:h-24 sm:w-24">
                 {user.profileImageUrl ? (
                   <img src={user.profileImageUrl} alt="" className="h-full w-full object-cover" />
                 ) : <span aria-hidden="true">👤</span>}
               </div>
-              <div className="pb-1">
+              <div className="min-w-0">
                 <h1 className="text-2xl font-bold text-slate-950 sm:text-3xl">{user.name}</h1>
                 <p className="mt-1 text-sm text-slate-600">
                   {isJobSeeker ? "Job seeker" : user.role === "employer" ? "Employer" : "Administrator"}

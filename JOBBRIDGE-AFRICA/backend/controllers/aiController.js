@@ -1,5 +1,6 @@
 import asyncHandler from 'express-async-handler';
 import Job from '../models/Job.js';
+import { buildActiveJobFilter } from '../utils/jobFilters.js';
 
 const CV_INPUT_LIMIT = 100000;
 const STOP_WORDS = new Set([
@@ -144,7 +145,7 @@ export const getAiMatches = asyncHandler(async (req, res) => {
   }
 
   // Fetch active (non-expired) jobs
-  const jobs = await Job.find({ expiryDate: { $gte: new Date() }, isApproved: true }).sort({ createdAt: -1 }).limit(200);
+  const jobs = await Job.find(buildActiveJobFilter()).sort({ createdAt: -1 }).limit(200);
 
   // Prepare profile features
   const userSkills = Array.isArray(user.skills) ? user.skills.map(s => String(s).toLowerCase()) : [];
