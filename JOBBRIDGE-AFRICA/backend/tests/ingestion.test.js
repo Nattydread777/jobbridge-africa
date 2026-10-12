@@ -262,6 +262,9 @@ test('normalizes remote API jobs with provider attribution and validates the Job
   assert.equal(normalizeRemoteJob('Remotive', null), null);
   assert.equal(normalizeRemoteJob('Remotive', undefined), null);
   assert.equal(new Job().jobType, 'Full-Time');
+  assert.equal(new Job({ source: 'remotive' }).source, 'remotive');
+  assert.ok(Job.schema.path('source').enumValues.includes('remotive'));
   assert.equal(Job.schema.path('workplaceType').defaultValue.call(null), 'on-site');
+  assert.equal(Job.schema.path('isDirectPosting').defaultValue.call(null), true);
   assert.equal(Job.schema.path('isRemote').defaultValue.call(null), false);
 });

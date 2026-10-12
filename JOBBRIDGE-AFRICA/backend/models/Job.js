@@ -15,7 +15,8 @@ const jobSchema = new mongoose.Schema({
     type: String,
     enum: ['remote', 'hybrid', 'on-site'],
     default: function defaultWorkplaceType() {
-      return this?.jobType === 'Remote' ? 'remote' : 'on-site';
+      if (!this) return 'on-site';
+      return this.jobType === 'Remote' ? 'remote' : 'on-site';
     },
   },
   salaryRange: { type: String, default: 'Competitive' },
@@ -28,20 +29,22 @@ const jobSchema = new mongoose.Schema({
   postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   isApproved: { type: Boolean, default: true },
   isActive: { type: Boolean, default: true },
-  source: { type: String, enum: ['employer', 'himalayas', 'aggregated'], default: 'employer' },
+  source: { type: String, enum: ['employer', 'himalayas', 'remotive', 'aggregated'], default: 'employer' },
   sourceProvider: { type: String, default: '' },
   sourceName: { type: String, default: '' },
   sourceUrl: { type: String, default: '' },
   isDirectPosting: {
     type: Boolean,
     default: function isDirectPostingBySource() {
+      if (!this) return true;
       return this.source === 'employer';
     },
   },
   isRemote: {
     type: Boolean,
     default: function isRemoteBySource() {
-      return this?.workplaceType === 'remote' || this?.jobType === 'Remote';
+      if (!this) return false;
+      return this.workplaceType === 'remote' || this.jobType === 'Remote';
     },
   },
   isWorldwideRemote: { type: Boolean, default: false },
