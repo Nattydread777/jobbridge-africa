@@ -34,7 +34,7 @@ const Jobs = () => {
     setLoading(true);
     setError("");
     const params = new URLSearchParams(search);
-    params.set("limit", "10");
+    params.set("limit", "12");
     api
       .get(`/jobs?${params.toString()}`, { signal: controller.signal })
       .then((res) => {

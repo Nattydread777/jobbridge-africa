@@ -34,10 +34,10 @@ export const getJobs = asyncHandler(async (req, res) => {
     datePosted,
     page = 1,
     cursor,
-    limit = 20,
+    limit = 12,
   } = req.query;
   const pageNumber = Math.max(1, Number.parseInt(page, 10) || 1);
-  const pageSize = Math.min(50, Math.max(1, Number.parseInt(limit, 10) || 20));
+  const pageSize = Math.min(50, Math.max(1, Number.parseInt(limit, 10) || 12));
   const remoteFilter = parseBoolean(isRemote, 'isRemote', res);
   const selectedWorkplace = workplaceType === undefined
     ? undefined
