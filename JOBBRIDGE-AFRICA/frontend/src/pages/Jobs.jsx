@@ -33,9 +33,10 @@ const Jobs = () => {
     const controller = new AbortController();
     setLoading(true);
     setError("");
-    const params = search || "";
+    const params = new URLSearchParams(search);
+    params.set("limit", "10");
     api
-      .get(`/jobs${params}`, { signal: controller.signal })
+      .get(`/jobs?${params.toString()}`, { signal: controller.signal })
       .then((res) => {
         const data = res.data;
         const loadedJobs = Array.isArray(data) ? data : data?.jobs;
@@ -236,8 +237,8 @@ const Jobs = () => {
             >
               <option value="">All Time</option>
               <option value="24h">Last 24 Hours</option>
-              <option value="7d">Last 7 Days</option>
-              <option value="30d">Last Month</option>
+              <option value="7d">Past Week</option>
+              <option value="30d">Past Month</option>
             </select>
           </div>
 
@@ -356,7 +357,7 @@ const Jobs = () => {
             <p className="text-gray-600">No jobs available at the moment.</p>
           ) : (
             <>
-              <div className="grid gap-6 md:grid-cols-2">
+              <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                 {jobs.map((job) => (
                   <JobCard key={job._id} job={job} />
                 ))}

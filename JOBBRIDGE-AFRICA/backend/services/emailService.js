@@ -8,11 +8,14 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (character)
   "'": '&#39;',
 }[character]));
 
+export const isEmailConfigured = () =>
+  Boolean(process.env.EMAIL_USER?.trim() && process.env.EMAIL_PASS?.trim());
+
 const createTransporter = () => {
   const emailFrom = process.env.EMAIL_FROM || process.env.EMAIL_USER;
   const emailHost = process.env.EMAIL_HOST || 'smtp.zoho.com';
-  if (!emailHost || !emailFrom || !process.env.EMAIL_PASS) {
-    throw new Error('Email delivery is not configured (EMAIL_USER/EMAIL_FROM and EMAIL_PASS are required).');
+  if (!emailHost || !emailFrom || !isEmailConfigured()) {
+    throw new Error('Email delivery is not configured (EMAIL_USER and EMAIL_PASS are required).');
   }
 
   const port = Number(process.env.EMAIL_PORT || 465);
@@ -26,6 +29,9 @@ const createTransporter = () => {
       user: process.env.EMAIL_USER || emailFrom,
       pass: process.env.EMAIL_PASS,
     },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
 };
 

@@ -134,6 +134,76 @@ const getJobsFromResponse = (payload) => {
   throw new Error('Himalayas API response did not include a jobs array');
 };
 
+const seedFallbackJobs = async (reason) => {
+  console.warn(`Using clearly labelled sample jobs because the external feed is unavailable: ${reason}`);
+  const publishedAt = new Date();
+  const expiryDate = new Date(publishedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const samples = [
+    {
+      title: 'Sample Remote Product Analyst',
+      location: 'Africa / Worldwide Remote',
+      locationRestriction: 'Africa / Worldwide remote',
+      seniority: 'Mid-level',
+      categories: ['Product', 'Analytics'],
+      tags: ['Sample listing'],
+    },
+    {
+      title: 'Sample Remote Frontend Engineer',
+      location: 'Africa / Worldwide Remote',
+      locationRestriction: 'Africa / Worldwide remote',
+      seniority: 'Mid-level',
+      categories: ['Engineering', 'Frontend'],
+      tags: ['Sample listing'],
+    },
+    {
+      title: 'Sample Remote Project Manager',
+      location: 'Africa / Worldwide Remote',
+      locationRestriction: 'Africa / Worldwide remote',
+      seniority: 'Senior',
+      categories: ['Operations', 'Project Management'],
+      tags: ['Sample listing'],
+    },
+  ];
+  let upserted = 0;
+
+  for (const sample of samples) {
+    const sourceKey = createHash('sha256')
+      .update(`jobbridge-fallback-${sample.title}`)
+      .digest('hex');
+    const result = await Job.updateOne(
+      { sourceKey, source: 'aggregated', sourceProvider: 'jobbridge-fallback' },
+      {
+        $set: {
+          ...sample,
+          source: 'aggregated',
+          sourceProvider: 'jobbridge-fallback',
+          isDirectPosting: false,
+          isRemote: true,
+          workplaceType: 'remote',
+          isWorldwideRemote: true,
+          companyName: 'JobBridge Africa (Sample)',
+          companySlug: 'jobbridge-africa-sample',
+          excerpt: 'Demonstration data shown while the external job feed is unavailable.',
+          description: 'This is a sample listing for demonstration only. It is not an active vacancy and cannot accept applications.',
+          jobType: 'Remote',
+          salaryRange: 'Not provided',
+          categories: sample.categories,
+          tags: sample.tags,
+          pubDate: publishedAt,
+          expiryDate,
+          isApproved: true,
+        },
+        $setOnInsert: { sourceKey },
+      },
+      { upsert: true },
+    );
+    if (result.upsertedCount || result.modifiedCount) upserted += 1;
+  }
+
+  console.info(`Fallback sample jobs ready: ${samples.length} listings (${upserted} inserted or refreshed).`);
+  return { pages: 0, fetched: 0, upserted, skipped: 0, fallback: true };
+};
+
 export const ingestHimalayasJobs = async () => {
   let cursor;
   let fetched = 0;
@@ -148,16 +218,28 @@ export const ingestHimalayasJobs = async () => {
     url.searchParams.set('limit', String(PAGE_SIZE));
     if (cursor) url.searchParams.set('cursor', cursor);
 
-    const response = await fetch(url, {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(30000),
-    });
-    if (!response.ok) {
-      throw new Error(`Himalayas API request failed (${response.status})`);
+    let payload;
+    let jobs;
+    const startedAt = Date.now();
+    try {
+      const response = await fetch(url, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(30000),
+      });
+      console.info(`Himalayas API page ${pages + 1}: HTTP ${response.status} (${Date.now() - startedAt} ms).`);
+      if (!response.ok) {
+        const retryAfter = response.headers.get('retry-after');
+        throw new Error(
+          `request failed with HTTP ${response.status}${retryAfter ? ` (retry after ${retryAfter})` : ''}`,
+        );
+      }
+      payload = await response.json();
+      jobs = getJobsFromResponse(payload);
+      console.info(`Himalayas API page ${pages + 1}: parsed ${jobs.length} job records.`);
+    } catch (error) {
+      console.error(`Himalayas API page ${pages + 1} request or response failed:`, error.message);
+      return seedFallbackJobs(error.message);
     }
-
-    const payload = await response.json();
-    const jobs = getJobsFromResponse(payload);
     pages += 1;
     fetched += jobs.length;
     let pageIsOldAndExpired = jobs.length > 0;
@@ -211,7 +293,7 @@ export const ingestHimalayasJobs = async () => {
     } else {
       cursor = String(nextCursor);
       if (seenCursors.has(cursor)) {
-        throw new Error('Himalayas API returned a repeated pagination cursor');
+        return seedFallbackJobs('the API returned a repeated pagination cursor');
       }
       seenCursors.add(cursor);
       await pause(REQUEST_DELAY_MS);
@@ -219,7 +301,11 @@ export const ingestHimalayasJobs = async () => {
   } while (cursor);
 
   console.info(`Global job sync complete: ${pages} pages, fetched ${fetched}, upserted ${upserted}, skipped ${skipped}`);
-  return { pages, fetched, upserted, skipped };
+  const removedFallbacks = await Job.deleteMany({ sourceProvider: 'jobbridge-fallback' });
+  if (removedFallbacks.deletedCount) {
+    console.info(`Removed ${removedFallbacks.deletedCount} sample fallback listings after a successful feed sync.`);
+  }
+  return { pages, fetched, upserted, skipped, fallback: false };
 };
 
 export const scheduleDailyJobIngestion = () => {
@@ -231,7 +317,12 @@ export const scheduleDailyJobIngestion = () => {
     }
     isRunning = true;
     try {
-      await ingestHimalayasJobs();
+      const result = await ingestHimalayasJobs();
+      if (result.fallback) {
+        console.warn(`Sample listings are active; the external feed will be retried in ${SYNC_RETRY_DELAY_MS / 60000} minutes.`);
+        const retryTimer = setTimeout(run, SYNC_RETRY_DELAY_MS);
+        retryTimer.unref();
+      }
     } catch (error) {
       console.error('Global job sync failed:', error);
       const retryTimer = setTimeout(run, SYNC_RETRY_DELAY_MS);

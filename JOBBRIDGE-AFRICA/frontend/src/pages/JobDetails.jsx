@@ -141,7 +141,11 @@ const JobDetails = () => {
             </span>
           )}
         </div>
-        {job.source !== "employer" && job.isDirectPosting !== true && (
+        {job.sourceProvider === "jobbridge-fallback" ? (
+          <p className="mb-6 rounded-lg bg-slate-100 p-4 text-sm text-slate-800">
+            This is a sample listing shown while the external job feed is unavailable. It is not an active vacancy and cannot accept applications.
+          </p>
+        ) : job.source !== "employer" && job.isDirectPosting !== true && (
           <p className="mb-6 rounded-lg bg-amber-50 p-4 text-sm text-amber-950">
             This is an external {job.isWorldwideRemote ? "worldwide remote" : "Africa-accessible remote"} listing
             from our Worldwide Remote Network. Applications are handled on the official employer career site.
@@ -204,7 +208,11 @@ const JobDetails = () => {
                 Apply on official site
               </a>
             ) : (
-              <p className="text-sm text-gray-600">The external application link is unavailable.</p>
+              <p className="text-sm text-gray-600">
+                {job.sourceProvider === "jobbridge-fallback"
+                  ? "Sample listings cannot accept applications."
+                  : "The external application link is unavailable."}
+              </p>
             )
           ) : (
             <button

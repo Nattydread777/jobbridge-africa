@@ -3,7 +3,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import User from '../models/userModel.js';
 import generateToken from '../utils/generateToken.js';
 import cloudinary from '../config/cloudinary.js';
-import { sendPasswordResetEmail } from '../services/emailService.js';
+import { isEmailConfigured, sendPasswordResetEmail } from '../services/emailService.js';
 
 export const registerUser = asyncHandler(async (req, res) => {
   const {
@@ -89,6 +89,12 @@ export const forgotPassword = asyncHandler(async (req, res) => {
     throw new Error('Enter a valid email address.');
   }
 
+  if (!isEmailConfigured()) {
+    return res.status(503).json({
+      message: 'Password reset email is temporarily unavailable. Please try again later.',
+    });
+  }
+
   const user = await User.findOne({ email });
   if (user) {
     const resetToken = randomBytes(32).toString('hex');
@@ -111,6 +117,9 @@ export const forgotPassword = asyncHandler(async (req, res) => {
       user.passwordResetExpires = undefined;
       await user.save();
       console.error('Password reset email delivery failed:', error.message);
+      return res.status(503).json({
+        message: 'We could not send the password reset email right now. Please try again later.',
+      });
     }
   }
 

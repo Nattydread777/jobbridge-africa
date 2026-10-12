@@ -21,10 +21,19 @@ const ForgotPasswordModal = ({ initialEmail, onClose }) => {
     setError("");
     setMessage("");
     try {
-      const response = await api.post("/auth/forgot-password", { email: email.trim() });
+      const response = await api.post(
+        "/auth/forgot-password",
+        { email: email.trim() },
+        { timeout: 20000 },
+      );
       setMessage(response.data.message);
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "We couldn’t submit your request. Please try again.");
+      setError(
+        requestError.response?.data?.message
+          || (requestError.code === "ECONNABORTED"
+            ? "The request timed out. Please check your connection and try again."
+            : "We couldn’t submit your request. Please try again."),
+      );
     } finally {
       setSubmitting(false);
     }

@@ -149,7 +149,12 @@ export const getJobs = asyncHandler(async (req, res) => {
     filters.push({
       $or: [
         { pubDate: { $gte: postedAfter } },
-        { pubDate: { $exists: false }, createdAt: { $gte: postedAfter } },
+        {
+          $and: [
+            { $or: [{ pubDate: { $exists: false } }, { pubDate: null }] },
+            { createdAt: { $gte: postedAfter } },
+          ],
+        },
       ],
     });
   }
