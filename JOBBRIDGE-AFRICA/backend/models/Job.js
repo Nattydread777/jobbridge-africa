@@ -27,6 +27,7 @@ const jobSchema = new mongoose.Schema({
   applicationEmail: { type: String },
   postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   isApproved: { type: Boolean, default: true },
+  isActive: { type: Boolean, default: true },
   source: { type: String, enum: ['employer', 'himalayas', 'aggregated'], default: 'employer' },
   sourceProvider: { type: String, default: '' },
   isDirectPosting: {
@@ -52,6 +53,7 @@ const jobSchema = new mongoose.Schema({
   categories: { type: [String], default: [] },
   tags: { type: [String], default: [] },
   pubDate: { type: Date },
+  lastSeenAt: { type: Date },
 }, { timestamps: true });
 
 // Virtual property to check if job is expired

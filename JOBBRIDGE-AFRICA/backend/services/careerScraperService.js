@@ -1,138 +1,197 @@
+import axios from 'axios';
 import { createHash } from 'node:crypto';
+import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
-import mongoose from 'mongoose';
+import https from 'node:https';
 import { load } from 'cheerio';
 import Job from '../models/Job.js';
-import User from '../models/userModel.js';
 
-const MAX_FEED_BYTES = 2 * 1024 * 1024;
-const MAX_JOB_PAGES = 30;
-const MAX_CHILD_SITEMAPS = 5;
-const REQUEST_TIMEOUT_MS = 20000;
-const CAREER_PATH = /\/(?:careers?|jobs?(?:-postings?)?|openings?|positions?|vacancies?|job-openings?|career-opportunities?)(?:\/|$)/i;
+const USER_AGENT = 'JobBridgeAfrica-JobPostingCrawler/1.0 (+https://www.jobbridgeafrica.org)';
+const REQUEST_TIMEOUT_MS = 15000;
+const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+const MAX_DISCOVERY_PAGES = 60;
+const MAX_POSTINGS_PER_DOMAIN = 500;
+const MAX_SITEMAPS = 5;
+const MAX_REDIRECTS = 3;
 const DEFAULT_SCRAPE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const CAREER_PATH = /\/(?:careers?|jobs?(?:-postings?)?|openings?|positions?|vacancies?|job-openings?|career-opportunities?)(?:\/|$)/i;
 
-export const isCareerJobUrl = (value) => {
-  try {
-    const pathname = new URL(value).pathname;
-    const match = pathname.match(CAREER_PATH);
-    return Boolean(match && pathname.slice(match.index + match[0].length).replace(/\//g, ''));
-  } catch {
-    return false;
+const privateIpv4 = (address) => {
+  const octets = address.split('.').map(Number);
+  const [first, second] = octets;
+  return first === 0 || first === 10 || first === 127 || first >= 224
+    || (first === 100 && second >= 64 && second <= 127)
+    || (first === 169 && second === 254)
+    || (first === 172 && second >= 16 && second <= 31)
+    || (first === 192 && second === 168)
+    || (first === 192 && second === 0)
+    || (first === 198 && (second === 18 || second === 19));
+};
+
+const isPublicAddress = (address) => {
+  const family = isIP(address);
+  if (family === 4) return !privateIpv4(address);
+  if (family !== 6) return false;
+  const normalized = address.toLowerCase();
+  if (normalized.startsWith('::ffff:')) {
+    const mappedIpv4 = normalized.slice('::ffff:'.length);
+    return isIP(mappedIpv4) === 4 && !privateIpv4(mappedIpv4);
   }
+  return normalized !== '::'
+    && normalized !== '::1'
+    && !normalized.startsWith('fc')
+    && !normalized.startsWith('fd')
+    && !normalized.startsWith('fe8')
+    && !normalized.startsWith('fe9')
+    && !normalized.startsWith('fea')
+    && !normalized.startsWith('feb')
+    && !normalized.startsWith('ff');
 };
 
-const safeHost = (hostname) => {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
-  if (!host || host === 'localhost' || host.endsWith('.localhost')
-    || host.endsWith('.local') || host.endsWith('.internal')) return false;
-  if (isIP(host)) return false;
-  return true;
-};
-
-const validateFeedUrl = (value, expectedHostname) => {
+const validateRootUrl = (value) => {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error('Career crawler target must be a non-empty domain or URL string.');
+  }
   let url;
   try {
-    url = new URL(value);
+    url = new URL(value.includes('://') ? value : `https://${value}`);
   } catch {
-    throw new Error('Career feed URL is invalid.');
+    throw new Error('Career crawler target must be a valid domain or URL.');
   }
-  if (url.protocol !== 'https:' || url.username || url.password || !safeHost(url.hostname)) {
-    throw new Error('Career feed URLs must use HTTPS and a public DNS hostname.');
-  }
-  if (expectedHostname && url.hostname.toLowerCase() !== expectedHostname.toLowerCase()) {
-    throw new Error('Career sitemap links must stay on the configured company hostname.');
+  if (url.protocol !== 'https:' || url.username || url.password || !url.hostname
+    || url.hostname === 'localhost' || url.hostname.endsWith('.localhost')
+    || url.hostname.endsWith('.local') || url.hostname.endsWith('.internal')
+    || isIP(url.hostname)) {
+    throw new Error('Career crawler targets must use HTTPS and a public DNS hostname.');
   }
   return url;
 };
 
-const fetchText = async (url, expectedHostname) => {
-  let parsedUrl = validateFeedUrl(url, expectedHostname);
-  let response;
-  for (let redirectCount = 0; redirectCount <= 3; redirectCount += 1) {
-    response = await fetch(parsedUrl, {
-      headers: {
-        Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.9, */*;q=0.8',
-        'User-Agent': 'JobBridgeAfrica-CareerFeed/1.0 (+https://www.jobbridgeafrica.org)',
-      },
-      redirect: 'manual',
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-    if (![301, 302, 303, 307, 308].includes(response.status)) break;
-    const redirectLocation = response.headers.get('location');
-    await response.body?.cancel();
-    if (!redirectLocation || redirectCount === 3) {
-      throw new Error(`Request to ${parsedUrl.hostname} returned an invalid or excessive redirect.`);
-    }
-    parsedUrl = validateFeedUrl(new URL(redirectLocation, parsedUrl).href, expectedHostname);
-  }
-  if (!response.ok) {
-    throw new Error(`Request to ${parsedUrl.hostname} failed with HTTP ${response.status}.`);
-  }
-  if (!response.body) throw new Error(`Response from ${parsedUrl.hostname} did not contain a body.`);
+const belongsToTargetDomain = (hostname, targetHostname) => {
+  const baseDomain = targetHostname.replace(/^www\./i, '').toLowerCase();
+  const candidate = hostname.toLowerCase();
+  return candidate === baseDomain || candidate.endsWith(`.${baseDomain}`);
+};
 
-  const reader = response.body.getReader();
-  const chunks = [];
-  let totalBytes = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      totalBytes += value.byteLength;
-      if (totalBytes > MAX_FEED_BYTES) {
-        await reader.cancel();
-        throw new Error(`Response from ${parsedUrl.hostname} exceeded the ${MAX_FEED_BYTES} byte limit.`);
+const validatePublicAddresses = async (hostname) => {
+  let dnsTimeout;
+  const addresses = await Promise.race([
+    lookup(hostname, { all: true, verbatim: true }),
+    new Promise((_, reject) => {
+      dnsTimeout = setTimeout(() => reject(new Error(`DNS lookup timed out for ${hostname}.`)), REQUEST_TIMEOUT_MS);
+      dnsTimeout.unref();
+    }),
+  ]).finally(() => clearTimeout(dnsTimeout));
+  if (!addresses.length || addresses.some(({ address }) => !isPublicAddress(address))) {
+    throw new Error(`Refusing to crawl ${hostname}: DNS resolved to a non-public address.`);
+  }
+  return addresses;
+};
+
+const createPinnedHttpsAgent = (hostname, addresses) => new https.Agent({
+  keepAlive: false,
+  lookup: (requestedHostname, options, callback) => {
+    if (requestedHostname.toLowerCase() !== hostname.toLowerCase()) {
+      callback(new Error('Unexpected hostname during career crawler request.'));
+      return;
+    }
+    const matchingAddresses = options?.family
+      ? addresses.filter(({ family }) => family === options.family)
+      : addresses;
+    if (!matchingAddresses.length) {
+      callback(new Error(`No validated DNS address is available for ${hostname}.`));
+      return;
+    }
+    if (options?.all) {
+      callback(null, matchingAddresses);
+      return;
+    }
+    callback(null, matchingAddresses[0].address, matchingAddresses[0].family);
+  },
+});
+
+const requestPublicHtml = async (urlValue, expectedDomain) => {
+  let url = validateRootUrl(urlValue);
+  for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
+    const addresses = await validatePublicAddresses(url.hostname);
+    const httpsAgent = createPinnedHttpsAgent(url.hostname, addresses);
+    let response;
+    try {
+      response = await axios.get(url.href, {
+        headers: {
+          Accept: 'text/html, application/xhtml+xml, application/xml, text/xml;q=0.9, */*;q=0.8',
+          'User-Agent': USER_AGENT,
+        },
+        timeout: REQUEST_TIMEOUT_MS,
+        maxContentLength: MAX_RESPONSE_BYTES,
+        maxBodyLength: MAX_RESPONSE_BYTES,
+        responseType: 'text',
+        responseEncoding: 'utf8',
+        validateStatus: () => true,
+        maxRedirects: 0,
+        proxy: false,
+        httpsAgent,
+      });
+    } finally {
+      httpsAgent.destroy();
+    }
+
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      if (redirectCount === MAX_REDIRECTS || !response.headers.location) {
+        throw new Error(`Career crawler encountered an invalid or excessive redirect at ${url.hostname}.`);
       }
-      chunks.push(value);
+      url = validateRootUrl(new URL(response.headers.location, url).href);
+      if (expectedDomain && !belongsToTargetDomain(url.hostname, expectedDomain)) {
+        throw new Error(`Career crawler refused a redirect outside ${expectedDomain}.`);
+      }
+      continue;
     }
-  } finally {
-    reader.releaseLock();
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`Career crawler request to ${url.hostname} failed with HTTP ${response.status}.`);
+    }
+    if (typeof response.data !== 'string') {
+      throw new Error(`Career crawler received an unexpected response from ${url.hostname}.`);
+    }
+    return { html: response.data, url };
   }
-
-  const body = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return { text: new TextDecoder().decode(body), url: parsedUrl };
+  throw new Error('Career crawler exceeded the redirect limit.');
 };
 
 const htmlToText = (value) => {
   const $ = load(value || '');
-  $('script, style').remove();
+  $('script, style, noscript').remove();
   return $.text().replace(/\s+/g, ' ').trim();
 };
 
 const asText = (value) => {
   if (typeof value === 'string' || typeof value === 'number') return String(value).trim();
   if (Array.isArray(value)) return value.map(asText).filter(Boolean).join(', ');
-  if (value && typeof value === 'object') {
-    if (value.currency || value.minValue !== undefined || value.maxValue !== undefined) {
-      const nestedValue = value.value && typeof value.value === 'object'
-        ? [value.value.minValue, value.value.maxValue]
-        : [value.value];
-      return [
-        value.currency,
-        value.minValue,
-        value.maxValue,
-        ...nestedValue,
-        value.unitText,
-      ].filter((part) => part !== undefined && part !== null && part !== '')
-        .map(asText)
-        .join(' ');
-    }
-    if (value.name || value.value || value.address || value.streetAddress || value.addressLocality) {
-      return [
-        value.name,
-        value.value,
-        value.address,
-        value.streetAddress,
-        value.addressLocality,
-        value.addressRegion,
-        value.addressCountry,
-      ].map(asText).filter(Boolean).join(', ');
-    }
+  if (!value || typeof value !== 'object') return '';
+  if (value.currency || value.minValue !== undefined || value.maxValue !== undefined) {
+    const nestedValue = value.value && typeof value.value === 'object'
+      ? [value.value.minValue, value.value.maxValue]
+      : [value.value];
+    return [
+      value.currency,
+      value.minValue,
+      value.maxValue,
+      ...nestedValue,
+      value.unitText,
+    ].filter((part) => part !== undefined && part !== null && part !== '')
+      .map(asText)
+      .join(' ');
+  }
+  if (value.name || value.value || value.address || value.streetAddress
+    || value.addressLocality || value.addressCountry) {
+    return [
+      value.name,
+      value.value,
+      value.address,
+      value.streetAddress,
+      value.addressLocality,
+      value.addressRegion,
+      value.addressCountry,
+    ].map(asText).filter(Boolean).join(', ');
   }
   return '';
 };
@@ -145,7 +204,7 @@ const parseDate = (value) => {
 
 const normalizeJobType = (value, workplaceType) => {
   if (workplaceType === 'remote') return 'Remote';
-  const normalized = asText(value).toLowerCase();
+  const normalized = asText(value).toLowerCase().replace(/[-_]/g, ' ');
   if (normalized.includes('part')) return 'Part-Time';
   if (normalized.includes('contract') || normalized.includes('temporary') || normalized.includes('freelance')) return 'Contract';
   if (normalized.includes('intern')) return 'Internship';
@@ -162,296 +221,433 @@ const getWorkplaceType = (job, location) => {
 const isJobPosting = (value) => {
   if (!value || typeof value !== 'object') return false;
   const type = value['@type'];
-  return (Array.isArray(type) ? type : [type]).includes('JobPosting');
+  return (Array.isArray(type) ? type : [type]).some((entry) =>
+    typeof entry === 'string' && entry.split(/[\/#]/).pop().toLowerCase() === 'jobposting',
+  );
 };
 
-const findJobPosting = (value) => {
-  if (Array.isArray(value)) return value.map(findJobPosting).find(Boolean);
-  if (!value || typeof value !== 'object') return null;
-  if (isJobPosting(value)) return value;
-  if (Array.isArray(value['@graph'])) return findJobPosting(value['@graph']);
-  return null;
+const collectJobPostings = (value, results = []) => {
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectJobPostings(item, results));
+    return results;
+  }
+  if (!value || typeof value !== 'object') return results;
+  if (isJobPosting(value)) results.push(value);
+  if (value['@graph']) collectJobPostings(value['@graph'], results);
+  if (value['@type'] === 'ItemList' && Array.isArray(value.itemListElement)) {
+    value.itemListElement.forEach((item) =>
+      collectJobPostings(item.item || item, results),
+    );
+  }
+  return results;
 };
 
-export const extractCareerPageJob = (html, url) => {
+const getJobLocation = (job) => {
+  const locations = [
+    job.jobLocation,
+    job.jobLocationType === 'TELECOMMUTE' ? 'Remote' : '',
+    job.applicantLocationRequirements,
+  ].filter(Boolean);
+  return locations.map(asText).filter(Boolean).join(' · ') || 'Not specified';
+};
+
+const getApplicationUrl = (job, pageUrl) => {
+  const rawUrl = asText(job.url)
+    || asText(job.applicationUrl)
+    || asText(job.mainEntityOfPage)
+    || pageUrl.href;
+  try {
+    const url = new URL(rawUrl, pageUrl);
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : pageUrl.href;
+  } catch {
+    return pageUrl.href;
+  }
+};
+
+export const isCareerJobUrl = (value) => {
+  try {
+    const pathname = new URL(value).pathname;
+    return CAREER_PATH.test(pathname);
+  } catch {
+    return false;
+  }
+};
+
+export const extractSchemaJobPostings = (html, pageUrl) => {
   const $ = load(html);
-  let structuredJob = null;
+  const postings = [];
   $('script[type="application/ld+json"]').each((_, script) => {
-    if (structuredJob) return;
     try {
-      structuredJob = findJobPosting(JSON.parse($(script).text()));
+      const parsed = JSON.parse($(script).text());
+      collectJobPostings(parsed, postings);
     } catch (error) {
-      console.warn(`Ignoring malformed JobPosting JSON-LD at ${url.href}:`, error.message);
+      console.warn(`Ignoring malformed JobPosting JSON-LD at ${pageUrl}:`, error.message);
     }
   });
-
-  const title = asText(structuredJob?.title)
-    || $('meta[property="og:title"]').attr('content')
-    || $('h1').first().text()
-    || $('title').text();
-  const description = htmlToText(structuredJob?.description)
-    || $('meta[name="description"]').attr('content')
-    || $('[class*="description"], [id*="description"]').first().text();
-  const location = asText(structuredJob?.jobLocation)
-    || $('meta[property="job:location"], [class*="location"], [data-testid*="location"]').first().text()
-    || 'Not specified';
-  const organizationName = asText(structuredJob?.hiringOrganization?.name);
-  const department = asText(
-    structuredJob?.industry || structuredJob?.occupationalCategory || structuredJob?.department,
-  );
-  const salary = asText(structuredJob?.baseSalary);
-  const postedAt = parseDate(structuredJob?.datePosted)
-    || parseDate($('meta[property="article:published_time"]').attr('content'));
-  const expiryDate = parseDate(structuredJob?.validThrough);
-  const employmentType = asText(structuredJob?.employmentType);
-
-  return {
-    title: htmlToText(title),
-    description,
-    location: htmlToText(location),
-    organizationName,
-    department,
-    salary,
-    postedAt,
-    expiryDate,
-    employmentType,
-    applicationLink: url.href,
-    workplaceType: getWorkplaceType(structuredJob || {}, location),
-  };
+  const page = pageUrl instanceof URL ? pageUrl : new URL(pageUrl);
+  return postings.map((job) => {
+    const location = getJobLocation(job);
+    const workplaceType = getWorkplaceType(job, location);
+    return {
+      title: htmlToText(asText(job.title)),
+      description: htmlToText(asText(job.description)),
+      employmentType: asText(job.employmentType),
+      salary: asText(job.baseSalary),
+      location,
+      workplaceType,
+      validThrough: parseDate(job.validThrough),
+      datePosted: parseDate(job.datePosted),
+      applicationUrl: getApplicationUrl(job, page),
+      employerName: asText(job.hiringOrganization?.name),
+      department: asText(job.industry || job.occupationalCategory || job.department),
+    };
+  }).filter((job) => job.title && job.description);
 };
 
-export const parseCareerRssEntries = (xml) => {
-  const $ = load(xml, { xmlMode: true });
-  return $('item, entry').toArray().map((node) => {
-    const item = $(node);
-    const linkNode = item.find('link').first();
-    const link = linkNode.attr('href') || linkNode.text().trim() || item.find('guid').first().text().trim();
-    const description = item.find('description, summary, content, content\\:encoded').first().text()
-      || item.find('encoded').first().text();
-    const categories = item.find('category').toArray().map((category) => $(category).text().trim()).filter(Boolean);
-    return {
-      title: htmlToText(item.find('title').first().text()),
-      description: htmlToText(description),
-      location: item.find('location, job\\:location').first().text().trim() || 'Not specified',
-      department: item.find('department, category').first().text().trim() || categories.join(', '),
-      salary: item.find('salary, job\\:salary').first().text().trim(),
-      postedAt: parseDate(item.find('pubDate, published, updated').first().text()),
-      expiryDate: parseDate(item.find('validThrough, deadline').first().text()),
-      employmentType: item.find('employmentType, job\\:type').first().text().trim(),
-      applicationLink: link,
-      workplaceType: getWorkplaceType({}, item.find('location, job\\:location').first().text()),
-    };
+const discoverCareerLinks = (html, pageUrl, allowedHost) => {
+  const $ = load(html);
+  return $('a[href]').toArray().flatMap((anchor) => {
+    try {
+      const url = new URL($(anchor).attr('href'), pageUrl);
+      if (!belongsToTargetDomain(url.hostname, allowedHost)
+        || url.protocol !== 'https:' || !isCareerJobUrl(url.href)) return [];
+      url.hash = '';
+      return [url.href];
+    } catch {
+      return [];
+    }
   });
 };
 
-const readSitemap = async (sitemapUrl, hostname, depth = 0, visited = new Set()) => {
-  const parsedUrl = validateFeedUrl(sitemapUrl, hostname);
-  if (visited.has(parsedUrl.href)) return [];
-  visited.add(parsedUrl.href);
-
-  const { text } = await fetchText(parsedUrl.href, hostname);
-  const $ = load(text, { xmlMode: true });
-  if ($('urlset, sitemapindex').length === 0) {
-    throw new Error(`Response from ${hostname} is not an XML sitemap.`);
-  }
-  const childSitemaps = $('sitemapindex > sitemap > loc').toArray()
+const parseSitemapLocations = (xml) => {
+  const $ = load(xml, { xmlMode: true });
+  const sitemapUrls = $('sitemapindex > sitemap > loc').toArray()
     .map((node) => $(node).text().trim())
     .filter(Boolean);
-  if (childSitemaps.length && depth < 2) {
-    if (childSitemaps.length > MAX_CHILD_SITEMAPS) {
-      console.warn(`Limiting ${hostname} sitemap index to ${MAX_CHILD_SITEMAPS} child sitemaps.`);
-    }
-    const childUrls = childSitemaps.slice(0, MAX_CHILD_SITEMAPS);
-    const nested = await Promise.all(childUrls.map((childUrl) =>
-      readSitemap(childUrl, hostname, depth + 1, visited),
-    ));
-    return nested.flat().slice(0, MAX_JOB_PAGES);
-  }
-
-  return $('urlset > url > loc').toArray()
+  const pageUrls = $('urlset > url > loc').toArray()
     .map((node) => $(node).text().trim())
-    .filter((value) => {
-      try {
-        const jobUrl = validateFeedUrl(value, hostname);
-        return isCareerJobUrl(jobUrl.href);
-      } catch (error) {
-        console.warn('Skipping invalid or out-of-host sitemap URL:', error.message);
-        return false;
-      }
-    })
-    .slice(0, MAX_JOB_PAGES);
+    .filter(Boolean);
+  return { sitemapUrls, pageUrls };
 };
 
-const upsertCareerJob = async (rawJob, feed, feedUrl, employer) => {
-  const title = htmlToText(rawJob.title).slice(0, 300);
-  const description = htmlToText(rawJob.description).slice(0, 100000);
-  if (!title || !description) {
-    console.info(`Skipping career URL without a usable title and description: ${feedUrl}`);
-    return false;
+const discoverSitemapUrls = async (rootUrl) => {
+  const isTargetHost = (hostname) => belongsToTargetDomain(hostname, rootUrl.hostname);
+  const discovered = new Set();
+  const robotsUrl = new URL('/robots.txt', rootUrl);
+  try {
+    const { html } = await requestPublicHtml(robotsUrl.href, rootUrl.hostname);
+    for (const line of html.split(/\r?\n/)) {
+      const match = line.match(/^\s*sitemap:\s*(\S+)/i);
+      if (match) {
+        try {
+          const sitemapUrl = new URL(match[1], rootUrl);
+          if (isTargetHost(sitemapUrl.hostname) && sitemapUrl.protocol === 'https:') {
+            discovered.add(sitemapUrl.href);
+          }
+        } catch (error) {
+          console.warn(`Ignoring invalid sitemap directive for ${rootUrl.hostname}:`, error.message);
+        }
+      }
+    }
+  } catch (error) {
+    console.info(`No readable robots.txt sitemap directives for ${rootUrl.hostname}: ${error.message}`);
   }
 
-  const applicationUrl = new URL(rawJob.applicationLink || feedUrl);
-  applicationUrl.hash = '';
-  const applicationLink = applicationUrl.href;
-  const location = htmlToText(rawJob.location) || 'Not specified';
-  const workplaceType = ['remote', 'hybrid', 'on-site'].includes(rawJob.workplaceType)
-    ? rawJob.workplaceType
-    : getWorkplaceType(rawJob, location);
-  const companyName = feed.companyName;
-  const companySlug = String(feed.companySlug || companyName)
-    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  const sourceKey = createHash('sha256')
-    .update(`career-scraper:${applicationUrl.hostname.toLowerCase()}${applicationUrl.pathname}${applicationUrl.search}`)
-    .digest('hex');
-  const postedAt = parseDate(rawJob.postedAt);
-  const explicitExpiry = parseDate(rawJob.expiryDate);
-  const expiryDate = explicitExpiry
-    || (postedAt && new Date(postedAt.getTime() + 90 * 24 * 60 * 60 * 1000))
-    || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
-  if (expiryDate <= new Date()) {
-    await Job.updateOne(
-      { sourceKey, source: 'aggregated', sourceProvider: 'career-scraper' },
-      { $set: { expiryDate } },
-    );
-    console.info(`Skipping expired career listing: ${applicationLink}`);
-    return false;
+  for (const path of ['/sitemap.xml', '/sitemap_index.xml']) {
+    if (discovered.size >= MAX_SITEMAPS) break;
+    discovered.add(new URL(path, rootUrl).href);
   }
-  const fields = {
-    title,
-    description,
-    excerpt: description.slice(0, 400),
-    companyName,
-    companySlug,
-    company: employer?._id || null,
-    department: htmlToText(rawJob.department).slice(0, 200),
+  return [...discovered].slice(0, MAX_SITEMAPS);
+};
+
+const discoverDomainPages = async (rootUrl, rootHtml) => {
+  const pages = new Set([rootUrl.href]);
+  const discoveredLinks = discoverCareerLinks(rootHtml, rootUrl, rootUrl.hostname);
+  discoveredLinks.forEach((url) => pages.add(url));
+  const sitemapUrls = await discoverSitemapUrls(rootUrl);
+  let sitemapCount = 0;
+
+  for (const sitemapUrl of sitemapUrls) {
+    if (pages.size >= MAX_DISCOVERY_PAGES) break;
+    try {
+      const { html } = await requestPublicHtml(sitemapUrl, rootUrl.hostname);
+      const { sitemapUrls: nestedSitemaps, pageUrls } = parseSitemapLocations(html);
+      for (const pageUrl of pageUrls) {
+        if (pages.size >= MAX_DISCOVERY_PAGES) break;
+        try {
+          const parsed = validateRootUrl(pageUrl);
+          if (belongsToTargetDomain(parsed.hostname, rootUrl.hostname)
+            && isCareerJobUrl(parsed.href)) {
+            parsed.hash = '';
+            pages.add(parsed.href);
+          }
+        } catch (error) {
+          console.info(`Skipping sitemap URL for ${rootUrl.hostname}: ${error.message}`);
+        }
+      }
+      if (sitemapCount < MAX_SITEMAPS) {
+        for (const nestedSitemap of nestedSitemaps.slice(0, MAX_SITEMAPS - sitemapCount)) {
+          sitemapCount += 1;
+          if (pages.size >= MAX_DISCOVERY_PAGES) break;
+          const parsedSitemap = validateRootUrl(nestedSitemap);
+          if (!isTargetHost(parsedSitemap.hostname)) {
+            console.info(`Skipping sitemap outside ${rootUrl.hostname}: ${parsedSitemap.hostname}`);
+            continue;
+          }
+          const { html: nestedXml } = await requestPublicHtml(parsedSitemap.href, rootUrl.hostname);
+          const nestedLocations = parseSitemapLocations(nestedXml).pageUrls;
+          for (const pageUrl of nestedLocations) {
+            if (pages.size >= MAX_DISCOVERY_PAGES) break;
+            try {
+              const parsed = validateRootUrl(pageUrl);
+              if (belongsToTargetDomain(parsed.hostname, rootUrl.hostname)
+                && isCareerJobUrl(parsed.href)) {
+                parsed.hash = '';
+                pages.add(parsed.href);
+              }
+            } catch (error) {
+              console.info(`Skipping nested sitemap URL for ${rootUrl.hostname}: ${error.message}`);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.info(`Sitemap discovery failed for ${rootUrl.hostname} (${sitemapUrl}): ${error.message}`);
+    }
+  }
+  return {
+    pages: [...pages].slice(0, MAX_DISCOVERY_PAGES),
+    capped: pages.size >= MAX_DISCOVERY_PAGES,
+  };
+};
+
+const domainProvider = (hostname) => `career-crawler:${hostname.toLowerCase()}`;
+
+export const normalizeSchemaJobPosting = (posting, rootUrlValue, crawledAt = new Date(), companyNameOverride = '') => {
+  const rootUrl = rootUrlValue instanceof URL ? rootUrlValue : validateRootUrl(rootUrlValue);
+  const location = posting.location || 'Not specified';
+  const provider = domainProvider(rootUrl.hostname);
+  const identity = [
+    rootUrl.hostname.toLowerCase(),
+    posting.title.trim().toLowerCase(),
+    location.trim().toLowerCase(),
+  ].join('\u0000');
+  return {
+    sourceKey: createHash('sha256').update(identity).digest('hex'),
+    sourceProvider: provider,
+    title: posting.title.slice(0, 300),
+    description: posting.description.slice(0, 100000),
+    excerpt: posting.description.slice(0, 400),
+    companyName: posting.employerName || companyNameOverride || rootUrl.hostname,
+    companySlug: rootUrl.hostname.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+    department: posting.department.slice(0, 200),
     location: location.slice(0, 500),
-    workplaceType,
-    isRemote: workplaceType === 'remote',
-    isWorldwideRemote: workplaceType === 'remote' && /\b(worldwide|global(?:ly)?|anywhere|africa)\b/i.test(location),
-    jobType: normalizeJobType(rawJob.employmentType, workplaceType),
-    salary: asText(rawJob.salary).slice(0, 500),
-    salaryRange: asText(rawJob.salary) || 'Competitive',
-    ...(explicitExpiry || postedAt ? { expiryDate } : {}),
-    ...(postedAt ? { pubDate: postedAt } : {}),
-    applicationLink,
+    locationRestriction: location.slice(0, 500),
+    workplaceType: posting.workplaceType,
+    isRemote: posting.workplaceType === 'remote',
+    isWorldwideRemote: posting.workplaceType === 'remote'
+      && /\b(worldwide|global(?:ly)?|anywhere|africa)\b/i.test(location),
+    jobType: normalizeJobType(posting.employmentType, posting.workplaceType),
+    salary: posting.salary.slice(0, 500),
+    salaryRange: posting.salary || 'Competitive',
+    expiryDate: posting.validThrough || new Date(crawledAt.getTime() + 90 * 24 * 60 * 60 * 1000),
+    ...(posting.datePosted ? { pubDate: posting.datePosted } : {}),
+    applicationLink: posting.applicationUrl,
     source: 'aggregated',
-    sourceProvider: 'career-scraper',
     isDirectPosting: false,
     isApproved: true,
-    ...(rawJob.department ? { categories: [htmlToText(rawJob.department).slice(0, 200)] } : {}),
+    isActive: !posting.validThrough || posting.validThrough > new Date(),
   };
-  await Job.updateOne(
-    { sourceKey, source: 'aggregated', sourceProvider: 'career-scraper' },
+};
+
+const upsertPosting = async (posting, rootUrl, crawledAt, companyNameOverride) => {
+  const normalized = normalizeSchemaJobPosting(posting, rootUrl, crawledAt, companyNameOverride);
+  const { sourceKey, ...fields } = normalized;
+  const result = await Job.updateOne(
+    { sourceKey, source: 'aggregated', sourceProvider: fields.sourceProvider },
     {
-      $set: fields,
-      $setOnInsert: {
-        sourceKey,
-        ...(!explicitExpiry && !postedAt ? { expiryDate } : {}),
-      },
+      $set: { ...fields, lastSeenAt: crawledAt },
+      $setOnInsert: { sourceKey },
     },
     { upsert: true, runValidators: true },
   );
-  return true;
+  return result.upsertedCount > 0 || result.modifiedCount > 0;
 };
 
-const validateFeedConfig = (feed) => {
-  if (!feed || typeof feed.companyName !== 'string' || !feed.companyName.trim()) {
-    throw new Error('Each career feed must have a companyName.');
+const markMissingOrExpiredListings = async (rootUrl, crawledAt, seenKeys, discoveryComplete) => {
+  const provider = domainProvider(rootUrl.hostname);
+  const expired = await Job.updateMany(
+    {
+      sourceProvider: provider,
+      source: 'aggregated',
+      expiryDate: { $lte: crawledAt },
+      isActive: { $ne: false },
+    },
+    { $set: { isActive: false } },
+  );
+  if (!discoveryComplete || !seenKeys.size) {
+    return { expired: expired.modifiedCount, missing: 0 };
   }
-  if (typeof feed.url !== 'string' || !feed.url.trim()) {
-    throw new Error(`Career feed for ${feed.companyName} must have a URL.`);
-  }
-  const url = validateFeedUrl(feed.url);
-  if (feed.employerId && !mongoose.isValidObjectId(feed.employerId)) {
-    throw new Error(`Career feed for ${feed.companyName} has an invalid employerId.`);
-  }
-  if (feed.type && !['auto', 'rss', 'sitemap'].includes(feed.type)) {
-    throw new Error(`Career feed for ${feed.companyName} type must be auto, rss, or sitemap.`);
-  }
-  return { ...feed, companyName: feed.companyName.trim(), url: url.href, hostname: url.hostname };
+
+  const missing = await Job.updateMany(
+    {
+      sourceProvider: provider,
+      source: 'aggregated',
+      sourceKey: { $nin: [...seenKeys] },
+      isActive: { $ne: false },
+    },
+    {
+      $set: {
+        isActive: false,
+        expiryDate: crawledAt,
+      },
+    },
+  );
+  return { expired: expired.modifiedCount, missing: missing.modifiedCount };
 };
 
-export const scrapeCareerFeed = async (feedInput) => {
-  const feed = validateFeedConfig(feedInput);
-  const employer = feed.employerId
-    ? await User.findOne({ _id: feed.employerId, role: 'employer' }).select('_id')
-    : null;
-  if (feed.employerId && !employer) {
-    throw new Error(`Career feed employer account not found for ${feed.companyName}.`);
-  }
+export const crawlCareerDomain = async (target) => {
+  const rootUrl = validateRootUrl(typeof target === 'string' ? target : target?.url || target?.domain);
+  const companyName = typeof target === 'object' && target?.companyName
+    ? String(target.companyName).trim()
+    : '';
+  const crawledAt = new Date();
+  console.info(`Starting autonomous Schema.org crawl for ${rootUrl.hostname}.`);
 
-  console.info(`Starting ${feed.type || 'auto'} career feed scrape for ${feed.companyName}.`);
-  const { text, url } = await fetchText(feed.url, feed.hostname);
-  const xml = load(text, { xmlMode: true });
-  const isRssOrAtom = xml('rss, feed, rdf\\:RDF').length > 0 || xml('item, entry').length > 0;
-  let candidates = [];
-  if (feed.type !== 'sitemap' && (feed.type === 'rss'
-    || isRssOrAtom)) {
-    const entries = parseCareerRssEntries(text);
-    if (entries.length > MAX_JOB_PAGES) {
-      console.info(`Limiting ${feed.companyName} RSS feed to the first ${MAX_JOB_PAGES} entries.`);
-    }
-    candidates = entries.slice(0, MAX_JOB_PAGES).filter((item) => {
-      if (!item.applicationLink) return false;
+  const { html: rootHtml, url: resolvedRootUrl } = await requestPublicHtml(rootUrl.href, rootUrl.hostname);
+  const discovery = await discoverDomainPages(resolvedRootUrl, rootHtml);
+  const pages = discovery.pages;
+  const pageCandidates = [];
+  const queuedUrls = new Set(pages);
+  let failedPages = 0;
+  let capped = discovery.capped;
+
+  for (let offset = 0; offset < pages.length && offset < MAX_DISCOVERY_PAGES; offset += 3) {
+    const batch = pages.slice(offset, offset + 3);
+    const results = await Promise.all(batch.map(async (pageUrl) => {
       try {
-        return ['http:', 'https:'].includes(new URL(item.applicationLink, url).protocol);
-      } catch {
-        return false;
+        if (pageUrl === rootUrl.href) return { pageUrl, html: rootHtml };
+        return { pageUrl, ...(await requestPublicHtml(pageUrl, rootUrl.hostname)) };
+      } catch (error) {
+        failedPages += 1;
+        console.error(`Career page crawl failed for ${rootUrl.hostname} (${pageUrl}):`, error.message);
+        return null;
       }
-    }).map((item) => ({
-      ...item,
-      applicationLink: new URL(item.applicationLink, url).href,
     }));
-  } else {
-    const jobUrls = await readSitemap(url.href, feed.hostname);
-    for (let offset = 0; offset < jobUrls.length; offset += 3) {
-      const pageBatch = jobUrls.slice(offset, offset + 3);
-      candidates.push(...await Promise.all(pageBatch.map(async (jobUrl) => {
-        const { text: html, url: parsedJobUrl } = await fetchText(jobUrl, feed.hostname);
-        return extractCareerPageJob(html, parsedJobUrl);
-      })));
+    const successfulResults = results.filter(Boolean);
+    pageCandidates.push(...successfulResults);
+    for (const { html: discoveredHtml, url: discoveredUrl, pageUrl } of successfulResults) {
+      for (const linkedUrl of discoverCareerLinks(
+        discoveredHtml,
+        discoveredUrl || new URL(pageUrl),
+        rootUrl.hostname,
+      )) {
+        if (queuedUrls.has(linkedUrl)) continue;
+        if (pages.length >= MAX_DISCOVERY_PAGES) {
+          capped = true;
+          break;
+        }
+        queuedUrls.add(linkedUrl);
+        pages.push(linkedUrl);
+      }
     }
   }
 
-  let upserted = 0;
-  for (const candidate of candidates) {
-    if (await upsertCareerJob(candidate, feed, candidate.applicationLink, employer)) upserted += 1;
+  const postings = [];
+  for (const { html, url, pageUrl } of pageCandidates) {
+    const page = url || new URL(pageUrl);
+    const extracted = extractSchemaJobPostings(html, page);
+    const remaining = MAX_POSTINGS_PER_DOMAIN - postings.length;
+    postings.push(...extracted.slice(0, Math.max(0, remaining))
+      .map((posting) => ({ ...posting, pageUrl: page.href })));
+    if (extracted.length > remaining) capped = true;
+    if (postings.length >= MAX_POSTINGS_PER_DOMAIN) {
+      capped = true;
+      break;
+    }
   }
-  console.info(`Career feed scrape complete for ${feed.companyName}: ${candidates.length} candidates, ${upserted} upserted.`);
-  return { companyName: feed.companyName, candidates: candidates.length, upserted };
+  const seenKeys = new Set();
+  let upserted = 0;
+  for (const posting of postings) {
+    const normalized = normalizeSchemaJobPosting(posting, rootUrl, crawledAt, companyName);
+    if (seenKeys.has(normalized.sourceKey)) continue;
+    seenKeys.add(normalized.sourceKey);
+    try {
+      if (await upsertPosting(posting, rootUrl, crawledAt, companyName)) upserted += 1;
+    } catch (error) {
+      console.error(`Failed to upsert ${rootUrl.hostname} job "${posting.title}":`, error.message);
+    }
+  }
+
+  const discoveryComplete = !capped && pages.length < MAX_DISCOVERY_PAGES && failedPages === 0;
+  const cleanup = await markMissingOrExpiredListings(rootUrl, crawledAt, seenKeys, discoveryComplete);
+  console.info(
+    `Schema.org crawl complete for ${rootUrl.hostname}: ${pages.length} pages, ${postings.length} postings, ${upserted} inserts/updates, ${cleanup.expired} expired and ${cleanup.missing} missing listings deactivated.`,
+  );
+  return {
+    domain: rootUrl.hostname,
+    pages: pages.length,
+    postings: postings.length,
+    upserted,
+    expired: cleanup.expired,
+    missing: cleanup.missing,
+    discoveryComplete,
+  };
 };
 
-const readConfiguredFeeds = () => {
-  if (!process.env.CAREER_FEEDS) return [];
-  const feeds = JSON.parse(process.env.CAREER_FEEDS);
-  if (!Array.isArray(feeds)) throw new Error('CAREER_FEEDS must be a JSON array.');
-  return feeds;
+export const parseCrawlerTargets = (configuredTargets) => {
+  if (!configuredTargets?.trim()) return [];
+  let targets;
+  if (configuredTargets.trim().startsWith('[')) {
+    targets = JSON.parse(configuredTargets);
+    if (!Array.isArray(targets)) throw new Error('CAREER_CRAWLER_DOMAINS must be a JSON array or comma-separated domains.');
+  } else {
+    targets = configuredTargets.split(',').map((domain) => domain.trim()).filter(Boolean);
+  }
+  const uniqueTargets = new Map();
+  for (const target of targets) {
+    const url = validateRootUrl(typeof target === 'string' ? target : target?.url || target?.domain);
+    if (!uniqueTargets.has(url.origin)) {
+      uniqueTargets.set(url.origin, {
+        url: url.origin,
+        ...(typeof target === 'object' && target.companyName
+          ? { companyName: String(target.companyName).trim() }
+          : {}),
+      });
+    }
+  }
+  return [...uniqueTargets.values()];
 };
 
-export const runConfiguredCareerScrapes = async () => {
-  let feeds;
+export const runCareerCrawls = async (targets = process.env.CAREER_CRAWLER_DOMAINS || '') => {
+  let domains;
   try {
-    feeds = readConfiguredFeeds();
+    domains = parseCrawlerTargets(targets);
   } catch (error) {
-    console.error('Career feed configuration error:', error.message);
+    console.error('Career crawler target configuration error:', error.message);
     return [];
   }
-  if (!feeds.length) return [];
+  if (!domains.length) {
+    console.info('Autonomous career crawling is disabled; set CAREER_CRAWLER_DOMAINS to target public company domains.');
+    return [];
+  }
 
   const results = [];
-  for (const feed of feeds) {
+  for (const target of domains) {
     try {
-      results.push(await scrapeCareerFeed(feed));
+      results.push(await crawlCareerDomain(target));
     } catch (error) {
-      console.error(`Career feed scrape failed for ${feed?.companyName || 'unknown company'}:`, error.message);
+      const domain = new URL(target.url).hostname;
+      console.error(`Autonomous career crawl failed for ${domain}:`, error.message);
+      results.push({ domain, error: error.message });
     }
   }
   return results;
 };
 
 export const scheduleCareerScrapes = () => {
-  if (!process.env.CAREER_FEEDS) {
-    console.info('Career scraping is disabled; set CAREER_FEEDS to configure target company feeds.');
+  if (!process.env.CAREER_CRAWLER_DOMAINS) {
+    console.info('Autonomous career crawling is disabled; set CAREER_CRAWLER_DOMAINS to configure target domains.');
     return;
   }
 
@@ -464,17 +660,18 @@ export const scheduleCareerScrapes = () => {
   if (process.env.CAREER_SCRAPE_INTERVAL_MS && interval !== configuredInterval) {
     console.warn('Invalid CAREER_SCRAPE_INTERVAL_MS; using the 6-hour default.');
   }
+
   let isRunning = false;
   const run = async () => {
     if (isRunning) {
-      console.info('Career feed scrape skipped because the previous run is still in progress.');
+      console.info('Career crawl skipped because the previous run is still in progress.');
       return;
     }
     isRunning = true;
     try {
-      await runConfiguredCareerScrapes();
+      await runCareerCrawls();
     } catch (error) {
-      console.error('Career feed scrape run failed:', error.message);
+      console.error('Career crawl run failed:', error.message);
     } finally {
       isRunning = false;
     }
@@ -482,5 +679,5 @@ export const scheduleCareerScrapes = () => {
 
   void run();
   setInterval(() => void run(), interval).unref();
-  console.info(`Targeted career feed scraping scheduled every ${Math.round(interval / 60000)} minutes.`);
+  console.info(`Autonomous Schema.org career crawler scheduled every ${Math.round(interval / 60000)} minutes.`);
 };

@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { normalizeWebhookJobPayload } from '../controllers/employerWebhookController.js';
+import Job from '../models/Job.js';
 import {
-  extractCareerPageJob,
+  extractSchemaJobPostings,
   isCareerJobUrl,
-  parseCareerRssEntries,
+  normalizeSchemaJobPosting,
+  parseCrawlerTargets,
 } from '../services/careerScraperService.js';
 
 const employer = {
@@ -85,42 +87,70 @@ test('normalizes nested Workday job-posting payloads', () => {
   assert.equal(job.sourceProvider, 'workday');
 });
 
-test('parses RSS listings and recognizes career page URLs', () => {
-  const entries = parseCareerRssEntries(`
-    <rss xmlns:content="http://purl.org/rss/1.0/modules/content/"
-      xmlns:job="https://example.com/job-fields"><channel><item>
-      <title>Data Analyst</title>
-      <link>https://careers.example.com/jobs/data-analyst</link>
-      <content:encoded><![CDATA[<p>Analyze business data.</p>]]></content:encoded>
-      <job:location>Hybrid - Lagos</job:location>
-      <category>Analytics</category>
-    </item></channel></rss>
-  `);
+test('extracts JobPosting JSON-LD from arrays and graphs, then normalizes it for the Job model', () => {
+  const postings = extractSchemaJobPostings(`
+    <html><head><script type="application/ld+json">
+      {"@context":"https://schema.org","@graph":[
+        {"@type":"Organization","name":"Example Company"},
+        {"@type":["JobPosting","Thing"],"title":"Remote Designer",
+         "description":"<p>Design accessible products.</p>",
+         "datePosted":"2026-08-01","validThrough":"2026-12-01",
+         "employmentType":["FULL_TIME","CONTRACT"],"jobLocationType":"TELECOMMUTE",
+         "jobLocation":[{"address":{"addressLocality":"Lagos","addressCountry":"NG"}}],
+         "hiringOrganization":{"name":"Example Company"},
+         "baseSalary":{"currency":"USD","value":{"minValue":90000,"maxValue":110000}},
+         "url":"https://careers.example.com/jobs/remote-designer"}
+      ]}
+    </script></head><body></body></html>
+  `, 'https://careers.example.com/jobs/remote-designer');
 
-  assert.equal(entries.length, 1);
-  assert.equal(entries[0].title, 'Data Analyst');
-  assert.equal(entries[0].description, 'Analyze business data.');
-  assert.equal(entries[0].location, 'Hybrid - Lagos');
-  assert.equal(entries[0].workplaceType, 'hybrid');
-  assert.equal(isCareerJobUrl(entries[0].applicationLink), true);
-  assert.equal(isCareerJobUrl('https://example.com/careers'), false);
-  assert.equal(isCareerJobUrl('https://example.com/company/about'), false);
+  assert.equal(postings.length, 1);
+  assert.equal(postings[0].title, 'Remote Designer');
+  assert.equal(postings[0].description, 'Design accessible products.');
+  assert.equal(postings[0].employmentType, 'FULL_TIME, CONTRACT');
+  assert.match(postings[0].salary, /USD/);
+  assert.match(postings[0].salary, /110000/);
+  assert.match(postings[0].location, /Lagos/);
+  assert.match(postings[0].location, /NG/);
+  assert.equal(postings[0].workplaceType, 'remote');
+  assert.equal(postings[0].validThrough.toISOString(), '2026-12-01T00:00:00.000Z');
+  assert.equal(postings[0].applicationUrl, 'https://careers.example.com/jobs/remote-designer');
+
+  const crawledAt = new Date('2026-10-12T00:00:00.000Z');
+  const normalized = normalizeSchemaJobPosting(
+    postings[0],
+    'https://careers.example.com',
+    crawledAt,
+  );
+  const normalizedAgain = normalizeSchemaJobPosting(
+    postings[0],
+    'https://careers.example.com',
+    new Date('2026-10-13T00:00:00.000Z'),
+  );
+  assert.equal(normalized.sourceKey, normalizedAgain.sourceKey);
+  assert.equal(normalized.companyName, 'Example Company');
+  assert.equal(normalized.sourceProvider, 'career-crawler:careers.example.com');
+  assert.equal(normalized.source, 'aggregated');
+  assert.equal(normalized.isDirectPosting, false);
+  assert.equal(normalized.jobType, 'Remote');
+  assert.equal(normalized.salaryRange, postings[0].salary);
+  const modelJob = new Job(normalized);
+  assert.equal(modelJob.validateSync(), undefined);
+  assert.equal(modelJob.source, 'aggregated');
+  assert.equal(modelJob.department, '');
 });
 
-test('extracts Schema.org JobPosting details from a sitemap page', () => {
-  const page = extractCareerPageJob(`
-    <html><head><script type="application/ld+json">
-      {"@type":"JobPosting","title":"Remote Designer","description":"Design accessible products.",
-       "datePosted":"2026-08-01","validThrough":"2026-12-01",
-       "employmentType":"FULL_TIME","jobLocationType":"TELECOMMUTE",
-       "jobLocation":{"address":{"addressLocality":"Africa"}},
-       "baseSalary":{"currency":"USD","value":{"minValue":90000,"maxValue":110000}}}
-    </script></head><body><h1>Remote Designer</h1></body></html>
-  `, new URL('https://careers.example.com/careers/remote-designer'));
-
-  assert.equal(page.title, 'Remote Designer');
-  assert.equal(page.description, 'Design accessible products.');
-  assert.equal(page.workplaceType, 'remote');
-  assert.equal(page.location, 'Africa');
-  assert.match(page.salary, /USD/);
+test('discovers configured domains without requiring sitemap URLs', () => {
+  assert.deepEqual(parseCrawlerTargets('careers.example.com, https://jobs.example.org/'), [
+    { url: 'https://careers.example.com' },
+    { url: 'https://jobs.example.org' },
+  ]);
+  assert.deepEqual(parseCrawlerTargets(
+    '[{"url":"https://example.com","companyName":"Example"},{"domain":"example.com"}]',
+  ), [{ url: 'https://example.com', companyName: 'Example' }]);
+  assert.throws(() => parseCrawlerTargets('http://example.com'), /HTTPS/);
+  assert.throws(() => parseCrawlerTargets('https://127.0.0.1'), /public DNS hostname/);
+  assert.equal(isCareerJobUrl('https://example.com/careers'), true);
+  assert.equal(isCareerJobUrl('https://example.com/jobs/remote-designer'), true);
+  assert.equal(isCareerJobUrl('https://example.com/company/about'), false);
 });
