@@ -15,7 +15,14 @@ const MAX_SITEMAPS = 5;
 const MAX_REDIRECTS = 3;
 const DEFAULT_SCRAPE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const CAREER_PATH = /\/(?:careers?|jobs?(?:-postings?)?|openings?|positions?|vacancies?|job-openings?|career-opportunities?)(?:\/|$)/i;
-const TRUSTED_ATS_DOMAINS = ['greenhouse.io', 'lever.co', 'myworkdayjobs.com'];
+const TRUSTED_ATS_DOMAINS = [
+  'greenhouse.io',
+  'lever.co',
+  'myworkdayjobs.com',
+  'workable.com',
+  'bamboohr.com',
+];
+const GREENHOUSE_DEFAULT_COMPANY_SLUG = 'paystack';
 
 const privateIpv4 = (address) => {
   const octets = address.split('.').map(Number);
@@ -653,17 +660,20 @@ export const parseCrawlerTargets = (configuredTargets) => {
     const companySlug = typeof target === 'object'
       ? String(target.companySlug || target.companyHandle || target.slug || target.handle || '').trim()
       : '';
-    if (isTrustedAtsHost(url.hostname) && url.pathname === '/') {
-      if (!companySlug) {
-        throw new Error(
-          `ATS crawler target ${url.hostname} must include a company slug, for example https://${url.hostname}/company-slug.`,
-        );
-      }
-      url.pathname = `/${encodeURIComponent(companySlug)}`;
+    if (isTrustedAtsHost(url.hostname)) {
+      const existingPath = url.pathname.split('/').filter(Boolean).join('/');
+      const slugPath = companySlug ? encodeURIComponent(companySlug.replace(/^\/+|\/+$/g, '')) : '';
+      const path = existingPath || slugPath
+        || (url.hostname.toLowerCase() === 'job-boards.greenhouse.io'
+          ? GREENHOUSE_DEFAULT_COMPANY_SLUG
+          : '');
+      url.pathname = path ? `/${path}` : '/';
     }
     url.search = '';
     url.hash = '';
-    const targetUrl = isTrustedAtsHost(url.hostname) ? url.href.replace(/\/$/, '') : url.origin;
+    const targetUrl = isTrustedAtsHost(url.hostname)
+      ? (url.pathname === '/' ? url.origin : `${url.origin}${url.pathname}`)
+      : url.origin;
     if (!uniqueTargets.has(targetUrl)) {
       uniqueTargets.set(targetUrl, {
         url: targetUrl,

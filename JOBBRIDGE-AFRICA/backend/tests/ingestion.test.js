@@ -160,10 +160,27 @@ test('discovers configured domains without requiring sitemap URLs', () => {
   assert.deepEqual(parseCrawlerTargets(
     '[{"domain":"https://job-boards.greenhouse.io","companySlug":"acme","companyName":"Acme"}]',
   ), [{ url: 'https://job-boards.greenhouse.io/acme', companyName: 'Acme' }]);
-  assert.throws(
-    () => parseCrawlerTargets('https://job-boards.greenhouse.io'),
-    /must include a company slug/,
-  );
+  assert.deepEqual(parseCrawlerTargets('https://job-boards.greenhouse.io'), [
+    { url: 'https://job-boards.greenhouse.io/paystack' },
+  ]);
+  assert.deepEqual(parseCrawlerTargets('job-boards.greenhouse.io/'), [
+    { url: 'https://job-boards.greenhouse.io/paystack' },
+  ]);
+  assert.deepEqual(parseCrawlerTargets('https://job-boards.greenhouse.io/paystack/'), [
+    { url: 'https://job-boards.greenhouse.io/paystack' },
+  ]);
+  assert.deepEqual(parseCrawlerTargets('https://apply.workable.com/paystack/'), [
+    { url: 'https://apply.workable.com/paystack' },
+  ]);
+  assert.deepEqual(parseCrawlerTargets('https://acme.bamboohr.com/careers/'), [
+    { url: 'https://acme.bamboohr.com/careers' },
+  ]);
+  assert.deepEqual(parseCrawlerTargets(
+    '[{"domain":"https://apply.workable.com","companyHandle":"acme"},{"url":"https://acme.bamboohr.com/jobs/"}]',
+  ), [
+    { url: 'https://apply.workable.com/acme' },
+    { url: 'https://acme.bamboohr.com/jobs' },
+  ]);
   assert.throws(() => parseCrawlerTargets('http://example.com'), /HTTPS/);
   assert.throws(() => parseCrawlerTargets('https://127.0.0.1'), /public DNS hostname/);
   assert.equal(isCareerJobUrl('https://example.com/careers'), true);
