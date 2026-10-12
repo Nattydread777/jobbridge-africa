@@ -100,6 +100,8 @@ const sourceIdentity = (sourceName, job, companyName, companySlug, title, locati
 };
 
 export const normalizeRemoteJob = (sourceName, rawJob) => {
+  if (!rawJob || typeof rawJob !== 'object' || Array.isArray(rawJob)) return null;
+
   const companyName = asText(rawJob.companyName || rawJob.company_name || rawJob.company?.name);
   const title = asText(rawJob.title || rawJob.position);
   const description = asText(rawJob.description || rawJob.excerpt || rawJob.description_text);

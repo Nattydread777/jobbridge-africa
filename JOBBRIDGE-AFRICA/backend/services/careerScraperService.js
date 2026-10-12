@@ -81,6 +81,11 @@ export const isAllowedCrawlerHost = (hostname, targetHostname) =>
     return candidate === domain || candidate.endsWith(`.${domain}`);
   });
 
+const isTrustedAtsHost = (hostname) => TRUSTED_ATS_DOMAINS.some((domain) => {
+  const candidate = hostname.toLowerCase();
+  return candidate === domain || candidate.endsWith(`.${domain}`);
+});
+
 export const getCareerPageFallbackUrls = (target) => {
   const rootUrl = target instanceof URL ? target : validateRootUrl(target);
   return [...new Set([
@@ -162,6 +167,11 @@ const requestPublicHtml = async (urlValue, expectedDomain) => {
         throw new Error(`Career crawler refused a redirect outside ${expectedDomain} and trusted ATS domains.`);
       }
       continue;
+    }
+    if (response.status === 403) {
+      throw new Error(
+        `Career crawler received HTTP 403 from ${url.hostname}; the site denied automated access.`,
+      );
     }
     if (response.status < 200 || response.status >= 300) {
       throw new Error(`Career crawler request to ${url.hostname} failed with HTTP ${response.status}.`);
@@ -640,9 +650,23 @@ export const parseCrawlerTargets = (configuredTargets) => {
   const uniqueTargets = new Map();
   for (const target of targets) {
     const url = validateRootUrl(typeof target === 'string' ? target : target?.url || target?.domain);
-    if (!uniqueTargets.has(url.origin)) {
-      uniqueTargets.set(url.origin, {
-        url: url.origin,
+    const companySlug = typeof target === 'object'
+      ? String(target.companySlug || target.companyHandle || target.slug || target.handle || '').trim()
+      : '';
+    if (isTrustedAtsHost(url.hostname) && url.pathname === '/') {
+      if (!companySlug) {
+        throw new Error(
+          `ATS crawler target ${url.hostname} must include a company slug, for example https://${url.hostname}/company-slug.`,
+        );
+      }
+      url.pathname = `/${encodeURIComponent(companySlug)}`;
+    }
+    url.search = '';
+    url.hash = '';
+    const targetUrl = isTrustedAtsHost(url.hostname) ? url.href.replace(/\/$/, '') : url.origin;
+    if (!uniqueTargets.has(targetUrl)) {
+      uniqueTargets.set(targetUrl, {
+        url: targetUrl,
         ...(typeof target === 'object' && target.companyName
           ? { companyName: String(target.companyName).trim() }
           : {}),
@@ -671,7 +695,13 @@ export const runCareerCrawls = async (targets = process.env.CAREER_CRAWLER_DOMAI
       results.push(await crawlCareerDomain(target));
     } catch (error) {
       const domain = new URL(target.url).hostname;
-      console.error(`Autonomous career crawl failed for ${domain}:`, error.message);
+      if (/HTTP 403\b/.test(error.message)) {
+        console.warn(
+          `Autonomous career crawl skipped ${domain}: access was denied (HTTP 403), likely by the site's crawler policy. Continuing with other targets.`,
+        );
+      } else {
+        console.error(`Autonomous career crawl failed for ${domain}:`, error.message);
+      }
       results.push({ domain, error: error.message });
     }
   }

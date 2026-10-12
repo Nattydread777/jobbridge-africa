@@ -154,6 +154,16 @@ test('discovers configured domains without requiring sitemap URLs', () => {
   assert.deepEqual(parseCrawlerTargets(
     '[{"url":"https://example.com","companyName":"Example"},{"domain":"example.com"}]',
   ), [{ url: 'https://example.com', companyName: 'Example' }]);
+  assert.deepEqual(parseCrawlerTargets('https://job-boards.greenhouse.io/acme'), [
+    { url: 'https://job-boards.greenhouse.io/acme' },
+  ]);
+  assert.deepEqual(parseCrawlerTargets(
+    '[{"domain":"https://job-boards.greenhouse.io","companySlug":"acme","companyName":"Acme"}]',
+  ), [{ url: 'https://job-boards.greenhouse.io/acme', companyName: 'Acme' }]);
+  assert.throws(
+    () => parseCrawlerTargets('https://job-boards.greenhouse.io'),
+    /must include a company slug/,
+  );
   assert.throws(() => parseCrawlerTargets('http://example.com'), /HTTPS/);
   assert.throws(() => parseCrawlerTargets('https://127.0.0.1'), /public DNS hostname/);
   assert.equal(isCareerJobUrl('https://example.com/careers'), true);
@@ -222,7 +232,6 @@ test('normalizes remote API jobs with provider attribution and validates the Job
     locationRestrictions: 'Worldwide',
     url: listingUrl,
     applicationLink: applyUrl,
-    employmentType: 'Full-time',
     publication_date: new Date().toISOString(),
     categories: ['Engineering'],
   });
@@ -235,6 +244,7 @@ test('normalizes remote API jobs with provider attribution and validates the Job
   assert.equal(normalized.applicationLink, applyUrl);
   assert.equal(normalized.isDirectPosting, false);
   assert.equal(normalized.isWorldwideRemote, true);
+  assert.equal(normalized.jobType, 'Full-Time');
 
   const modelJob = new Job(normalized);
   assert.equal(modelJob.validateSync(), undefined);
@@ -248,4 +258,10 @@ test('normalizes remote API jobs with provider attribution and validates the Job
     candidate_required_location: 'United States',
     url: 'https://remotive.com/remote-jobs/restricted-role',
   }), null);
+
+  assert.equal(normalizeRemoteJob('Remotive', null), null);
+  assert.equal(normalizeRemoteJob('Remotive', undefined), null);
+  assert.equal(new Job().jobType, 'Full-Time');
+  assert.equal(Job.schema.path('workplaceType').defaultValue.call(null), 'on-site');
+  assert.equal(Job.schema.path('isRemote').defaultValue.call(null), false);
 });

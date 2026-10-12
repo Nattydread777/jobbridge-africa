@@ -15,7 +15,7 @@ const jobSchema = new mongoose.Schema({
     type: String,
     enum: ['remote', 'hybrid', 'on-site'],
     default: function defaultWorkplaceType() {
-      return this.jobType === 'Remote' ? 'remote' : 'on-site';
+      return this?.jobType === 'Remote' ? 'remote' : 'on-site';
     },
   },
   salaryRange: { type: String, default: 'Competitive' },
@@ -41,7 +41,7 @@ const jobSchema = new mongoose.Schema({
   isRemote: {
     type: Boolean,
     default: function isRemoteBySource() {
-      return this.workplaceType === 'remote' || this.jobType === 'Remote';
+      return this?.workplaceType === 'remote' || this?.jobType === 'Remote';
     },
   },
   isWorldwideRemote: { type: Boolean, default: false },
