@@ -4,6 +4,8 @@ import { normalizeWebhookJobPayload } from '../controllers/employerWebhookContro
 import Job from '../models/Job.js';
 import {
   extractSchemaJobPostings,
+  getCareerPageFallbackUrls,
+  isAllowedCrawlerHost,
   isCareerJobUrl,
   normalizeSchemaJobPosting,
   parseCrawlerTargets,
@@ -153,4 +155,24 @@ test('discovers configured domains without requiring sitemap URLs', () => {
   assert.equal(isCareerJobUrl('https://example.com/careers'), true);
   assert.equal(isCareerJobUrl('https://example.com/jobs/remote-designer'), true);
   assert.equal(isCareerJobUrl('https://example.com/company/about'), false);
+});
+
+test('allows target domains and ATS redirect hosts without opening redirects generally', () => {
+  assert.equal(isAllowedCrawlerHost('www.whytecleon.com', 'whytecleon.com'), true);
+  assert.equal(isAllowedCrawlerHost('boards.greenhouse.io', 'whytecleon.com'), true);
+  assert.equal(isAllowedCrawlerHost('jobs.lever.co', 'workforcegroup.com'), true);
+  assert.equal(isAllowedCrawlerHost('careers.myworkdayjobs.com', 'workforcegroup.com'), true);
+  assert.equal(isAllowedCrawlerHost('untrusted.example', 'whytecleon.com'), false);
+});
+
+test('provides direct career-page URLs when a domain sitemap is missing', () => {
+  assert.deepEqual(getCareerPageFallbackUrls('https://whytecleon.com'), [
+    'https://whytecleon.com/careers/',
+    'https://whytecleon.com/jobs/',
+  ]);
+  assert.deepEqual(getCareerPageFallbackUrls('https://workforcegroup.com/careers/openings'), [
+    'https://workforcegroup.com/careers/openings',
+    'https://workforcegroup.com/careers/',
+    'https://workforcegroup.com/jobs/',
+  ]);
 });

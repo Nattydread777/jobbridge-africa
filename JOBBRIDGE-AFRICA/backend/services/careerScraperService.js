@@ -15,6 +15,7 @@ const MAX_SITEMAPS = 5;
 const MAX_REDIRECTS = 3;
 const DEFAULT_SCRAPE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const CAREER_PATH = /\/(?:careers?|jobs?(?:-postings?)?|openings?|positions?|vacancies?|job-openings?|career-opportunities?)(?:\/|$)/i;
+const TRUSTED_ATS_DOMAINS = ['greenhouse.io', 'lever.co', 'myworkdayjobs.com'];
 
 const privateIpv4 = (address) => {
   const octets = address.split('.').map(Number);
@@ -71,6 +72,22 @@ const belongsToTargetDomain = (hostname, targetHostname) => {
   const baseDomain = targetHostname.replace(/^www\./i, '').toLowerCase();
   const candidate = hostname.toLowerCase();
   return candidate === baseDomain || candidate.endsWith(`.${baseDomain}`);
+};
+
+export const isAllowedCrawlerHost = (hostname, targetHostname) =>
+  belongsToTargetDomain(hostname, targetHostname)
+  || TRUSTED_ATS_DOMAINS.some((domain) => {
+    const candidate = hostname.toLowerCase();
+    return candidate === domain || candidate.endsWith(`.${domain}`);
+  });
+
+export const getCareerPageFallbackUrls = (target) => {
+  const rootUrl = target instanceof URL ? target : validateRootUrl(target);
+  return [...new Set([
+    rootUrl.href,
+    new URL('/careers/', rootUrl).href,
+    new URL('/jobs/', rootUrl).href,
+  ].filter(isCareerJobUrl))];
 };
 
 const validatePublicAddresses = async (hostname) => {
@@ -141,8 +158,8 @@ const requestPublicHtml = async (urlValue, expectedDomain) => {
         throw new Error(`Career crawler encountered an invalid or excessive redirect at ${url.hostname}.`);
       }
       url = validateRootUrl(new URL(response.headers.location, url).href);
-      if (expectedDomain && !belongsToTargetDomain(url.hostname, expectedDomain)) {
-        throw new Error(`Career crawler refused a redirect outside ${expectedDomain}.`);
+      if (expectedDomain && !isAllowedCrawlerHost(url.hostname, expectedDomain)) {
+        throw new Error(`Career crawler refused a redirect outside ${expectedDomain} and trusted ATS domains.`);
       }
       continue;
     }
@@ -309,7 +326,7 @@ const discoverCareerLinks = (html, pageUrl, allowedHost) => {
   return $('a[href]').toArray().flatMap((anchor) => {
     try {
       const url = new URL($(anchor).attr('href'), pageUrl);
-      if (!belongsToTargetDomain(url.hostname, allowedHost)
+      if (!isAllowedCrawlerHost(url.hostname, allowedHost)
         || url.protocol !== 'https:' || !isCareerJobUrl(url.href)) return [];
       url.hash = '';
       return [url.href];
@@ -331,7 +348,7 @@ const parseSitemapLocations = (xml) => {
 };
 
 const discoverSitemapUrls = async (rootUrl) => {
-  const isTargetHost = (hostname) => belongsToTargetDomain(hostname, rootUrl.hostname);
+  const isTargetHost = (hostname) => isAllowedCrawlerHost(hostname, rootUrl.hostname);
   const discovered = new Set();
   const robotsUrl = new URL('/robots.txt', rootUrl);
   try {
@@ -360,9 +377,13 @@ const discoverSitemapUrls = async (rootUrl) => {
   return [...discovered].slice(0, MAX_SITEMAPS);
 };
 
-const discoverDomainPages = async (rootUrl, rootHtml) => {
+const discoverDomainPages = async (rootUrl, rootHtml, rootHtmlUrl = rootUrl) => {
+  const isTargetHost = (hostname) => isAllowedCrawlerHost(hostname, rootUrl.hostname);
   const pages = new Set([rootUrl.href]);
-  const discoveredLinks = discoverCareerLinks(rootHtml, rootUrl, rootUrl.hostname);
+  if (isAllowedCrawlerHost(rootHtmlUrl.hostname, rootUrl.hostname)) {
+    pages.add(rootHtmlUrl.href);
+  }
+  const discoveredLinks = discoverCareerLinks(rootHtml, rootHtmlUrl, rootUrl.hostname);
   discoveredLinks.forEach((url) => pages.add(url));
   const sitemapUrls = await discoverSitemapUrls(rootUrl);
   let sitemapCount = 0;
@@ -372,11 +393,14 @@ const discoverDomainPages = async (rootUrl, rootHtml) => {
     try {
       const { html } = await requestPublicHtml(sitemapUrl, rootUrl.hostname);
       const { sitemapUrls: nestedSitemaps, pageUrls } = parseSitemapLocations(html);
+      if (!pageUrls.length && !nestedSitemaps.length) {
+        console.info(`Sitemap URL did not contain sitemap locations for ${rootUrl.hostname}; the target HTML page will still be parsed.`);
+      }
       for (const pageUrl of pageUrls) {
         if (pages.size >= MAX_DISCOVERY_PAGES) break;
         try {
           const parsed = validateRootUrl(pageUrl);
-          if (belongsToTargetDomain(parsed.hostname, rootUrl.hostname)
+          if (isTargetHost(parsed.hostname)
             && isCareerJobUrl(parsed.href)) {
             parsed.hash = '';
             pages.add(parsed.href);
@@ -400,7 +424,7 @@ const discoverDomainPages = async (rootUrl, rootHtml) => {
             if (pages.size >= MAX_DISCOVERY_PAGES) break;
             try {
               const parsed = validateRootUrl(pageUrl);
-              if (belongsToTargetDomain(parsed.hostname, rootUrl.hostname)
+              if (isTargetHost(parsed.hostname)
                 && isCareerJobUrl(parsed.href)) {
                 parsed.hash = '';
                 pages.add(parsed.href);
@@ -413,6 +437,13 @@ const discoverDomainPages = async (rootUrl, rootHtml) => {
       }
     } catch (error) {
       console.info(`Sitemap discovery failed for ${rootUrl.hostname} (${sitemapUrl}): ${error.message}`);
+      if (/HTTP 404\b/.test(error.message)) {
+        const fallbackUrls = getCareerPageFallbackUrls(rootUrl);
+        fallbackUrls.forEach((fallbackUrl) => pages.add(fallbackUrl));
+        console.info(
+          `Sitemap returned 404 for ${rootUrl.hostname}; falling back to direct career-page parsing (${fallbackUrls.length} URLs).`,
+        );
+      }
     }
   }
   return {
@@ -515,7 +546,7 @@ export const crawlCareerDomain = async (target) => {
   console.info(`Starting autonomous Schema.org crawl for ${rootUrl.hostname}.`);
 
   const { html: rootHtml, url: resolvedRootUrl } = await requestPublicHtml(rootUrl.href, rootUrl.hostname);
-  const discovery = await discoverDomainPages(resolvedRootUrl, rootHtml);
+  const discovery = await discoverDomainPages(rootUrl, rootHtml, resolvedRootUrl);
   const pages = discovery.pages;
   const pageCandidates = [];
   const queuedUrls = new Set(pages);
@@ -526,7 +557,9 @@ export const crawlCareerDomain = async (target) => {
     const batch = pages.slice(offset, offset + 3);
     const results = await Promise.all(batch.map(async (pageUrl) => {
       try {
-        if (pageUrl === rootUrl.href) return { pageUrl, html: rootHtml };
+        if (pageUrl === rootUrl.href || pageUrl === resolvedRootUrl.href) {
+          return { pageUrl, html: rootHtml, url: resolvedRootUrl };
+        }
         return { pageUrl, ...(await requestPublicHtml(pageUrl, rootUrl.hostname)) };
       } catch (error) {
         failedPages += 1;
