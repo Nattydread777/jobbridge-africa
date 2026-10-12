@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { createHash } from 'node:crypto';
 import Job from '../models/Job.js';
+import { cleanHtmlSnippet } from '../utils/sanitizer.js';
 
 const HIMALAYAS_API = 'https://himalayas.app/jobs/api/search';
 const REMOTIVE_API = 'https://remotive.com/api/remote-jobs';
@@ -104,7 +105,8 @@ export const normalizeRemoteJob = (sourceName, rawJob) => {
 
   const companyName = asText(rawJob.companyName || rawJob.company_name || rawJob.company?.name);
   const title = asText(rawJob.title || rawJob.position);
-  const description = asText(rawJob.description || rawJob.excerpt || rawJob.description_text);
+  const description = cleanHtmlSnippet(rawJob.description || rawJob.excerpt || rawJob.description_text);
+  const excerpt = cleanHtmlSnippet(rawJob.excerpt) || description.slice(0, 400);
   const location = asText(
     rawJob.locationRestriction || rawJob.locationRestrictions || rawJob.location_restrictions || rawJob.location
       || rawJob.candidate_required_location || rawJob.regions,
@@ -145,7 +147,7 @@ export const normalizeRemoteJob = (sourceName, rawJob) => {
     title,
     companyName,
     companySlug,
-    excerpt: asText(rawJob.excerpt) || description.slice(0, 400),
+    excerpt,
     description,
     pubDate,
     applicationLink,

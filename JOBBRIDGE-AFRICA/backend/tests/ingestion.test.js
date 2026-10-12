@@ -19,6 +19,7 @@ import {
   normalizeMyJobMagListing,
   parseMyJobMagListings,
 } from '../services/localAggregatorScraper.js';
+import { cleanHtmlSnippet } from '../utils/sanitizer.js';
 
 const employer = {
   _id: '64c000000000000000000001',
@@ -289,6 +290,27 @@ test('normalizes remote API jobs with provider attribution and validates the Job
   assert.equal(Job.schema.path('workplaceType').defaultValue.call(null), 'on-site');
   assert.equal(Job.schema.path('isDirectPosting').defaultValue.call(null), true);
   assert.equal(Job.schema.path('isRemote').defaultValue.call(null), false);
+});
+
+test('cleans raw HTML, style markup, and encoded entities from job text', () => {
+  assert.equal(
+    cleanHtmlSnippet('<p style="color:red">Senior &amp; <strong>skilled</strong></p><style>.x{color:red}</style>'),
+    'Senior & skilled',
+  );
+  assert.equal(
+    cleanHtmlSnippet('&lt;p style=&quot;color:red&quot;&gt;Encoded &amp; safe&lt;/p&gt;'),
+    'Encoded & safe',
+  );
+
+  const normalizedRemote = normalizeRemoteJob('Remotive', {
+    company_name: 'Example Co',
+    title: 'Engineer',
+    description: '<p style="font-size:12px">Build &amp; maintain <b>services</b>.</p>',
+    location: 'Worldwide',
+    url: 'https://remotive.com/remote-jobs/example-engineer',
+  });
+  assert.equal(normalizedRemote.description, 'Build & maintain services.');
+  assert.equal(normalizedRemote.excerpt, 'Build & maintain services.');
 });
 
 test('parses MyJobMag agency listings and normalizes attribution for the Job model', () => {

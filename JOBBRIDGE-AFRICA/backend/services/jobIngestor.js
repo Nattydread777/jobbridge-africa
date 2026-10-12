@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import Job from '../models/Job.js';
+import { cleanHtmlSnippet } from '../utils/sanitizer.js';
 
 const HIMALAYAS_API = 'https://himalayas.app/jobs/api';
 const PAGE_SIZE = 20;
@@ -64,7 +65,8 @@ const normalizeJob = (job) => {
   const companySlug = asText(job.companySlug || job.company?.slug)
     || companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const title = asText(job.title);
-  const description = asText(job.description || job.excerpt);
+  const description = cleanHtmlSnippet(job.description || job.excerpt);
+  const excerpt = cleanHtmlSnippet(job.excerpt) || description.slice(0, 400);
   const locationRestriction = asText(
     job.locationRestriction || job.locationRestrictions || job.location,
   );
@@ -110,7 +112,7 @@ const normalizeJob = (job) => {
     title,
     companyName,
     companySlug,
-    excerpt: asText(job.excerpt) || description.slice(0, 400),
+    excerpt,
     description,
     pubDate: safePubDate,
     applicationLink,

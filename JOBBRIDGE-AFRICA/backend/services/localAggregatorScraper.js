@@ -2,6 +2,7 @@ import axios from 'axios';
 import { createHash } from 'node:crypto';
 import { load } from 'cheerio';
 import Job from '../models/Job.js';
+import { cleanHtmlSnippet } from '../utils/sanitizer.js';
 
 export const MYJOBMAG_TARGETS = [
   {
@@ -94,7 +95,7 @@ export const normalizeMyJobMagListing = (listing) => {
   if (!listing || typeof listing !== 'object') return null;
   const title = String(listing.title || '').trim();
   const companyName = String(listing.companyName || '').trim();
-  const description = String(listing.description || '').trim();
+  const description = cleanHtmlSnippet(listing.description);
   const location = String(listing.location || 'Nigeria').trim();
   const listingUrl = detailUrl(listing.detailUrl || listing.sourceUrl || '', MYJOBMAG_TARGETS[0].url);
   if (!title || !companyName || !description || !listingUrl) return null;

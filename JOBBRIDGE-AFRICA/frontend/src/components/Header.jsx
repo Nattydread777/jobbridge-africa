@@ -185,13 +185,13 @@ const Header = () => {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <nav id="mobile-navigation" className="mt-3 space-y-2 border-t border-white/20 bg-charcoal pb-3 pt-3 xl:hidden">
+          <nav id="mobile-navigation" className="mt-3 space-y-2 border-t border-white/20 bg-charcoal pb-3 pt-3 text-white xl:hidden">
             <NavLink
               to="/"
               onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) =>
                 `block px-4 py-2 rounded transition cursor-pointer ${
-                  isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"
+                  isActive ? "bg-white/15 font-semibold text-amber-300" : "text-white hover:bg-white/10 hover:text-amber-200"
                 }`
               }
             >
@@ -202,7 +202,7 @@ const Header = () => {
               onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) =>
                 `block px-4 py-2 rounded transition cursor-pointer ${
-                  isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"
+                  isActive ? "bg-white/15 font-semibold text-amber-300" : "text-white hover:bg-white/10 hover:text-amber-200"
                 }`
               }
             >
@@ -212,7 +212,7 @@ const Header = () => {
               to="/sdg-impact"
               onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) =>
-                `block px-4 py-2 rounded transition ${isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"}`
+                `block px-4 py-2 rounded transition ${isActive ? "bg-white/15 font-semibold text-amber-300" : "text-white hover:bg-white/10 hover:text-amber-200"}`
               }
             >
               Mission (SDG 8)
@@ -221,12 +221,12 @@ const Header = () => {
               to="/ai-cv-tool"
               onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) =>
-                `block px-4 py-2 rounded transition ${isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"}`
+                `block px-4 py-2 rounded transition ${isActive ? "bg-white/15 font-semibold text-amber-300" : "text-white hover:bg-white/10 hover:text-amber-200"}`
               }
             >
               AI CV Tool
             </NavLink>
-            <a href="/#royal-merchant" onClick={() => setMobileMenuOpen(false)} className="block px-4 py-2 rounded hover:bg-white/10">
+            <a href="/#royal-merchant" onClick={() => setMobileMenuOpen(false)} className="block rounded px-4 py-2 text-white transition hover:bg-white/10 hover:text-amber-200">
               Royal Merchant loans
             </a>
             <NavLink
@@ -234,7 +234,7 @@ const Header = () => {
               onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) =>
                 `block px-4 py-2 rounded transition cursor-pointer ${
-                  isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"
+                  isActive ? "bg-white/15 font-semibold text-amber-300" : "text-white hover:bg-white/10 hover:text-amber-200"
                 }`
               }
             >
@@ -245,7 +245,7 @@ const Header = () => {
               onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) =>
                 `block px-4 py-2 rounded transition cursor-pointer ${
-                  isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"
+                  isActive ? "bg-white/15 font-semibold text-amber-300" : "text-white hover:bg-white/10 hover:text-amber-200"
                 }`
               }
             >
@@ -256,7 +256,7 @@ const Header = () => {
               onClick={() => setMobileMenuOpen(false)}
               className={({ isActive }) =>
                 `block px-4 py-2 rounded transition cursor-pointer ${
-                  isActive ? "bg-white/20 font-semibold" : "hover:bg-white/10"
+                  isActive ? "bg-white/15 font-semibold text-amber-300" : "text-white hover:bg-white/10 hover:text-amber-200"
                 }`
               }
             >
