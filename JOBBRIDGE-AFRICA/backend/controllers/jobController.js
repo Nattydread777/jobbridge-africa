@@ -29,6 +29,8 @@ export const getJobs = asyncHandler(async (req, res) => {
     employmentType,
     seniority,
     isRemote,
+    workplaceType,
+    datePosted,
     page = 1,
     cursor,
     limit = 20,
@@ -36,6 +38,13 @@ export const getJobs = asyncHandler(async (req, res) => {
   const pageNumber = Math.max(1, Number.parseInt(page, 10) || 1);
   const pageSize = Math.min(50, Math.max(1, Number.parseInt(limit, 10) || 20));
   const remoteFilter = parseBoolean(isRemote, 'isRemote', res);
+  const selectedWorkplace = workplaceType === undefined
+    ? undefined
+    : String(workplaceType).trim().toLowerCase();
+  if (selectedWorkplace && !['remote', 'hybrid', 'on-site'].includes(selectedWorkplace)) {
+    res.status(400);
+    throw new Error('workplaceType must be remote, hybrid, or on-site');
+  }
   const filters = [
     { expiryDate: { $gte: new Date() } },
     { isApproved: true },
@@ -51,6 +60,9 @@ export const getJobs = asyncHandler(async (req, res) => {
         { companyName: regex },
         { excerpt: regex },
         { description: regex },
+        { seniority: regex },
+        { categories: regex },
+        { tags: regex },
       ],
     });
   }
@@ -80,23 +92,67 @@ export const getJobs = asyncHandler(async (req, res) => {
 
   const typeFilter = employmentType || jobType;
   if (typeFilter) filters.push({ jobType: String(typeFilter) });
-  if (seniority) {
-    const escapedSeniority = escapeRegex(String(seniority));
-    filters.push({ seniority: { $regex: escapedSeniority, $options: 'i' } });
-  }
-  if (remoteFilter === true) {
+  if (selectedWorkplace) {
+    if (selectedWorkplace === 'remote') {
+      filters.push({
+        $or: [
+          { workplaceType: 'remote' },
+          { isRemote: true },
+          { jobType: 'Remote' },
+        ],
+      });
+    } else if (selectedWorkplace === 'hybrid') {
+      filters.push({ workplaceType: 'hybrid' });
+    } else {
+      filters.push({
+        $or: [
+          { workplaceType: 'on-site' },
+          {
+            workplaceType: { $exists: false },
+            isRemote: { $ne: true },
+            jobType: { $ne: 'Remote' },
+          },
+        ],
+      });
+    }
+  } else if (remoteFilter === true) {
     filters.push({
       $or: [
         { isRemote: true },
+        { workplaceType: 'remote' },
         { isWorldwideRemote: true },
         { jobType: 'Remote' },
       ],
     });
   } else if (remoteFilter === false) {
     filters.push({
-      isRemote: { $ne: true },
-      isWorldwideRemote: { $ne: true },
-      jobType: { $ne: 'Remote' },
+      $or: [
+        { workplaceType: { $in: ['hybrid', 'on-site'] } },
+        {
+          workplaceType: { $exists: false },
+          isRemote: { $ne: true },
+          isWorldwideRemote: { $ne: true },
+          jobType: { $ne: 'Remote' },
+        },
+      ],
+    });
+  }
+  if (seniority) {
+    const escapedSeniority = escapeRegex(String(seniority));
+    filters.push({ seniority: { $regex: escapedSeniority, $options: 'i' } });
+  }
+  if (datePosted) {
+    const ageInHours = { '24h': 24, '7d': 24 * 7, '30d': 24 * 30 }[String(datePosted)];
+    if (!ageInHours) {
+      res.status(400);
+      throw new Error('datePosted must be 24h, 7d, or 30d');
+    }
+    const postedAfter = new Date(Date.now() - ageInHours * 60 * 60 * 1000);
+    filters.push({
+      $or: [
+        { pubDate: { $gte: postedAfter } },
+        { pubDate: { $exists: false }, createdAt: { $gte: postedAfter } },
+      ],
     });
   }
   const countFilters = [...filters];
@@ -124,6 +180,24 @@ export const getJobs = asyncHandler(async (req, res) => {
   const priorityStage = {
     $addFields: {
         source: { $ifNull: ['$source', 'employer'] },
+        workplaceType: {
+          $ifNull: [
+            '$workplaceType',
+            {
+              $cond: [
+                {
+                  $or: [
+                    { $eq: ['$isRemote', true] },
+                    { $eq: ['$jobType', 'Remote'] },
+                    { $eq: ['$isWorldwideRemote', true] },
+                  ],
+                },
+                'remote',
+                'on-site',
+              ],
+            },
+          ],
+        },
         isDirectPosting: {
           $cond: [
             { $eq: [{ $ifNull: ['$source', 'employer'] }, 'employer'] },
@@ -274,6 +348,7 @@ export const createJob = asyncHandler(async (req, res) => {
     title, 
     location, 
     jobType, 
+    workplaceType,
     salaryRange, 
     description, 
     requirements,
@@ -287,6 +362,13 @@ export const createJob = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Please fill in all required fields');
   }
+  const normalizedWorkplaceType = String(workplaceType || (jobType === 'Remote' ? 'remote' : 'on-site'))
+    .trim()
+    .toLowerCase();
+  if (!['remote', 'hybrid', 'on-site'].includes(normalizedWorkplaceType)) {
+    res.status(400);
+    throw new Error('Workplace type must be remote, hybrid, or on-site');
+  }
 
   const job = await Job.create({
     title,
@@ -298,10 +380,12 @@ export const createJob = asyncHandler(async (req, res) => {
     company: req.user._id,
     location,
     jobType,
+    workplaceType: normalizedWorkplaceType,
     source: 'employer',
     isDirectPosting: true,
-    isRemote: jobType === 'Remote' || /\bremote\b/i.test(location),
-    isWorldwideRemote: /\b(worldwide|global(?:ly)?|anywhere|africa)\b/i.test(location),
+    isRemote: normalizedWorkplaceType === 'remote',
+    isWorldwideRemote: normalizedWorkplaceType === 'remote'
+      && /\b(worldwide|global(?:ly)?|anywhere|africa)\b/i.test(location),
     salaryRange,
     description,
     requirements,
@@ -334,6 +418,20 @@ export const updateJob = asyncHandler(async (req, res) => {
   job.title = req.body.title || job.title;
   job.location = req.body.location || job.location;
   job.jobType = req.body.jobType || job.jobType;
+  if (req.body.workplaceType !== undefined) {
+    const normalizedWorkplaceType = String(req.body.workplaceType).trim().toLowerCase();
+    if (!['remote', 'hybrid', 'on-site'].includes(normalizedWorkplaceType)) {
+      res.status(400);
+      throw new Error('Workplace type must be remote, hybrid, or on-site');
+    }
+    job.workplaceType = normalizedWorkplaceType;
+    job.isRemote = normalizedWorkplaceType === 'remote';
+    job.isWorldwideRemote = normalizedWorkplaceType === 'remote'
+      && /\b(worldwide|global(?:ly)?|anywhere|africa)\b/i.test(job.location);
+  } else if (req.body.location !== undefined) {
+    job.isWorldwideRemote = job.isRemote
+      && /\b(worldwide|global(?:ly)?|anywhere|africa)\b/i.test(job.location);
+  }
   job.salaryRange = req.body.salaryRange || job.salaryRange;
   job.description = req.body.description || job.description;
   job.requirements = req.body.requirements || job.requirements;

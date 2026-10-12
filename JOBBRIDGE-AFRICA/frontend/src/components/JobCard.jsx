@@ -30,11 +30,16 @@ const JobCard = ({ job }) => {
         </p>
       ) : (
         <p className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-terracotta-dark">
-          {job.isWorldwideRemote ? "Worldwide remote" : "Africa-accessible remote"}
+          {job.isWorldwideRemote
+            ? "Worldwide remote"
+            : `Remote · ${job.locationRestriction || job.location}`}
           {" · Global Partner Feed"}
         </p>
       )}
-      <p className="text-sm text-gray-600 mt-1">{job.jobType}</p>
+      <p className="mt-1 text-sm text-gray-600">
+        {job.jobType}
+        {job.workplaceType && ` · ${job.workplaceType.replace("-", " ")}`}
+      </p>
       {job.salaryRange && (
         <p className="text-sm text-gray-600 mt-1">Salary: {job.salaryRange}</p>
       )}
@@ -79,6 +84,7 @@ JobCard.propTypes = {
     companyName: PropTypes.string.isRequired,
     location: PropTypes.string.isRequired,
     jobType: PropTypes.string,
+    workplaceType: PropTypes.string,
     salaryRange: PropTypes.string,
     description: PropTypes.string.isRequired,
     source: PropTypes.string,

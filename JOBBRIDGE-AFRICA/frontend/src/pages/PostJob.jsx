@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import africaLocations from "../data/africaLocations";
 import api from "../services/api";
 
 const PostJob = () => {
@@ -12,9 +11,8 @@ const PostJob = () => {
     title: "",
     companyName: user?.companyName || "",
     location: "",
-    country: "",
-    city: "",
     jobType: "Full-Time",
+    workplaceType: "on-site",
     salaryRange: "",
     description: "",
     requirements: "",
@@ -24,18 +22,7 @@ const PostJob = () => {
     applicationEmail: user?.email || "",
   });
 
-  const [selectedCountry, setSelectedCountry] = useState("");
-  const [cities, setCities] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  const handleCountryChange = (e) => {
-    const country = e.target.value;
-    setSelectedCountry(country);
-    setFormData({ ...formData, country, city: "" });
-
-    const countryData = africaLocations.find((loc) => loc.country === country);
-    setCities(countryData ? countryData.cities : []);
-  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -47,16 +34,12 @@ const PostJob = () => {
     setLoading(true);
 
     try {
-      // Combine country and city for location
-      const fullLocation = formData.city
-        ? `${formData.city}, ${formData.country}`
-        : formData.country;
-
       const jobData = {
         title: formData.title,
         companyName: formData.companyName,
-        location: fullLocation,
+        location: formData.location,
         jobType: formData.jobType,
+        workplaceType: formData.workplaceType,
         salaryRange: formData.salaryRange,
         description: formData.description,
         requirements: formData.requirements,
@@ -124,52 +107,44 @@ const PostJob = () => {
             />
           </div>
 
-          {/* Location */}
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Country <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={selectedCountry}
-                onChange={handleCountryChange}
-                required
-                className="w-full border rounded px-4 py-2"
-              >
-                <option value="">Select Country</option>
-                {africaLocations.map((loc) => (
-                  <option key={loc.country} value={loc.country}>
-                    {loc.country}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                City <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="city"
-                value={formData.city}
-                onChange={handleChange}
-                required
-                disabled={!selectedCountry}
-                className="w-full border rounded px-4 py-2 disabled:bg-gray-100"
-              >
-                <option value="">Select City</option>
-                {cities.map((city) => (
-                  <option key={city} value={city}>
-                    {city}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label htmlFor="job-location" className="mb-2 block text-sm font-medium">
+              Location <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="job-location"
+              type="text"
+              name="location"
+              value={formData.location}
+              onChange={handleChange}
+              required
+              className="w-full rounded border px-4 py-2"
+              placeholder="e.g., Lagos, Nigeria · London, UK · Worldwide"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="workplace-type" className="mb-2 block text-sm font-medium">
+              Workplace arrangement <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="workplace-type"
+              name="workplaceType"
+              value={formData.workplaceType}
+              onChange={handleChange}
+              required
+              className="w-full rounded border px-4 py-2"
+            >
+              <option value="on-site">On-site</option>
+              <option value="hybrid">Hybrid</option>
+              <option value="remote">Remote</option>
+            </select>
           </div>
 
           {/* Job Type */}
           <div>
             <label className="block text-sm font-medium mb-2">
-              Job Type <span className="text-red-500">*</span>
+              Employment type <span className="text-red-500">*</span>
             </label>
             <select
               name="jobType"
@@ -181,7 +156,6 @@ const PostJob = () => {
               <option value="Full-Time">Full-Time</option>
               <option value="Part-Time">Part-Time</option>
               <option value="Contract">Contract</option>
-              <option value="Remote">Remote</option>
               <option value="Internship">Internship</option>
             </select>
           </div>

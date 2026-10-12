@@ -10,6 +10,13 @@ const jobSchema = new mongoose.Schema({
     enum: ['Full-Time', 'Part-Time', 'Contract', 'Internship', 'Remote'],
     default: 'Full-Time',
   },
+  workplaceType: {
+    type: String,
+    enum: ['remote', 'hybrid', 'on-site'],
+    default: function defaultWorkplaceType() {
+      return this.jobType === 'Remote' ? 'remote' : 'on-site';
+    },
+  },
   salaryRange: { type: String, default: 'Competitive' },
   description: { type: String, required: true },
   requirements: { type: String }, // Changed from array to string for easier text input
@@ -30,7 +37,7 @@ const jobSchema = new mongoose.Schema({
   isRemote: {
     type: Boolean,
     default: function isRemoteBySource() {
-      return this.source !== 'employer' || this.jobType === 'Remote';
+      return this.workplaceType === 'remote' || this.jobType === 'Remote';
     },
   },
   isWorldwideRemote: { type: Boolean, default: false },

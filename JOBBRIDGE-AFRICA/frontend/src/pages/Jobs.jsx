@@ -15,10 +15,12 @@ const Jobs = () => {
   // Filter states
   const [filters, setFilters] = useState({
     search: searchParams.get("search") || searchParams.get("q") || "",
+    location: searchParams.get("location") || "",
     country: searchParams.get("country") || "",
     city: searchParams.get("city") || "",
     jobType: searchParams.get("jobType") || "",
     isRemote: searchParams.get("isRemote") || "",
+    workplaceType: searchParams.get("workplaceType") || "",
     salary: searchParams.get("salary") || "",
     datePosted: searchParams.get("datePosted") || "",
     experience: searchParams.get("experience") || "",
@@ -67,10 +69,17 @@ const Jobs = () => {
   }, [search, retryKey]);
 
   const handleFilterChange = (key, value) => {
+    const legacyNonRemote = key === "workplaceType" && value === "non-remote";
     const newFilters = {
       ...filters,
-      [key]: value,
+      [key]: legacyNonRemote ? "" : value,
+      ...(legacyNonRemote ? { isRemote: "false" } : {}),
       ...(key === "country" ? { city: "" } : {}),
+      ...(key === "location" ? { country: "", city: "" } : {}),
+      ...(key === "location" || key === "country" || key === "city"
+        ? { location: key === "location" ? value : "" }
+        : {}),
+      ...(key === "workplaceType" && !legacyNonRemote ? { isRemote: "" } : {}),
       ...(key === "country" && value === "Worldwide" ? { isRemote: "true" } : {}),
       ...(key === "country" && value !== "Worldwide" && filters.country === "Worldwide"
         ? { isRemote: "" }
@@ -81,9 +90,12 @@ const Jobs = () => {
     // Update URL params
     const params = new URLSearchParams();
     Object.entries(newFilters).forEach(([k, v]) => {
-      if (!v || k === "experience") return;
+      if (!v || k === "experience" || k === "isRemote" || k === "country" || k === "city") return;
       params.set(k === "search" ? "q" : k, v);
     });
+    if (newFilters.country && !newFilters.location) params.set("country", newFilters.country);
+    if (newFilters.city && !newFilters.location) params.set("city", newFilters.city);
+    if (newFilters.isRemote && !newFilters.workplaceType) params.set("isRemote", newFilters.isRemote);
     if (newFilters.experience) {
       const seniority = {
         entry: "entry",
@@ -115,9 +127,8 @@ const Jobs = () => {
 
       <h1 className="text-3xl font-bold mb-2 text-charcoal">Find Your Dream Job</h1>
       <p className="mb-6 text-sm text-stone-600">
-        JobBridge Africa prioritizes direct African employer opportunities and uses global feeds as
-        enrichment. Direct roles use our candidate matching and application flow; worldwide roles
-        link to the employer&apos;s official site.
+        Explore active opportunities across Africa and worldwide. Search by any city, country, or
+        region, then narrow results by remote, hybrid, or on-site work arrangements.
       </p>
       <p className="mb-6 inline-flex rounded-full bg-amber-100 px-4 py-2 text-sm font-semibold text-terracotta-dark">
         UN SDG 8 · Decent Work and Economic Growth · Africa-first matching
@@ -135,6 +146,35 @@ const Jobs = () => {
               placeholder="Title, company, or keyword"
               className="w-full rounded border p-2"
             />
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow">
+            <label htmlFor="job-location-search" className="mb-2 block font-bold">Search worldwide locations</label>
+            <input
+              id="job-location-search"
+              type="search"
+              list="job-location-options"
+              value={filters.location}
+              onChange={(event) => handleFilterChange("location", event.target.value)}
+              placeholder="City, country, or region"
+              className="w-full rounded border p-2"
+            />
+            <datalist id="job-location-options">
+              {Array.from(new Set([
+                "Africa",
+                "Europe",
+                "North America",
+                "South America",
+                "Asia",
+                "Asia-Pacific",
+                "Middle East",
+                "Oceania",
+                "Worldwide",
+                ...locations.map((item) => item.country),
+                ...locations.flatMap((item) => item.cities || []),
+              ])).map((option) => <option key={option} value={option} />)}
+            </datalist>
+            <p className="mt-2 text-xs text-gray-500">Enter any country, city, or region—not only a suggestion.</p>
           </div>
 
           {/* Location Filter */}
@@ -238,13 +278,15 @@ const Jobs = () => {
             <label htmlFor="remote-filter" className="mb-3 block font-bold">Work location</label>
             <select
               id="remote-filter"
-              value={filters.isRemote}
-              onChange={(event) => handleFilterChange("isRemote", event.target.value)}
+              value={filters.workplaceType || (filters.isRemote === "true" ? "remote" : filters.isRemote === "false" ? "non-remote" : "")}
+              onChange={(event) => handleFilterChange("workplaceType", event.target.value)}
               className="w-full rounded border p-2"
             >
-              <option value="">Remote and on-site</option>
-              <option value="true">Remote</option>
-              <option value="false">On-site / hybrid</option>
+              <option value="">All arrangements</option>
+              <option value="remote">Remote</option>
+              <option value="hybrid">Hybrid</option>
+              <option value="on-site">On-site</option>
+              {filters.isRemote === "false" && !filters.workplaceType && <option value="non-remote">Hybrid / on-site</option>}
             </select>
           </div>
 

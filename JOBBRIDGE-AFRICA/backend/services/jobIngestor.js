@@ -3,8 +3,9 @@ import Job from '../models/Job.js';
 
 const HIMALAYAS_API = 'https://himalayas.app/jobs/api';
 const PAGE_SIZE = 20;
-const REQUEST_DELAY_MS = 500;
+const REQUEST_DELAY_MS = 100;
 const SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const ACTIVE_JOB_LOOKBACK_MS = 120 * 24 * 60 * 60 * 1000;
 const WORLDWIDE_PATTERN = /\b(worldwide|global(?:ly)?|anywhere|any location|africa)\b/i;
 
 const pause = (milliseconds) =>
@@ -42,6 +43,21 @@ const normalizeJobType = (value) => {
   return 'Full-Time';
 };
 
+const asDate = (value) => {
+  if (!value) return null;
+  const timestamp = typeof value === 'number'
+    || (typeof value === 'string' && /^\d+$/.test(value))
+    ? Number(value)
+    : null;
+  const normalizedValue = timestamp !== null
+    ? timestamp < 1e12
+      ? timestamp * 1000
+      : timestamp
+    : value;
+  const date = new Date(normalizedValue);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 const normalizeJob = (job) => {
   const companyName = asText(job.companyName || job.company?.name);
   const companySlug = asText(job.companySlug || job.company?.slug)
@@ -52,20 +68,18 @@ const normalizeJob = (job) => {
     job.locationRestriction || job.locationRestrictions || job.location,
   );
   const restrictionScope = `${locationRestriction} ${asText(job.location)}`;
-  const rawPubDate = job.pubDate;
-  const pubDateValue = typeof rawPubDate === 'number' && rawPubDate < 1e12
-    ? rawPubDate * 1000
-    : rawPubDate;
-  const pubDate = pubDateValue ? new Date(pubDateValue) : new Date();
-  const safePubDate = Number.isNaN(pubDate.getTime()) ? new Date() : pubDate;
+  const safePubDate = asDate(job.pubDate) || new Date();
   const applicationUrl = asText(job.applicationLink || job.applicationUrl || job.url);
   const externalId = asText(job.slug || job.id);
+  const workplaceText = asText(job.workplaceType || job.locationType || job.workplace);
+  const workplaceType = /\bhybrid\b/i.test(workplaceText)
+    ? 'hybrid'
+    : job.remote === false || job.isRemote === false
+      || /\b(on[- ]?site|office[- ]based)\b/i.test(workplaceText)
+      ? 'on-site'
+      : 'remote';
 
   if (!companyName || !title || !description || !applicationUrl) return null;
-  if (job.remote === false || job.isRemote === false
-    || /\b(on[- ]?site|office[- ]based)\b/i.test(asText(job.workplaceType || job.locationType))) {
-    return null;
-  }
   let applicationLink;
   try {
     const parsedApplicationUrl = new URL(applicationUrl);
@@ -81,17 +95,17 @@ const normalizeJob = (job) => {
   const categories = asList(job.categories);
   const tags = asList(job.tags);
   const seniority = asText(job.seniority || job.experienceLevel);
-  const expiryDate = job.expiryDate
-    ? new Date(job.expiryDate)
-    : new Date(safePubDate.getTime() + 90 * 24 * 60 * 60 * 1000);
+  const expiryDate = asDate(job.expiryDate)
+    || new Date(safePubDate.getTime() + 90 * 24 * 60 * 60 * 1000);
 
   return {
     sourceKey,
     source: 'aggregated',
     sourceProvider: 'himalayas',
     isDirectPosting: false,
-    isRemote: true,
-    isWorldwideRemote: WORLDWIDE_PATTERN.test(restrictionScope),
+    isRemote: workplaceType === 'remote',
+    workplaceType,
+    isWorldwideRemote: workplaceType === 'remote' && WORLDWIDE_PATTERN.test(restrictionScope),
     title,
     companyName,
     companySlug,
@@ -107,9 +121,7 @@ const normalizeJob = (job) => {
     salaryRange: salary || 'Competitive',
     categories,
     tags,
-    expiryDate: Number.isNaN(expiryDate.getTime())
-      ? new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
-      : expiryDate,
+    expiryDate,
     isApproved: true,
   };
 };
@@ -126,6 +138,8 @@ export const ingestHimalayasJobs = async () => {
   let fetched = 0;
   let upserted = 0;
   let skipped = 0;
+  let pages = 0;
+  let stalePages = 0;
   const seenCursors = new Set();
 
   do {
@@ -143,15 +157,27 @@ export const ingestHimalayasJobs = async () => {
 
     const payload = await response.json();
     const jobs = getJobsFromResponse(payload);
+    pages += 1;
     fetched += jobs.length;
+    let pageIsOldAndExpired = jobs.length > 0;
 
     for (const rawJob of jobs) {
       if (!rawJob || typeof rawJob !== 'object') {
         skipped += 1;
+        pageIsOldAndExpired = false;
         continue;
       }
       const normalized = normalizeJob(rawJob);
       if (!normalized) {
+        skipped += 1;
+        pageIsOldAndExpired = false;
+        continue;
+      }
+      if (normalized.pubDate.getTime() >= Date.now() - ACTIVE_JOB_LOOKBACK_MS
+        || normalized.expiryDate >= new Date()) {
+        pageIsOldAndExpired = false;
+      }
+      if (normalized.expiryDate < new Date()) {
         skipped += 1;
         continue;
       }
@@ -177,8 +203,9 @@ export const ingestHimalayasJobs = async () => {
       }
     }
 
+    stalePages = pageIsOldAndExpired ? stalePages + 1 : 0;
     const nextCursor = payload?.nextCursor;
-    if (nextCursor === null || nextCursor === undefined || nextCursor === '') {
+    if (stalePages >= 2 || nextCursor === null || nextCursor === undefined || nextCursor === '') {
       cursor = null;
     } else {
       cursor = String(nextCursor);
@@ -190,29 +217,28 @@ export const ingestHimalayasJobs = async () => {
     }
   } while (cursor);
 
-  console.info(`Global remote sync complete: fetched ${fetched}, upserted ${upserted}, skipped ${skipped}`);
-  return { fetched, upserted, skipped };
+  console.info(`Global job sync complete: ${pages} pages, fetched ${fetched}, upserted ${upserted}, skipped ${skipped}`);
+  return { pages, fetched, upserted, skipped };
 };
 
 export const scheduleDailyJobIngestion = () => {
-  const now = new Date();
-  const nextRun = new Date(now);
-  nextRun.setUTCHours(2, 0, 0, 0);
-  if (nextRun <= now) nextRun.setUTCDate(nextRun.getUTCDate() + 1);
-
-  const startDailyInterval = () => {
-    const run = async () => {
-      try {
-        await ingestHimalayasJobs();
-      } catch (error) {
-        console.error('Scheduled global remote job sync failed:', error);
-      }
-    };
-    run();
-    setInterval(run, SYNC_INTERVAL_MS).unref();
+  let isRunning = false;
+  const run = async () => {
+    if (isRunning) {
+      console.info('Global job sync skipped because the previous sync is still running.');
+      return;
+    }
+    isRunning = true;
+    try {
+      await ingestHimalayasJobs();
+    } catch (error) {
+      console.error('Global job sync failed:', error);
+    } finally {
+      isRunning = false;
+    }
   };
 
-  const timer = setTimeout(startDailyInterval, nextRun.getTime() - now.getTime());
-  timer.unref();
-  console.info(`Global remote job sync scheduled for ${nextRun.toISOString()}`);
+  run();
+  setInterval(run, SYNC_INTERVAL_MS).unref();
+  console.info('Global job sync started and scheduled to repeat every 24 hours.');
 };

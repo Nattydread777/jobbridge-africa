@@ -80,6 +80,7 @@ const COMMON_SKILLS = [
   "Pandas",
   "NumPy",
   "Data Analysis",
+  "Data Analytics",
   "Data Visualization",
   "NLP",
   "Computer Vision",
@@ -164,7 +165,7 @@ const COMMON_SKILLS = [
 const Profile = () => {
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("photo");
+  const [activeTab, setActiveTab] = useState("basic");
   const [resumeFile, setResumeFile] = useState(null);
   const [profileImagePreview, setProfileImagePreview] = useState(
     user?.profileImageUrl || null
@@ -340,8 +341,11 @@ const Profile = () => {
   };
 
   const handleAddSkill = (skillToAdd = null) => {
-    const skill = skillToAdd || newSkill.trim();
-    if (skill && !profile.skills.includes(skill)) {
+    const skill = (skillToAdd || newSkill).trim();
+    const alreadyAdded = profile.skills.some(
+      (existingSkill) => existingSkill.toLowerCase() === skill.toLowerCase()
+    );
+    if (skill && !alreadyAdded) {
       setProfile({ ...profile, skills: [...profile.skills, skill] });
       setNewSkill("");
       setShowSuggestions(false);
@@ -403,28 +407,6 @@ const Profile = () => {
       // Refresh user data from server
       await refreshUser();
       alert("Profile saved successfully!");
-    } catch (error) {
-      console.error("Error saving profile:", error);
-      alert(error.response?.data?.message || "Failed to save profile");
-    }
-  };
-
-  const handleSaveAndContinue = async (nextTab) => {
-    try {
-      await api.put("/auth/profile", {
-        name: profile.name,
-        email: profile.email,
-        country: profile.country,
-        bio: profile.bio,
-        education: profile.education,
-        experience: profile.experience,
-        skills: profile.skills,
-      });
-
-      // Refresh user data from server
-      await refreshUser();
-      // Move to next tab
-      setActiveTab(nextTab);
     } catch (error) {
       console.error("Error saving profile:", error);
       alert(error.response?.data?.message || "Failed to save profile");
@@ -547,80 +529,34 @@ const Profile = () => {
         )}
 
         {/* Tabs */}
-        <div className="border-b mb-6">
-          <div className="flex gap-6">
-            <button
-              onClick={() => setActiveTab("photo")}
-              className={`pb-3 px-2 font-medium ${
-                activeTab === "photo"
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              Profile Photo
-            </button>
-            <button
-              onClick={() => setActiveTab("resume")}
-              className={`pb-3 px-2 font-medium ${
-                activeTab === "resume"
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              Resume Upload
-            </button>
-            <button
-              onClick={() => setActiveTab("basic")}
-              className={`pb-3 px-2 font-medium ${
-                activeTab === "basic"
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              Basic Info
-            </button>
-            <button
-              onClick={() => setActiveTab("education")}
-              className={`pb-3 px-2 font-medium ${
-                activeTab === "education"
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              Education
-            </button>
-            <button
-              onClick={() => setActiveTab("experience")}
-              className={`pb-3 px-2 font-medium ${
-                activeTab === "experience"
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              Experience
-            </button>
-            <button
-              onClick={() => setActiveTab("skills")}
-              className={`pb-3 px-2 font-medium ${
-                activeTab === "skills"
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              Skills
-            </button>
-            <button
-              onClick={() => setActiveTab("alerts")}
-              className={`pb-3 px-2 font-medium ${
-                activeTab === "alerts"
-                  ? "border-b-2 border-primary text-primary"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              Job Alerts
-            </button>
+        <nav aria-label="Profile sections" className="mb-6 overflow-x-auto border-b">
+          <div role="tablist" className="flex min-w-max gap-5">
+            {[
+              ["basic", "Overview"],
+              ["experience", "Experience"],
+              ["education", "Education"],
+              ["skills", "Skills"],
+              ["resume", "Resume Management"],
+              ["photo", "Profile Photo"],
+              ["alerts", "Job Alerts"],
+            ].map(([tab, label]) => (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab}
+                onClick={() => setActiveTab(tab)}
+                className={`border-b-2 px-2 py-3 font-medium transition ${
+                  activeTab === tab
+                    ? "border-primary text-primary"
+                    : "border-transparent text-gray-600 hover:text-gray-800"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-        </div>
+        </nav>
 
         {/* Profile Photo Tab */}
         {activeTab === "photo" && (
@@ -727,10 +663,10 @@ const Profile = () => {
 
             <div className="flex justify-end mt-8">
               <button
-                onClick={() => handleSaveAndContinue("resume")}
+                onClick={handleSaveProfile}
                 className="bg-secondary text-white px-6 py-2 rounded hover:bg-green-700 font-semibold"
               >
-                Save and Continue to Resume →
+                Save Changes
               </button>
             </div>
           </div>
@@ -739,11 +675,19 @@ const Profile = () => {
         {/* Resume Upload Tab */}
         {activeTab === "resume" && (
           <div className="bg-white p-8 rounded-lg shadow">
-            <h2 className="text-2xl font-bold mb-4">Upload Your Resume</h2>
+            <h2 className="text-2xl font-bold mb-4">Resume Management</h2>
             <p className="text-gray-600 mb-6">
               Upload your resume and we'll automatically populate your profile
               (LinkedIn-style auto-fill).
             </p>
+            {user.resumeUrl && (
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <span className="font-medium text-gray-800">A resume is currently attached to your profile.</span>
+                <a href={user.resumeUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
+                  View current resume
+                </a>
+              </div>
+            )}
 
             {parsing && (
               <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center gap-3">
@@ -767,7 +711,7 @@ const Profile = () => {
               <input
                 type="file"
                 id="resume-upload"
-                accept=".pdf,.docx,.txt"
+                accept=".pdf,.doc,.docx,.txt"
                 onChange={handleResumeUpload}
                 disabled={parsing}
                 className="hidden"
@@ -782,10 +726,10 @@ const Profile = () => {
                 <p className="text-lg font-medium mb-2">
                   {resumeFile
                     ? `Uploaded: ${resumeFile.name}`
-                    : "Click to upload your resume"}
+                    : user.resumeUrl ? "Click to replace your resume" : "Click to upload your resume"}
                 </p>
                 <p className="text-sm text-gray-500">
-                  Supported formats: PDF, DOCX, TXT (up to 10MB)
+                  Supported formats: PDF, DOC, DOCX, TXT (up to 10MB)
                 </p>
               </label>
             </div>
@@ -824,10 +768,10 @@ const Profile = () => {
             {resumeFile && !parsing && (
               <div className="flex justify-end mt-6">
                 <button
-                  onClick={() => handleSaveAndContinue("basic")}
+                  onClick={() => setActiveTab("basic")}
                   className="bg-primary text-white px-6 py-2 rounded hover:bg-yellow-600 transition"
                 >
-                  Save and Continue to Basic Info →
+                  Review profile details →
                 </button>
               </div>
             )}
@@ -924,12 +868,6 @@ const Profile = () => {
                   className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 transition"
                 >
                   Save Changes
-                </button>
-                <button
-                  onClick={() => handleSaveAndContinue("education")}
-                  className="bg-primary text-white px-6 py-2 rounded hover:bg-yellow-600 transition"
-                >
-                  Save & Continue →
                 </button>
               </div>
             </div>
@@ -1034,34 +972,10 @@ const Profile = () => {
             )}
             <div className="flex gap-3 mt-6">
               <button
-                onClick={() => setActiveTab("basic")}
-                className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 transition"
-              >
-                ← Back
-                <button
-                  onClick={handleSaveProfile}
-                  className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 transition"
-                >
-                  Save Changes
-                </button>
-                <button
-                  onClick={handleSaveProfile}
-                  className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 transition"
-                >
-                  Save Changes
-                </button>
-                <button
-                  onClick={handleSaveProfile}
-                  className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 transition"
-                >
-                  Save Changes
-                </button>
-              </button>
-              <button
-                onClick={() => handleSaveAndContinue("experience")}
+                onClick={handleSaveProfile}
                 className="bg-primary text-white px-6 py-2 rounded hover:bg-yellow-600 transition ml-auto"
               >
-                Save and Continue to Experience →
+                Save Changes
               </button>
             </div>
           </div>
@@ -1176,16 +1090,10 @@ const Profile = () => {
             )}
             <div className="flex gap-3 mt-6">
               <button
-                onClick={() => setActiveTab("education")}
-                className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 transition"
-              >
-                ← Back
-              </button>
-              <button
-                onClick={() => handleSaveAndContinue("skills")}
+                onClick={handleSaveProfile}
                 className="bg-primary text-white px-6 py-2 rounded hover:bg-yellow-600 transition ml-auto"
               >
-                Save and Continue to Skills →
+                Save Changes
               </button>
             </div>
           </div>
@@ -1197,16 +1105,22 @@ const Profile = () => {
             <h2 className="text-2xl font-bold mb-6">Skills</h2>
 
             <div className="mb-6 relative">
-              <label className="block text-sm font-medium mb-2">
+              <label htmlFor="skill-picker" className="block text-sm font-medium mb-2">
                 Type to search for skills or add your own
               </label>
               <div className="flex gap-3">
                 <div className="flex-1 relative">
                   <input
+                    id="skill-picker"
                     type="text"
                     value={newSkill}
                     onChange={handleSkillInputChange}
-                    onKeyPress={(e) => e.key === "Enter" && handleAddSkill()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddSkill();
+                      }
+                    }}
                     onFocus={() => newSkill && setShowSuggestions(true)}
                     placeholder="Type a skill (e.g., JavaScript, Project Management)"
                     className="w-full border rounded px-4 py-2"
@@ -1215,9 +1129,10 @@ const Profile = () => {
                   {/* Autocomplete Dropdown */}
                   {showSuggestions && skillSuggestions.length > 0 && (
                     <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {skillSuggestions.map((skill, index) => (
+                      {skillSuggestions.map((skill) => (
                         <button
-                          key={index}
+                          key={skill}
+                          type="button"
                           onClick={() => handleAddSkill(skill)}
                           className="w-full text-left px-4 py-2 hover:bg-primary hover:text-white transition"
                         >
@@ -1263,6 +1178,8 @@ const Profile = () => {
                   >
                     {skill}
                     <button
+                      type="button"
+                      aria-label={`Remove ${skill}`}
                       onClick={() => handleRemoveSkill(index)}
                       className="text-red-500 hover:text-red-700 font-bold"
                     >
@@ -1274,16 +1191,10 @@ const Profile = () => {
             </div>
             <div className="flex gap-3 mt-6">
               <button
-                onClick={() => setActiveTab("experience")}
-                className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 transition"
-              >
-                ← Back
-              </button>
-              <button
-                onClick={() => handleSaveAndContinue("alerts")}
+                onClick={handleSaveProfile}
                 className="bg-primary text-white px-6 py-2 rounded hover:bg-yellow-600 transition ml-auto"
               >
-                Save and Continue to Job Alerts →
+                Save Changes
               </button>
             </div>
           </div>

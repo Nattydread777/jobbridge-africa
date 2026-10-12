@@ -481,7 +481,7 @@ Auth (`/api/auth`)
 
 Jobs (`/api/jobs`)
 
-- GET `/` — Unified, Africa-first paginated list (filter by `q`/`search`, `country`/`location`, `jobType`, `isRemote`, and `seniority`; supports `page`, `cursor`, and `limit`; direct African employer roles rank ahead of enriched listings)
+- GET `/` — Unified paginated list searchable across African and global locations (filter by `q`/`search`, `country`/`location`, `jobType`, `workplaceType` (`remote`, `hybrid`, or `on-site`), `datePosted`, `isRemote`, and `seniority`; supports `page`, `cursor`, and `limit`; direct African employer roles rank ahead of enriched listings)
 - GET `/:id` — Job detail
 - POST `/` — Create job (employer only)
 - PUT `/:id` — Update job (employer only)
@@ -500,7 +500,7 @@ AI (`/api/ai`)
 - GET `/match` — Get recommended jobs for current user (protected)
 - POST `/optimize-cv` — Rule-based CV and job-description keyword comparison using `cvText` and `jobDescription` (10 requests/hour per IP)
 
-Himalayas listings are background enrichment, not the primary source of jobs. The importer accepts remote roles whose location restrictions include worldwide/global/Africa or an African country, labels them as aggregated external listings, and upserts with a stable source key without replacing employer postings. The daily sync is scheduled at 02:00 UTC after MongoDB connects. Run `cd backend; npm run ingest:jobs` for a one-off sync. External applications open on the official career site.
+Himalayas listings are background enrichment, not the primary source of jobs. The importer pages through the active global feed, normalizes epoch-second publication and expiry dates, labels records as aggregated external listings, and upserts with a stable source key without replacing employer postings. It starts after MongoDB connects and repeats every 24 hours; expired historic pages outside the active-feed window are skipped. Direct employer posts support remote, hybrid, and on-site arrangements at any location. Run `cd backend; npm run ingest:jobs` for a one-off sync. External applications open on the official career site.
 
 ---
 
