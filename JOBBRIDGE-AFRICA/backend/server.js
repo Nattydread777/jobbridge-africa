@@ -24,6 +24,7 @@ import { notFound, errorHandler } from './middleware/errorMiddleware.js'; // MUS
 import { scheduleCareerScrapes } from './services/careerScraperService.js';
 import { scheduleRemoteApiIngestion } from './services/remoteApiIngestor.js';
 import { scheduleMyJobMagScrapes } from './services/localAggregatorScraper.js';
+import { scheduleHubstaffTalentIngestion } from './services/hubstaffTalentScraper.js';
 
 // -------------------
 // Environment Validation
@@ -191,6 +192,7 @@ const startServer = async () => {
   scheduleCareerScrapes();
   scheduleRemoteApiIngestion();
   scheduleMyJobMagScrapes();
+  scheduleHubstaffTalentIngestion();
 
   await new Promise((resolve, reject) => {
     const server = app.listen(PORT, () => {

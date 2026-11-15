@@ -497,7 +497,7 @@ AI (`/api/ai`)
 - GET `/match` — Get recommended jobs for current user (protected)
 - POST `/optimize-cv` — Rule-based CV and job-description keyword comparison using `cvText` and `jobDescription` (10 requests/hour per IP)
 
-Himalayas listings are background enrichment, not the primary source of jobs. The importer pages through the active global feed, normalizes epoch-second publication and expiry dates, labels records as aggregated external listings, and upserts with a stable source key without replacing employer postings. It starts after MongoDB connects and repeats every 24 hours; expired historic pages outside the active-feed window are skipped. Direct employer posts support remote, hybrid, and on-site arrangements at any location. Run `cd backend; npm run ingest:jobs` for a one-off sync. External applications open on the official career site.
+Himalayas and Hubstaff Talent listings are ingested as aggregated external jobs with stable source keys and URL-based deduplication. The Hubstaff scraper reads the first three remote-job result pages daily, normalizes each listing, and links to its Hubstaff application page. Both ingestion schedulers start after MongoDB connects; `cd backend; npm run ingest:jobs` runs a one-off Himalayas and Hubstaff sync. Direct employer posts support remote, hybrid, and on-site arrangements at any location.
 
 ---
 
@@ -526,7 +526,7 @@ User
 
 Job
 
-- Fields: employer jobs plus attributed Himalayas listings (`source`, `sourceKey`, `companySlug`, `excerpt`, `applicationLink`, `locationRestriction`, `seniority`, `salary`, `categories`, `tags`, `pubDate`)
+- Fields: employer jobs plus attributed Himalayas, Hubstaff Talent, and other aggregated listings (`source`, `sourceName`, `sourceProvider`, `sourceKey`, `companySlug`, `excerpt`, `applicationLink`, `locationRestriction`, `seniority`, `salary`, `categories`, `tags`, `pubDate`)
 
 Application
 

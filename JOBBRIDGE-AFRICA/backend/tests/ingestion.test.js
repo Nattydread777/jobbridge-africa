@@ -19,6 +19,11 @@ import {
   normalizeMyJobMagListing,
   parseMyJobMagListings,
 } from '../services/localAggregatorScraper.js';
+import {
+  extractHubstaffResultsHtml,
+  normalizeHubstaffTalentListing,
+  parseHubstaffTalentListings,
+} from '../services/hubstaffTalentScraper.js';
 import { cleanHtmlSnippet } from '../utils/sanitizer.js';
 
 const employer = {
@@ -371,4 +376,78 @@ test('parses MyJobMag agency listings and normalizes attribution for the Job mod
   assert.equal(normalized.location, 'Lagos, Nigeria');
   const modelJob = new Job(normalized);
   assert.equal(modelJob.validateSync(), undefined);
+});
+
+test('parses Hubstaff Talent remote jobs and normalizes them for the Job model', () => {
+  const resultHtml = `
+    <div class="search-result">
+      <div class="main-details">
+        <a class="name" href="/jobs/remote-product-designer">Remote Product Designer</a>
+        <span class="label label-hourly">hourly</span>
+        <div class="pay-rate">$25/hr</div>
+        <div class="job-company">
+          <a class="job-agency">Example Client</a>
+          <i class="hi-remote"></i>
+          <span class="a-tooltip" data-original-title="November 15, 2026 at 11:24 am">5 hrs ago</span>
+        </div>
+        <div class="profil-bio">Design and maintain accessible product interfaces.</div>
+        <div class="list-inline"><a class="tag">Figma</a><a class="tag">Product Design</a></div>
+      </div>
+    </div>
+    <div class="search-result">
+      <div class="main-details">
+        <a class="name" href="/jobs/fixed-price-developer">Fixed-price Developer</a>
+        <span class="label label-fixed_price">fixed price</span>
+        <div class="budget">$1,200</div>
+        <div class="job-company"><a class="job-agency">Another Client</a><i class="hi-remote"></i></div>
+        <div class="profil-bio">Build an integration for the client platform.</div>
+      </div>
+    </div>
+    <div class="search-result">
+      <div class="main-details">
+        <a class="name" href="https://example.com/jobs/not-hubstaff">Not a Hubstaff listing</a>
+        <a class="job-agency">Unknown</a>
+        <div class="profil-bio">This listing must be rejected.</div>
+        <i class="hi-remote"></i>
+      </div>
+    </div>
+  `;
+  const jsResponse = `$('#results').html(${JSON.stringify(resultHtml).replace(/\$/g, '\\$')});`;
+  const parsedHtml = extractHubstaffResultsHtml(jsResponse);
+  const listings = parseHubstaffTalentListings(parsedHtml);
+
+  assert.equal(listings.length, 2);
+  assert.deepEqual(listings[0], {
+    title: 'Remote Product Designer',
+    companyName: 'Example Client',
+    description: 'Design and maintain accessible product interfaces.',
+    sourceUrl: 'https://hubstafftalent.net/jobs/remote-product-designer',
+    applicationUrl: 'https://hubstafftalent.net/jobs/remote-product-designer/apply',
+    salary: '$25/hr',
+    jobType: 'hourly',
+    tags: ['Figma', 'Product Design'],
+    postedDate: 'November 15, 2026 at 11:24 am',
+  });
+  assert.equal(listings[1].salary, '$1,200');
+  assert.equal(listings[1].jobType, 'fixed price');
+
+  const normalized = normalizeHubstaffTalentListing(listings[0], new Date('2026-11-15T12:00:00Z'));
+  const normalizedAgain = normalizeHubstaffTalentListing(listings[0], new Date('2026-11-16T12:00:00Z'));
+  assert.equal(normalized.sourceKey, normalizedAgain.sourceKey);
+  assert.equal(normalized.source, 'aggregated');
+  assert.equal(normalized.sourceProvider, 'hubstafftalent');
+  assert.equal(normalized.sourceName, 'Hubstaff Talent');
+  assert.equal(normalized.location, 'Remote');
+  assert.equal(normalized.workplaceType, 'remote');
+  assert.equal(normalized.jobType, 'Contract');
+  assert.equal(normalized.salaryRange, '$25/hr');
+  assert.equal(normalized.applicationLink, 'https://hubstafftalent.net/jobs/remote-product-designer/apply');
+  assert.notEqual(normalized.pubDate.getTime(), new Date('2026-11-15T12:00:00Z').getTime());
+  assert.deepEqual(normalized.tags, ['Figma', 'Product Design']);
+
+  const modelJob = new Job(normalized);
+  assert.equal(modelJob.validateSync(), undefined);
+
+  const normalizedFixedPrice = normalizeHubstaffTalentListing(listings[1]);
+  assert.equal(normalizedFixedPrice.jobType, 'Contract');
 });
