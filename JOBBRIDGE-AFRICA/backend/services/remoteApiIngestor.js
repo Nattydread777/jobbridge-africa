@@ -10,7 +10,7 @@ const HIMALAYAS_DAILY_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const REMOTIVE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const HIMALAYAS_REQUEST_DELAY_MS = 1000;
 const HIMALAYAS_MAX_PAGES = 5;
-const API_USER_AGENT = 'JobBridgeAfricaRemoteJobs/1.0 (+https://www.jobbridgeafrica.org)';
+const API_USER_AGENT = 'JobBridgeAfricaRemoteJobs/1.0 (+https://jobbridgeafrica.com)';
 
 const sleep = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));

@@ -16,7 +16,7 @@ export const MYJOBMAG_TARGETS = [
 ];
 const REQUEST_TIMEOUT_MS = 20000;
 const DAILY_INTERVAL_MS = 24 * 60 * 60 * 1000;
-const USER_AGENT = 'JobBridgeAfrica-JobAggregator/1.0 (+https://www.jobbridgeafrica.org)';
+const USER_AGENT = 'JobBridgeAfrica-JobAggregator/1.0 (+https://jobbridgeafrica.com)';
 
 const textOf = (element) => element
   .text()

@@ -115,7 +115,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
             <p style="color: #4b5563; margin-top: 10px;">${message.substring(0, 200)}${message.length > 200 ? '...' : ''}</p>
           </div>
           <div style="margin: 30px 0;">
-            <a href="https://www.jobbridgeafrica.org/jobs" style="background-color: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">Browse Jobs</a>
+            <a href="https://jobbridgeafrica.com/jobs" style="background-color: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">Browse Jobs</a>
           </div>
           <div style="border-top: 1px solid #e5e7eb; margin-top: 30px; padding-top: 20px;">
             <p style="color: #6b7280; font-size: 14px; margin: 0;">

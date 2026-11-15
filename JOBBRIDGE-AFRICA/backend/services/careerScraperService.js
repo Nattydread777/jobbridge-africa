@@ -6,7 +6,7 @@ import https from 'node:https';
 import { load } from 'cheerio';
 import Job from '../models/Job.js';
 
-const USER_AGENT = 'JobBridgeAfrica-JobPostingCrawler/1.0 (+https://www.jobbridgeafrica.org)';
+const USER_AGENT = 'JobBridgeAfrica-JobPostingCrawler/1.0 (+https://jobbridgeafrica.com)';
 const REQUEST_TIMEOUT_MS = 15000;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_DISCOVERY_PAGES = 60;

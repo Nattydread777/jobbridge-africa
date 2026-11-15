@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://www.jobbridgeafrica.org/sitemap.xml
+Sitemap: https://jobbridgeafrica.com/sitemap.xml

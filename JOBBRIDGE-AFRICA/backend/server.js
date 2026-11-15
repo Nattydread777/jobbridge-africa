@@ -87,21 +87,21 @@ const contactLimiter = rateLimit({
 // -------------------
 // CORS Configuration
 // -------------------
-// Parse allowed origins from environment variable
-const allowedOrigins = (() => {
-  if (process.env.NODE_ENV === 'production') {
-    if (process.env.ALLOWED_ORIGINS) {
-      return process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim());
-    }
-    return ['https://www.jobbridgeafrica.org'];
-  }
-  return [
+const allowedOrigins = [
+  'https://jobbridgeafrica.com',
+  'https://www.jobbridgeafrica.com',
+  'https://jobbridge-africa.vercel.app',
+  ...(process.env.NODE_ENV === 'production' ? [] : [
     'http://localhost:5173',
     'http://localhost:5174',
     'http://127.0.0.1:5173',
     'http://127.0.0.1:5174',
-  ];
-})();
+  ]),
+  ...(process.env.CORS_ORIGIN || process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map(origin => origin.trim().replace(/\/+$/, ''))
+    .filter(Boolean),
+];
 
 // Robust CORS configuration with dynamic origin checking
 const corsOptions = {

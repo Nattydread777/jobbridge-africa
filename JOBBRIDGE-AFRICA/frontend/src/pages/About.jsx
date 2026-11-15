@@ -173,8 +173,8 @@ const About = () => {
           <h2 className="mb-3 text-xl font-bold md:text-2xl">Learn more</h2>
           <ul className="space-y-2 text-slate-700">
             <li>
-              <a className="text-blue-600 hover:underline" href="https://www.jobbridgeafrica.org" target="_blank" rel="noreferrer">
-                www.jobbridgeafrica.org
+              <a className="text-blue-600 hover:underline" href="https://jobbridgeafrica.com" target="_blank" rel="noreferrer">
+                jobbridgeafrica.com
               </a>
             </li>
             <li>

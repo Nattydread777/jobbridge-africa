@@ -1,31 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://www.jobbridgeafrica.org/</loc>
+    <loc>https://jobbridgeafrica.com/</loc>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://www.jobbridgeafrica.org/about</loc>
+    <loc>https://jobbridgeafrica.com/about</loc>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://www.jobbridgeafrica.org/jobs</loc>
+    <loc>https://jobbridgeafrica.com/jobs</loc>
     <changefreq>daily</changefreq>
   </url>
   <url>
-    <loc>https://www.jobbridgeafrica.org/contact</loc>
+    <loc>https://jobbridgeafrica.com/contact</loc>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://www.jobbridgeafrica.org/career-resources</loc>
+    <loc>https://jobbridgeafrica.com/career-resources</loc>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://www.jobbridgeafrica.org/privacy</loc>
+    <loc>https://jobbridgeafrica.com/privacy</loc>
     <changefreq>yearly</changefreq>
   </url>
   <url>
-    <loc>https://www.jobbridgeafrica.org/terms</loc>
+    <loc>https://jobbridgeafrica.com/terms</loc>
     <changefreq>yearly</changefreq>
   </url>
 </urlset>

@@ -28,8 +28,10 @@ services:
         sync: false
       - key: CLOUDINARY_CLIENT_SECRET
         sync: false
-      - key: ALLOWED_ORIGINS
-        value: https://www.jobbridgeafrica.org
+      - key: CORS_ORIGIN
+        value: https://jobbridgeafrica.com,https://www.jobbridgeafrica.com,https://jobbridge-africa.vercel.app
+      - key: FRONTEND_URL
+        value: https://jobbridgeafrica.com
       - key: EMAIL_USER
         sync: false
       - key: EMAIL_PASS

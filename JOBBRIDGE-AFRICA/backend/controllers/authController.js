@@ -104,7 +104,10 @@ export const forgotPassword = asyncHandler(async (req, res) => {
 
     try {
       const frontendUrl = process.env.FRONTEND_URL
-        || process.env.ALLOWED_ORIGINS?.split(',').map((origin) => origin.trim()).find(Boolean)
+        || (process.env.CORS_ORIGIN || process.env.ALLOWED_ORIGINS)
+          ?.split(',')
+          .map((origin) => origin.trim())
+          .find(Boolean)
         || 'http://localhost:5173';
       const resetUrl = new URL(`/reset-password/${resetToken}`, frontendUrl).toString();
       await sendPasswordResetEmail({

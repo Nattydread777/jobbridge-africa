@@ -72,7 +72,8 @@ Click **Advanced** → **Add Environment Variable** and add these one by one:
 | `EMAIL_USER`               | `info@jobbridgeafrica.org`                                            | -                                   |
 | `EMAIL_PASS`               | `pBC7sZeQYAB9`                                                        | Your Zoho app password              |
 | `EMAIL_FROM`               | `info@jobbridgeafrica.org`                                            | Optional: preferred sender address  |
-| `ALLOWED_ORIGINS`          | `https://www.jobbridgeafrica.org,https://jobbridge-africa.vercel.app` | Comma-separated, no spaces          |
+| `CORS_ORIGIN`              | `https://jobbridgeafrica.com,https://www.jobbridgeafrica.com,https://jobbridge-africa.vercel.app` | Comma-separated frontend origins |
+| `FRONTEND_URL`             | `https://jobbridgeafrica.com`                                         | Public frontend URL for password-reset links |
 
 ### Optional Variables (only if needed)
 
@@ -108,7 +109,7 @@ Click **Advanced** → **Add Environment Variable** and add these one by one:
 2. Select your **JobBridge Africa** project
 3. Go to **Settings** → **Environment Variables**
 4. Click **Add New**
-   - **Key**: `VITE_API_BASE`
+   - **Key**: `VITE_API_URL`
    - **Value**: `https://jobbridge-backend.onrender.com/api` (replace with your URL)
    - **Environments**: Check all (Production, Preview, Development)
 5. Click **Save**
@@ -158,7 +159,7 @@ Should return:
 
 ### Test Contact Form
 
-1. Go to: `https://www.jobbridgeafrica.org/contact`
+1. Go to: `https://jobbridgeafrica.com/contact`
 2. Fill out the form with your details
 3. Click **Send Message**
 4. ✅ Expected: Success message appears
@@ -177,8 +178,8 @@ Should return:
 
 ### CORS Errors in Browser Console
 
-- Check `ALLOWED_ORIGINS` includes your exact Vercel domain
-- No trailing slashes in origins
+- Check `CORS_ORIGIN` includes the exact frontend origin (the apex, `www`, and production Vercel origins are allowed by default)
+- The backend trims spaces and trailing slashes from configured origins
 - Redeploy backend after changing env vars
 
 ### Email Not Sending
@@ -252,7 +253,7 @@ Use a service like [UptimeRobot](https://uptimerobot.com) to ping your backend e
 
    - ✅ `JWT_SECRET` is strong and unique
    - ✅ `MONGO_URI` uses password authentication
-   - ✅ `ALLOWED_ORIGINS` only includes your domains
+   - ✅ `CORS_ORIGIN` only includes your domains
    - ✅ Environment variables are never committed to Git
 
 4. 🚀 Optional upgrades:
@@ -305,7 +306,7 @@ This project is a monorepo. The frontend lives under `frontend/`. In Vercel, you
    - Build Command: `npm run build`
    - Output Directory: `dist`
 6. Add Environment Variables:
-   - Key: `VITE_API_BASE`
+   - Key: `VITE_API_URL`
    - Value: `https://jobbridge-backend.onrender.com/api` (replace if your Render URL differs)
    - Environments: Production, Preview, Development
 7. Deploy.
@@ -328,7 +329,7 @@ We included `frontend/vercel.json` to rewrite all routes to `index.html` for Rea
 ## Common Vercel Build Issues
 
 - Builds from the repo root instead of `frontend` → Set Root Directory to `frontend`.
-- Missing API base → Add `VITE_API_BASE` to Environment Variables.
+- Missing API base → Add `VITE_API_URL` (or `VITE_API_BASE`) to Environment Variables.
 - Old cache causing failures → Redeploy with "Use existing Build Cache" unchecked.
 
 ---
