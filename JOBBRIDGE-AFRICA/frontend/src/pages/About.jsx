@@ -178,8 +178,8 @@ const About = () => {
               </a>
             </li>
             <li>
-              <a className="text-blue-600 hover:underline" href="mailto:info@jobbridgeafrica.org">
-                info@jobbridgeafrica.org
+              <a className="text-blue-600 hover:underline" href="mailto:info@jobbridgeafrica.com">
+                info@jobbridgeafrica.com
               </a>
             </li>
             <li>Follow us: LinkedIn, X, Instagram, Facebook</li>

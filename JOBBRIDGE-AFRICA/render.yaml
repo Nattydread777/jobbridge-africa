@@ -33,13 +33,13 @@ services:
       - key: FRONTEND_URL
         value: https://jobbridgeafrica.com
       - key: EMAIL_USER
-        sync: false
+        value: info@jobbridgeafrica.com
       - key: EMAIL_PASS
         sync: false
       - key: EMAIL_FROM
-        sync: false
+        value: info@jobbridgeafrica.com
       - key: ADMIN_EMAIL
-        sync: false
+        value: info@jobbridgeafrica.com
       - key: EMAIL_HOST
         value: smtp.zoho.com
       - key: EMAIL_PORT

@@ -60,7 +60,7 @@ const Contact = () => {
         type: "error",
         message:
           error.response?.data?.message ||
-          "Failed to send message. Please try again or email us directly at info@jobbridgeafrica.org",
+          "Failed to send message. Please try again or email us directly at info@jobbridgeafrica.com",
       });
     } finally {
       setLoading(false);
@@ -204,10 +204,10 @@ const Contact = () => {
                   <div>
                     <h3 className="font-semibold text-gray-900">Email</h3>
                     <a
-                      href="mailto:info@jobbridgeafrica.org"
+                      href="mailto:info@jobbridgeafrica.com"
                       className="text-green-600 hover:underline"
                     >
-                      info@jobbridgeafrica.org
+                      info@jobbridgeafrica.com
                     </a>
                   </div>
                 </div>

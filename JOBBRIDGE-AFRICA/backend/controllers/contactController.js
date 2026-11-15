@@ -70,8 +70,8 @@ const sendContactEmail = asyncHandler(async (req, res) => {
   }
 
   // Prepare email payloads BEFORE attempting any provider so variables exist.
-  const defaultFrom = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'info@jobbridgeafrica.org';
-  const adminEmail = process.env.ADMIN_EMAIL || 'info@jobbridgeafrica.org';
+  const defaultFrom = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'info@jobbridgeafrica.com';
+  const adminEmail = process.env.ADMIN_EMAIL || 'info@jobbridgeafrica.com';
   const mailOptions = {
     from: defaultFrom,
     to: adminEmail,
@@ -100,7 +100,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     from: defaultFrom,
     to: email,
     subject: 'We received your message - JobBridge Africa',
-    replyTo: 'info@jobbridgeafrica.org',
+    replyTo: 'info@jobbridgeafrica.com',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: linear-gradient(to right, #16a34a, #15803d); padding: 30px; border-radius: 8px 8px 0 0;">
@@ -119,7 +119,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
           </div>
           <div style="border-top: 1px solid #e5e7eb; margin-top: 30px; padding-top: 20px;">
             <p style="color: #6b7280; font-size: 14px; margin: 0;">
-              <strong>JobBridge Africa</strong><br>📧 info@jobbridgeafrica.org<br>📞 +234 807 320 8945
+              <strong>JobBridge Africa</strong><br>📧 info@jobbridgeafrica.com<br>📞 +234 807 320 8945
             </p>
             <p style="color: #9ca3af; font-size: 12px; margin-top: 15px;">Supporting UN SDG 8: Decent Work and Economic Growth</p>
           </div>
@@ -211,7 +211,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     if (process.env.NODE_ENV !== 'production') {
       console.error('Email send error diagnostics:', JSON.stringify(diagnostics, null, 2));
     }
-    res.status(500).json({ success: false, message: 'Failed to send email. Please try again later or contact us directly at info@jobbridgeafrica.org' });
+    res.status(500).json({ success: false, message: 'Failed to send email. Please try again later or contact us directly at info@jobbridgeafrica.com' });
   }
 });
 

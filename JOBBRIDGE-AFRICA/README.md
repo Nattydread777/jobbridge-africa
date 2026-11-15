@@ -415,9 +415,10 @@ Add these to `backend/.env` for SMTP email delivery and password reset links:
 EMAIL_HOST=smtp.zoho.com
 EMAIL_PORT=587            # use 465 for SSL if 587 blocked
 EMAIL_SECURE=false        # set true if using 465
-EMAIL_USER=info@jobbridgeafrica.org
+EMAIL_USER=info@jobbridgeafrica.com
 EMAIL_PASS=<zoho_app_password>
-EMAIL_FROM=info@jobbridgeafrica.org
+EMAIL_FROM=info@jobbridgeafrica.com
+ADMIN_EMAIL=info@jobbridgeafrica.com
 FRONTEND_URL=https://jobbridgeafrica.com
 
 # CORS origins (comma-separated)
@@ -433,7 +434,7 @@ Troubleshooting:
 - Timeouts: Often host egress restrictions; try switching ports or confirm outbound rules.
 - Zoho + 2FA: Use an App Password (Zoho Mail Settings → Security → App Passwords).
 - SendGrid: Verify domain & sender identity to avoid silent drops.
-- Improve deliverability: Add SPF + DKIM records for `jobbridgeafrica.org` (recommended future step).
+- Improve deliverability: Add SPF + DKIM records for `jobbridgeafrica.com` (recommended future step).
 
 ---
 
@@ -606,7 +607,7 @@ npm run lint
 
 **Usikpedo Nathaniel (Nigeria)** — Founder, Project Manager & Software Developer
 
-- Email: [info@jobbridgeafrica.org](mailto:info@jobbridgeafrica.org)
+- Email: [info@jobbridgeafrica.com](mailto:info@jobbridgeafrica.com)
 - Website: [https://jobbridgeafrica.com](https://jobbridgeafrica.com)
 - LinkedIn: Add your profile URL here
 

@@ -48,7 +48,7 @@ const Footer = () => (
           />
           <div className="mt-3 space-y-1 text-xs text-slate-400">
             <p>+234 807 320 8945</p>
-            <a href="mailto:info@jobbridgeafrica.org" className="hover:text-amber-300">info@jobbridgeafrica.org</a>
+            <a href="mailto:info@jobbridgeafrica.com" className="hover:text-amber-300">info@jobbridgeafrica.com</a>
           </div>
         </div>
       </div>

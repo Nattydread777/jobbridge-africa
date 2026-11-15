@@ -69,9 +69,10 @@ Click **Advanced** → **Add Environment Variable** and add these one by one:
 | `CLOUDINARY_CLIENT_NAME`   | Your Cloudinary cloud name                                            | From local `.env`                   |
 | `CLOUDINARY_CLIENT_API`    | Your Cloudinary API key                                               | From local `.env`                   |
 | `CLOUDINARY_CLIENT_SECRET` | Your Cloudinary API secret                                            | From local `.env`                   |
-| `EMAIL_USER`               | `info@jobbridgeafrica.org`                                            | -                                   |
+| `EMAIL_USER`               | `info@jobbridgeafrica.com`                                            | -                                   |
 | `EMAIL_PASS`               | `pBC7sZeQYAB9`                                                        | Your Zoho app password              |
-| `EMAIL_FROM`               | `info@jobbridgeafrica.org`                                            | Optional: preferred sender address  |
+| `EMAIL_FROM`               | `info@jobbridgeafrica.com`                                            | Optional: preferred sender address  |
+| `ADMIN_EMAIL`              | `info@jobbridgeafrica.com`                                            | Contact form recipient              |
 | `CORS_ORIGIN`              | `https://jobbridgeafrica.com,https://www.jobbridgeafrica.com,https://jobbridge-africa.vercel.app` | Comma-separated frontend origins |
 | `FRONTEND_URL`             | `https://jobbridgeafrica.com`                                         | Public frontend URL for password-reset links |
 
@@ -164,7 +165,7 @@ Should return:
 3. Click **Send Message**
 4. ✅ Expected: Success message appears
 5. ✅ Check your email for:
-   - Message received at `info@jobbridgeafrica.org`
+   - Message received at `info@jobbridgeafrica.com`
    - Auto-reply sent to the email you entered
 
 ---
@@ -284,7 +285,7 @@ The backend now includes:
 
 - **Render Docs**: [https://render.com/docs](https://render.com/docs)
 - **Render Community**: [https://community.render.com](https://community.render.com)
-- **JobBridge Support**: info@jobbridgeafrica.org
+- **JobBridge Support**: info@jobbridgeafrica.com
 
 ---
 

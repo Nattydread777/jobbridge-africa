@@ -401,10 +401,10 @@ const TermsOfService = () => {
               <p>
                 📧 Email:{" "}
                 <a
-                  href="mailto:info@jobbridgeafrica.org"
+                  href="mailto:info@jobbridgeafrica.com"
                   className="text-green-600 hover:underline"
                 >
-                  info@jobbridgeafrica.org
+                  info@jobbridgeafrica.com
                 </a>
               </p>
               <p>

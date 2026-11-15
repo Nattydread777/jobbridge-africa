@@ -79,7 +79,7 @@ const UserAdmin = () => {
                       <button
                         className="bg-gray-500 text-white px-3 py-1 rounded"
                         onClick={() => handleRoleChange(user._id, "job_seeker")}
-                        disabled={user.email === "info@jobbridgeafrica.org"}
+                        disabled={user.email === "info@jobbridgeafrica.com"}
                       >
                         Demote to User
                       </button>

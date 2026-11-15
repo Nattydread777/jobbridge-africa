@@ -5,31 +5,31 @@
 ### Symptoms
 
 - ✅ Auto-reply sent successfully to user
-- ❌ Admin notification to `info@jobbridgeafrica.org` **not received**
+- ❌ Admin notification to `info@jobbridgeafrica.com` **not received**
 
 ### Root Cause Analysis
 
 SendGrid has strict sender authentication requirements:
 
 1. **Verified Sender**: The `from` address MUST be verified in SendGrid
-2. **Domain Authentication**: SPF, DKIM, and DMARC records should be configured for `jobbridgeafrica.org`
+2. **Domain Authentication**: SPF, DKIM, and DMARC records should be configured for `jobbridgeafrica.com`
 
 ### Immediate Fixes
 
 #### Option 1: Use SendGrid Verified Sender (Recommended)
 
 1. Log into SendGrid → Settings → Sender Authentication
-2. Verify `info@jobbridgeafrica.org` OR authenticate the entire `jobbridgeafrica.org` domain
+2. Verify `info@jobbridgeafrica.com` OR authenticate the entire `jobbridgeafrica.com` domain
 3. Set environment variable on Render:
    ```
-   EMAIL_FROM=info@jobbridgeafrica.org
+   EMAIL_FROM=info@jobbridgeafrica.com
    ```
 4. Ensure SendGrid accepts emails sent FROM this address
 
 #### Option 2: Check SendGrid Activity Log
 
 1. Go to SendGrid Dashboard → Activity
-2. Search for recent sends to `info@jobbridgeafrica.org`
+2. Search for recent sends to `info@jobbridgeafrica.com`
 3. Check for:
    - **Dropped**: Sender not verified
    - **Bounced**: Invalid recipient
@@ -43,12 +43,12 @@ SendGrid has strict sender authentication requirements:
 const defaultFrom =
   process.env.EMAIL_FROM ||
   process.env.EMAIL_USER ||
-  "info@jobbridgeafrica.org";
+  "info@jobbridgeafrica.com";
 
 // Admin notification
 const mailOptions = {
   from: defaultFrom,
-  to: "info@jobbridgeafrica.org", // ← Admin receives this
+  to: "info@jobbridgeafrica.com", // ← Admin receives this
   subject: `JobBridge Contact: ${subject}`,
   replyTo: email, // ← User's email for easy reply
   html: "...",
@@ -59,7 +59,7 @@ const autoReplyOptions = {
   from: defaultFrom,
   to: email, // ← User receives this ✅
   subject: "We received your message - JobBridge Africa",
-  replyTo: "info@jobbridgeafrica.org",
+  replyTo: "info@jobbridgeafrica.com",
   html: "...",
 };
 ```
@@ -67,7 +67,7 @@ const autoReplyOptions = {
 ### Required Render Environment Variables
 
 ```bash
-EMAIL_FROM=info@jobbridgeafrica.org
+EMAIL_FROM=info@jobbridgeafrica.com
 SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxxxxxxx
 ```
 
@@ -92,7 +92,7 @@ SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxxxxxxx
    Invoke-RestMethod -Method Post -Uri 'https://jobbridge-backend.onrender.com/api/contact' -ContentType 'application/json' -Body $body
    ```
    - Check if auto-reply arrives at `your-personal-email@gmail.com`
-   - Check if admin email arrives at `info@jobbridgeafrica.org` (Zoho)
+   - Check if admin email arrives at `info@jobbridgeafrica.com` (Zoho)
 
 ### Additional Checks
 
@@ -106,14 +106,14 @@ SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxxxxxxx
 #### SendGrid Suppressions
 
 ```
-SendGrid → Suppressions → Check for info@jobbridgeafrica.org
+SendGrid → Suppressions → Check for info@jobbridgeafrica.com
 ```
 
 - If found in Bounces, Blocks, or Spam Reports → Remove it
 
 ### DNS Records (Optional but Recommended)
 
-Add these to `jobbridgeafrica.org` DNS:
+Add these to `jobbridgeafrica.com` DNS:
 
 **SPF Record**:
 
@@ -126,14 +126,14 @@ TXT @ v=spf1 include:sendgrid.net ~all
 **DMARC**:
 
 ```
-TXT _dmarc v=DMARC1; p=none; rua=mailto:info@jobbridgeafrica.org
+TXT _dmarc v=DMARC1; p=none; rua=mailto:info@jobbridgeafrica.com
 ```
 
 ### Next Steps
 
 1. ✅ Added `EMAIL_FROM` to backend `.env` and `render.yaml`
-2. ⏳ Set `EMAIL_FROM=info@jobbridgeafrica.org` on Render dashboard
-3. ⏳ Verify `info@jobbridgeafrica.org` in SendGrid
+2. ⏳ Set `EMAIL_FROM=info@jobbridgeafrica.com` on Render dashboard
+3. ⏳ Verify `info@jobbridgeafrica.com` in SendGrid
 4. ⏳ Check SendGrid Activity for dropped/bounced admin emails
 5. ⏳ Redeploy backend after setting env var
 6. ✅ Pushed changes to trigger Vercel redeploy
