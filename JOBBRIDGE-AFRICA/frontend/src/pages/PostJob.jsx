@@ -239,14 +239,13 @@ const PostJob = () => {
           {/* Expiry Date */}
           <div>
             <label className="block text-sm font-medium mb-2">
-              Application Deadline <span className="text-red-500">*</span>
+              Application Deadline (optional)
             </label>
             <input
               type="date"
               name="expiryDate"
               value={formData.expiryDate}
               onChange={handleChange}
-              required
               min={new Date().toISOString().split("T")[0]}
               className="w-full border rounded px-4 py-2"
             />

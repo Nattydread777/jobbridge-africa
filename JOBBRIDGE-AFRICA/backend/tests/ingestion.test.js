@@ -56,6 +56,19 @@ test('normalizes Greenhouse-style webhook payloads and links them to the employe
   assert.equal(job.company, employer._id);
   assert.equal(job.applicationLink, 'https://jobs.example.com/jobs/456');
   assert.equal(job.pubDate.toISOString(), new Date(1781200000000).toISOString());
+  assert.equal(job.expiryDate, null);
+});
+
+test('allows jobs without an application deadline', () => {
+  const job = new Job({
+    title: 'No-deadline role',
+    companyName: 'Example Company',
+    location: 'Remote',
+    description: 'Apply while the role is available.',
+  });
+
+  assert.equal(job.expiryDate, null);
+  assert.equal(job.validateSync(), undefined);
 });
 
 test('normalizes Lever categories and rejects unsafe application URLs', () => {
@@ -102,6 +115,7 @@ test('normalizes nested Workday job-posting payloads', () => {
   assert.equal(job.jobType, 'Part-Time');
   assert.equal(job.department, 'Operations');
   assert.equal(job.sourceProvider, 'workday');
+  assert.equal(job.expiryDate.toISOString(), '2026-12-31T00:00:00.000Z');
 });
 
 test('extracts JobPosting JSON-LD from arrays and graphs, then normalizes it for the Job model', () => {
@@ -151,10 +165,19 @@ test('extracts JobPosting JSON-LD from arrays and graphs, then normalizes it for
   assert.equal(normalized.isDirectPosting, false);
   assert.equal(normalized.jobType, 'Remote');
   assert.equal(normalized.salaryRange, postings[0].salary);
+  assert.equal(normalized.expiryDate.toISOString(), '2026-12-01T00:00:00.000Z');
   const modelJob = new Job(normalized);
   assert.equal(modelJob.validateSync(), undefined);
   assert.equal(modelJob.source, 'aggregated');
   assert.equal(modelJob.department, '');
+
+  const withoutDeadline = normalizeSchemaJobPosting(
+    { ...postings[0], validThrough: null },
+    'https://careers.example.com',
+    crawledAt,
+  );
+  assert.equal(withoutDeadline.expiryDate, null);
+  assert.equal(new Job(withoutDeadline).validateSync(), undefined);
 });
 
 test('discovers configured domains without requiring sitemap URLs', () => {
@@ -269,6 +292,7 @@ test('normalizes remote API jobs with provider attribution and validates the Job
   assert.equal(normalized.sourceProvider, 'himalayas');
   assert.equal(normalized.sourceName, 'Himalayas');
   assert.equal(normalized.sourceUrl, listingUrl);
+  assert.equal(normalized.expiryDate, null);
   assert.equal(normalized.applicationLink, applyUrl);
   assert.equal(normalized.isDirectPosting, false);
   assert.equal(normalized.isWorldwideRemote, true);
@@ -374,6 +398,7 @@ test('parses MyJobMag agency listings and normalizes attribution for the Job mod
   assert.equal(normalized.sourceUrl, listings[0].detailUrl);
   assert.equal(normalized.applicationLink, listings[0].detailUrl);
   assert.equal(normalized.location, 'Lagos, Nigeria');
+  assert.equal(normalized.expiryDate, null);
   const modelJob = new Job(normalized);
   assert.equal(modelJob.validateSync(), undefined);
 });
@@ -443,6 +468,7 @@ test('parses Hubstaff Talent remote jobs and normalizes them for the Job model',
   assert.equal(normalized.salaryRange, '$25/hr');
   assert.equal(normalized.applicationLink, 'https://hubstafftalent.net/jobs/remote-product-designer/apply');
   assert.notEqual(normalized.pubDate.getTime(), new Date('2026-11-15T12:00:00Z').getTime());
+  assert.equal(normalized.expiryDate, null);
   assert.deepEqual(normalized.tags, ['Figma', 'Product Design']);
 
   const modelJob = new Job(normalized);

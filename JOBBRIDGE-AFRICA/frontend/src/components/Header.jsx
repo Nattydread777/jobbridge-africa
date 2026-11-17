@@ -184,8 +184,18 @@ const Header = () => {
         </div>
 
         {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <nav id="mobile-navigation" className="mt-3 space-y-2 border-t border-white/20 bg-charcoal pb-3 pt-3 text-white xl:hidden">
+        <nav
+          id="mobile-navigation"
+          aria-hidden={!mobileMenuOpen}
+          inert={!mobileMenuOpen}
+          className={`grid overflow-hidden text-white transition-[grid-template-rows,opacity] duration-300 ease-in-out xl:hidden ${
+            mobileMenuOpen
+              ? "mt-3 grid-rows-[1fr] border-t border-white/20 opacity-100"
+              : "mt-0 grid-rows-[0fr] border-t-0 opacity-0"
+          }`}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <div className="space-y-2 bg-charcoal pb-3 pt-3">
             <NavLink
               to="/"
               onClick={() => setMobileMenuOpen(false)}
@@ -285,8 +295,9 @@ const Header = () => {
                 Sign Up
               </NavLink>
             </div>
-          </nav>
-        )}
+              </div>
+            </div>
+        </nav>
       </div>
     </header>
   );

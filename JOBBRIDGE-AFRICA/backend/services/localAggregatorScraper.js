@@ -101,7 +101,6 @@ export const normalizeMyJobMagListing = (listing) => {
   if (!title || !companyName || !description || !listingUrl) return null;
 
   const sourceKey = createHash('sha256').update(listingUrl.toLowerCase()).digest('hex');
-  const now = new Date();
   return {
     sourceKey,
     source: 'aggregated',
@@ -121,8 +120,8 @@ export const normalizeMyJobMagListing = (listing) => {
     description,
     applicationLink: listingUrl,
     jobType: 'Full-Time',
-    pubDate: now,
-    expiryDate: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+    pubDate: new Date(),
+    expiryDate: null,
     isApproved: true,
     isActive: true,
   };

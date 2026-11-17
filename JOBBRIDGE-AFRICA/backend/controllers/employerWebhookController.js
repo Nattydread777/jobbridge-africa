@@ -153,9 +153,10 @@ export const normalizeWebhookJobPayload = (rawJob, employer, index = 0) => {
 
   const expiryDate = parseDate(
     rawJob.expiryDate || rawJob.validThrough || rawJob.deadline || jobPostingInfo.endDate,
-  )
-    || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
-  if (expiryDate <= new Date()) throw new Error(`Job at index ${index} has an expired application deadline.`);
+  );
+  if (expiryDate && expiryDate <= new Date()) {
+    throw new Error(`Job at index ${index} has an expired application deadline.`);
+  }
 
   const externalId = valueAsText(
     rawJob.id || rawJob.requisitionId || rawJob.jobRequisitionId || rawJob.externalJobId

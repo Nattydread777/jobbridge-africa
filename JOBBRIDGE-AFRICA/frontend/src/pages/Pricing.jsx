@@ -25,8 +25,8 @@ const plans = [
       "Advanced AI job matching",
       "Priority application review",
     ],
-    action: "Get started",
-    to: "/register",
+    action: "Request early access",
+    to: "/contact?subject=Early%20access%20-%20Job%20Seeker%20Pro",
     highlighted: true,
   },
   {
@@ -41,8 +41,8 @@ const plans = [
       "Custom skill recommendations",
       "Direct recruiter visibility",
     ],
-    action: "Explore career tools",
-    to: "/ai-cv-tool",
+    action: "Request early access",
+    to: "/contact?subject=Early%20access%20-%20AI%20Career%20Suite",
   },
 ];
 
@@ -113,7 +113,7 @@ const Pricing = () => (
       ))}
     </div>
     <p className="mx-auto mt-6 max-w-6xl text-xs text-stone-500">
-      Paid-plan checkout and subscription billing are not enabled yet. Contact JobBridge Africa to discuss early access.
+      Paystack and Flutterwave checkout are not enabled yet. Paid plans are shown for planning only; contact us to request early access. Do not send payment details by email.
     </p>
   </div>
 );

@@ -24,7 +24,7 @@ const jobSchema = new mongoose.Schema({
   requirements: { type: String }, // Changed from array to string for easier text input
   responsibilities: { type: String },
   benefits: { type: String },
-  expiryDate: { type: Date, required: true }, // Job application deadline
+  expiryDate: { type: Date, default: null }, // Optional job application deadline
   applicationEmail: { type: String },
   postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   isApproved: { type: Boolean, default: true },

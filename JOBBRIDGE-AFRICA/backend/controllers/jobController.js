@@ -8,6 +8,16 @@ const AFRICAN_LOCATION_PATTERN = '\\b(?:africa|algeria|angola|benin|botswana|bur
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const parseOptionalExpiryDate = (value, res) => {
+  if (value === undefined || value === null || value === '') return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    res.status(400);
+    throw new Error('Application deadline must be a valid date.');
+  }
+  return date;
+};
+
 const parseBoolean = (value, name, res) => {
   if (value === undefined) return undefined;
   if (value === 'true' || value === '1') return true;
@@ -361,10 +371,11 @@ export const createJob = asyncHandler(async (req, res) => {
     applicationEmail 
   } = req.body;
 
-  if (!title || !location || !description || !expiryDate) {
+  if (!title || !location || !description) {
     res.status(400);
     throw new Error('Please fill in all required fields');
   }
+  const parsedExpiryDate = parseOptionalExpiryDate(expiryDate, res);
   const normalizedWorkplaceType = String(workplaceType || (jobType === 'Remote' ? 'remote' : 'on-site'))
     .trim()
     .toLowerCase();
@@ -394,7 +405,7 @@ export const createJob = asyncHandler(async (req, res) => {
     requirements,
     responsibilities,
     benefits,
-    expiryDate,
+    expiryDate: parsedExpiryDate,
     applicationEmail: applicationEmail || req.user.email,
     postedBy: req.user._id,
   });
@@ -440,7 +451,9 @@ export const updateJob = asyncHandler(async (req, res) => {
   job.requirements = req.body.requirements || job.requirements;
   job.responsibilities = req.body.responsibilities || job.responsibilities;
   job.benefits = req.body.benefits || job.benefits;
-  job.expiryDate = req.body.expiryDate || job.expiryDate;
+  if (Object.prototype.hasOwnProperty.call(req.body, 'expiryDate')) {
+    job.expiryDate = parseOptionalExpiryDate(req.body.expiryDate, res);
+  }
   job.applicationEmail = req.body.applicationEmail || job.applicationEmail;
 
   const updatedJob = await job.save();

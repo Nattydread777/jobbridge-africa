@@ -98,8 +98,7 @@ const normalizeJob = (job) => {
   const categories = asList(job.categories);
   const tags = asList(job.tags);
   const seniority = asText(job.seniority || job.experienceLevel);
-  const expiryDate = asDate(job.expiryDate)
-    || new Date(safePubDate.getTime() + 90 * 24 * 60 * 60 * 1000);
+  const expiryDate = asDate(job.expiryDate);
 
   return {
     sourceKey,
@@ -139,7 +138,6 @@ const getJobsFromResponse = (payload) => {
 const seedFallbackJobs = async (reason) => {
   console.warn(`Using clearly labelled sample jobs because the external feed is unavailable: ${reason}`);
   const publishedAt = new Date();
-  const expiryDate = new Date(publishedAt.getTime() + 7 * 24 * 60 * 60 * 1000);
   const samples = [
     {
       title: 'Sample Remote Product Analyst',
@@ -192,7 +190,7 @@ const seedFallbackJobs = async (reason) => {
           categories: sample.categories,
           tags: sample.tags,
           pubDate: publishedAt,
-          expiryDate,
+          expiryDate: null,
           isApproved: true,
         },
         $setOnInsert: { sourceKey },
@@ -259,10 +257,10 @@ export const ingestHimalayasJobs = async () => {
         continue;
       }
       if (normalized.pubDate.getTime() >= Date.now() - ACTIVE_JOB_LOOKBACK_MS
-        || normalized.expiryDate >= new Date()) {
+        || (normalized.expiryDate && normalized.expiryDate >= new Date())) {
         pageIsOldAndExpired = false;
       }
-      if (normalized.expiryDate < new Date()) {
+      if (normalized.expiryDate && normalized.expiryDate < new Date()) {
         skipped += 1;
         continue;
       }

@@ -124,9 +124,8 @@ export const normalizeRemoteJob = (sourceName, rawJob) => {
     || !isWorldwideOnly(location)) return null;
 
   const pubDate = asDate(rawJob.pubDate || rawJob.publication_date || rawJob.date || rawJob.createdAt) || new Date();
-  const expiryDate = asDate(rawJob.expiryDate || rawJob.expiry_date)
-    || new Date(pubDate.getTime() + 90 * 24 * 60 * 60 * 1000);
-  if (expiryDate <= new Date()) return null;
+  const expiryDate = asDate(rawJob.expiryDate || rawJob.expiry_date);
+  if (expiryDate && expiryDate <= new Date()) return null;
 
   const companySlug = asText(rawJob.companySlug || rawJob.company_slug || rawJob.company?.slug)
     || companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');

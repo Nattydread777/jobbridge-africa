@@ -213,7 +213,10 @@ const CvOptimizerModal = ({ onClose }) => {
           </label>
 
           <label className={`w-fit rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-charcoal hover:bg-stone-100 ${readingFile ? "cursor-wait opacity-70" : "cursor-pointer"}`}>
-            {readingFile ? "Reading your document..." : "Upload CV (TXT, DOCX, PDF, or text formats)"}
+            <span className="inline-flex items-center gap-2">
+              {readingFile && <span className="h-4 w-4 animate-spin rounded-full border-2 border-stone-300 border-t-terracotta" aria-hidden="true" />}
+              {readingFile ? "Reading your document..." : "Upload CV (TXT, DOCX, PDF, or text formats)"}
+            </span>
             <input
               type="file"
               accept=".txt,.md,.csv,.html,.htm,.rtf,.docx,.pdf,text/plain,text/markdown,text/csv,text/html,application/rtf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
@@ -249,10 +252,15 @@ const CvOptimizerModal = ({ onClose }) => {
           <button
             type="submit"
             disabled={loading || !cvText.trim() || !jobDescription.trim()}
-            className="w-fit rounded-xl bg-terracotta px-6 py-3 font-bold text-white transition hover:bg-terracotta-dark disabled:cursor-not-allowed disabled:opacity-60"
+            aria-busy={loading}
+            className="inline-flex w-fit items-center gap-2 rounded-xl bg-terracotta px-6 py-3 font-bold text-white transition hover:bg-terracotta-dark disabled:cursor-not-allowed disabled:opacity-60"
           >
+            {loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" />}
             {loading ? "Reviewing your CV..." : "Review my CV"}
           </button>
+          <p aria-live="polite" className="sr-only">
+            {loading ? "Analyzing your resume and job description." : ""}
+          </p>
         </form>
 
         {result && (

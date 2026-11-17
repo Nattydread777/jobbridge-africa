@@ -19,6 +19,14 @@ const JobDetails = () => {
     resume: null,
   });
   const [submitting, setSubmitting] = useState(false);
+  const salaryLabel = [job?.salary, job?.salaryRange]
+    .map((value) => String(value || "").trim())
+    .find((value) => value && !/^competitive$/i.test(value)) || "";
+  const workMode = {
+    remote: "Remote",
+    hybrid: "Hybrid",
+    "on-site": "On-site",
+  }[job?.workplaceType] || "";
 
   useEffect(() => {
     setLoading(true);
@@ -133,8 +141,8 @@ const JobDetails = () => {
         <p className="text-xl text-gray-700 mb-2">{job.companyName}</p>
         <div className="flex flex-wrap gap-4 mb-6 text-sm text-gray-600">
           <span>📍 {job.location}</span>
-          <span>💼 {job.jobType}</span>
-          {job.salaryRange && <span>💰 {job.salaryRange}</span>}
+          <span>💼 {job.jobType}{workMode && job.jobType !== workMode ? ` · ${workMode}` : ""}</span>
+          {salaryLabel && <span>💰 {salaryLabel}</span>}
           {job.expiryDate && (
             <span>
               ⏰ Apply by: {new Date(job.expiryDate).toLocaleDateString()}

@@ -75,7 +75,7 @@ const TermsOfService = () => {
             <ul className="list-disc pl-6 space-y-2 mb-4">
               <li>
                 <strong>Job Seekers:</strong> Create profiles, upload resumes,
-                apply for jobs, and receive AI-powered matches
+                apply for jobs, and receive AI-enabled matches
               </li>
               <li>
                 <strong>Employers:</strong> Post jobs, review applications, and
@@ -228,7 +228,7 @@ const TermsOfService = () => {
               7. AI Matching and Profile Completion
             </h2>
             <p className="mb-4">
-              Our AI-powered matching system analyzes your profile data to
+              Our AI-enabled matching system analyzes your profile data to
               recommend relevant job opportunities. The accuracy of matches
               depends on the completeness and accuracy of your profile
               information.

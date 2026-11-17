@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import PropTypes from "prop-types";
+import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 
 const getRelativePostedTime = (value) => {
@@ -24,16 +25,30 @@ const getDeadlineLabel = (value) => {
   const deadline = value ? new Date(value) : null;
   return deadline && !Number.isNaN(deadline.getTime())
     ? deadline.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
-    : "Not specified";
+    : null;
 };
 
 const JobCard = ({ job }) => {
+  const [logoFailed, setLogoFailed] = useState(false);
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const isSampleListing = job.sourceProvider === "jobbridge-fallback";
   const isDirectPosting = job.source === "employer"
     || (job.source == null && job.isDirectPosting !== false);
   const postedDate = job.pubDate || job.createdAt;
+  const deadlineLabel = getDeadlineLabel(job.expiryDate);
+  const companyInitial = job.companyName?.trim()?.[0]?.toUpperCase() || "?";
+  const companyLogo = job.companyLogoUrl || job.companyLogo;
+  const jobUrl = `${window.location.origin}/jobs/${job._id}`;
+  const shareText = `${job.title} at ${job.companyName} - ${jobUrl}`;
+  const workMode = {
+    remote: "Remote",
+    hybrid: "Hybrid",
+    "on-site": "On-site",
+  }[job.workplaceType] || job.jobType;
+  const salaryLabel = [job.salary, job.salaryRange]
+    .map((value) => String(value || "").trim())
+    .find((value) => value && !/^competitive$/i.test(value)) || "";
 
   const handleApply = () => {
     if (!isAuthenticated) {
@@ -46,11 +61,29 @@ const JobCard = ({ job }) => {
   };
 
   return (
-    <div className="border p-4 rounded shadow-sm bg-white hover:shadow-md transition">
-      <h3 className="text-xl font-semibold text-primary">{job.title}</h3>
-      <p className="text-sm text-text mt-1">
-        {job.companyName} – {job.location}
-      </p>
+    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+      <div className="flex items-start gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100 text-lg font-bold text-slate-600">
+          {companyLogo && !logoFailed
+            ? <img src={companyLogo} alt={`${job.companyName} logo`} className="h-full w-full object-contain" onError={() => setLogoFailed(true)} />
+            : companyInitial}
+        </div>
+        <div className="min-w-0">
+          <h3 className="text-lg font-semibold leading-snug text-primary">{job.title}</h3>
+          <p className="mt-1 text-sm text-slate-700">{job.companyName}</p>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium">
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">📍 {job.location}</span>
+        <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-900">
+          {workMode}
+        </span>
+        {job.jobType && job.jobType !== workMode && (
+          <span className="rounded-full bg-violet-50 px-3 py-1 text-violet-900">
+            {job.jobType}
+          </span>
+        )}
+      </div>
       {isSampleListing ? (
         <p className="mt-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
           Sample listing · external feed backup
@@ -67,20 +100,20 @@ const JobCard = ({ job }) => {
           {" · Global Partner Feed"}
         </p>
       )}
-      <p className="mt-1 text-sm text-gray-600">
-        {job.jobType}
-        {job.workplaceType && ` · ${job.workplaceType.replace("-", " ")}`}
-      </p>
-      {job.salaryRange && (
-        <p className="text-sm text-gray-600 mt-1">Salary: {job.salaryRange}</p>
+      {salaryLabel && (
+        <p className="mt-2 inline-flex rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-semibold text-emerald-900">
+          💰 {salaryLabel}
+        </p>
       )}
       <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium">
         <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
           {getRelativePostedTime(postedDate)}
         </span>
-        <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-900">
-          Application deadline: {getDeadlineLabel(job.expiryDate)}
-        </span>
+        {deadlineLabel && (
+          <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-900">
+            Application deadline: {deadlineLabel}
+          </span>
+        )}
       </div>
       <p className="mt-2 text-gray-700">
         {job.description.length > 150
@@ -112,7 +145,16 @@ const JobCard = ({ job }) => {
           </button>
         ) : null}
       </div>
-    </div>
+      <a
+        href={`https://wa.me/?text=${encodeURIComponent(shareText)}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`Share ${job.title} on WhatsApp`}
+        className="mt-3 inline-flex rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50"
+      >
+        Share on WhatsApp
+      </a>
+    </article>
   );
 };
 
@@ -121,6 +163,8 @@ JobCard.propTypes = {
     _id: PropTypes.string.isRequired,
     title: PropTypes.string.isRequired,
     companyName: PropTypes.string.isRequired,
+    companyLogo: PropTypes.string,
+    companyLogoUrl: PropTypes.string,
     location: PropTypes.string.isRequired,
     jobType: PropTypes.string,
     workplaceType: PropTypes.string,

@@ -95,10 +95,15 @@ const Login = () => {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-xl bg-amber-500 px-5 py-3 font-bold text-slate-950 transition hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60"
+            aria-busy={submitting}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-5 py-3 font-bold text-slate-950 transition hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60"
           >
+            {submitting && <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" aria-hidden="true" />}
             {submitting ? "Signing you in..." : "Sign in"}
           </button>
+          <p aria-live="polite" className="sr-only">
+            {submitting ? "Signing in to your account." : ""}
+          </p>
           <p className="text-center text-sm text-slate-600">
             New to JobBridge Africa? <Link to="/register" className="font-bold text-amber-700 hover:underline">Create an account</Link>
           </p>

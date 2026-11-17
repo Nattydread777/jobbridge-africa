@@ -64,7 +64,7 @@ const PrivacyPolicy = () => {
               2.3 AI Matching Data
             </h3>
             <p>
-              Our AI-powered matching system analyzes your profile data (skills,
+              Our AI-enabled matching system analyzes your profile data (skills,
               experience, education) to connect you with relevant job
               opportunities. This processing is done securely and in accordance
               with SDG 8's goal of promoting inclusive and sustainable

@@ -10,7 +10,7 @@
 
 **🌐 Live Application:** [https://jobbridgeafrica.com](https://jobbridgeafrica.com)
 
-JobBridge Africa is a MERN-stack platform connecting African job seekers with employers, aligned with SDG 8 (Decent Work and Economic Growth). It includes candidate profiles with completion tracking, job search and application workflows, employer job posting, and AI-powered job matching.
+JobBridge Africa is a MERN-stack platform connecting African job seekers with employers, aligned with SDG 8 (Decent Work and Economic Growth). It includes candidate profiles with completion tracking, job search and application workflows, employer job posting, and AI-enabled job matching.
 
 This README documents the current system, setup, tooling, conventions, and a roadmap (monetization, in-app chat for job seekers to connect, and more).
 
@@ -122,12 +122,12 @@ Job seeker
 ### Recent Additions (2025)
 
 - Professional UI/UX overhaul: standardized fonts, headings, buttons, and layout for a modern, accessible experience
-- Interactive Dashboard: AI-powered features for job seekers
+- Interactive Dashboard: AI-enabled features for job seekers
   - Resume Analyzer: Upload resume, receive AI feedback and improvement tips
   - Smart Job Alerts: Set preferences, receive personalized job alerts
   - Interview Preparation Bot: Get AI-generated interview questions for your target roles
   - Skill Gap Analysis: Identify missing skills, get actionable course/certification recommendations, track progress
-  - Chat Assistant (coming soon): AI-powered career Q&A and support
+  - Chat Assistant (coming soon): AI-enabled career Q&A and support
 - Employer Dashboard: Candidate ranking and analytics (in progress)
 - Backend: New endpoints for all AI features (`/api/ai/analyze-resume`, `/api/ai/job-alerts`, `/api/ai/interview-questions`, `/api/ai/skill-gap`, `/api/ai/chat-assistant`, `/api/ai/rank-candidates`)
 - Improved error handling and feedback for all user actions
@@ -611,7 +611,7 @@ npm run lint
 - Website: [https://jobbridgeafrica.com](https://jobbridgeafrica.com)
 - LinkedIn: Add your profile URL here
 
-Nathaniel is a certified MERN Full‑Stack Developer and SDG 8 advocate. He leads the strategic and technical direction of JobBridge Africa, focusing on AI‑powered matching, inclusive access to decent work, and Pan‑African collaboration.
+Nathaniel is a certified MERN Full‑Stack Developer and SDG 8 advocate. He leads the strategic and technical direction of JobBridge Africa, focusing on AI-enabled matching, inclusive access to decent work, and Pan‑African collaboration.
 
 ---
 

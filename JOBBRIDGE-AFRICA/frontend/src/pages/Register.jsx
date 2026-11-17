@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ForgotPasswordModal from "../components/ForgotPasswordModal";
 import api from "../services/api";
@@ -17,8 +17,9 @@ const emptyParsed = {
 };
 
 const Register = () => {
+  const [searchParams] = useSearchParams();
   const [form, setForm] = useState({
-    name: "", email: "", password: "", role: "job_seeker",
+    name: "", email: "", password: "", role: searchParams.get("role") === "employer" ? "employer" : "job_seeker",
     companyName: "", country: "", phone: "", bio: "",
   });
   const [resume, setResume] = useState(null);
@@ -222,9 +223,13 @@ const Register = () => {
               </div>
             </>
           )}
-          <button type="submit" disabled={submitting} className="mt-2 rounded-xl bg-amber-500 px-5 py-3 font-bold text-slate-950 transition hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60 sm:col-span-2">
+          <button type="submit" disabled={submitting} aria-busy={submitting} className="mt-2 inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-5 py-3 font-bold text-slate-950 transition hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60 sm:col-span-2">
+            {submitting && <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" aria-hidden="true" />}
             {submitting ? "Creating your account..." : "Create free account"}
           </button>
+          <p aria-live="polite" className="sr-only sm:col-span-2">
+            {submitting ? "Creating your account." : ""}
+          </p>
         </form>
         <p className="mt-5 text-center text-sm text-slate-600">Already have an account? <Link to="/login" className="font-bold text-amber-700 hover:underline">Sign in</Link></p>
       </section>

@@ -147,16 +147,24 @@ const About = () => {
             </div>
           </div>
 
-          <div className="mx-auto mt-10 max-w-2xl rounded-xl bg-white/80 px-2 py-6 text-center shadow">
-            <div className="mb-4 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-primary to-orange-400 mx-auto">
-              <img src="/team/plp.jpg" alt="PLP Africa" className="h-full w-full object-cover" />
+          <div className="mt-10">
+            <h3 className="mb-5 text-center text-2xl font-extrabold text-charcoal">Our educational and cooperative partners</h3>
+            <div className="grid gap-5 md:grid-cols-2">
+              <article className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-3xl" aria-hidden="true">🎓</div>
+                <h4 className="text-lg font-bold text-charcoal">Power Learn Project (PLP) Africa</h4>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                  An educational inspiration and skills-development partner whose work to expand technology skills for African youth informs our mission.
+                </p>
+              </article>
+              <article className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center shadow-sm">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-3xl" aria-hidden="true">🤝</div>
+                <h4 className="text-lg font-bold text-charcoal">Royal Merchant MPCS</h4>
+                <p className="mt-2 text-sm leading-relaxed text-slate-700">
+                  A cooperative partner supporting pathways to micro-loans and short-course upskilling. Eligibility, availability, and terms are set by the partner.
+                </p>
+              </article>
             </div>
-            <h3 className="mb-1 text-lg font-bold text-gray-900">PLP Africa</h3>
-            <p className="mb-2 font-medium text-primary">Support & Inspiration</p>
-            <p className="text-sm text-gray-600">
-              We acknowledge the continued support of PLP Africa, whose mission to empower
-              one million African youth with tech skills inspires our work.
-            </p>
           </div>
         </section>
 

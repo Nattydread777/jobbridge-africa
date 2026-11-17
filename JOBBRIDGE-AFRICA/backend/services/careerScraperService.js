@@ -498,7 +498,7 @@ export const normalizeSchemaJobPosting = (posting, rootUrlValue, crawledAt = new
     jobType: normalizeJobType(posting.employmentType, posting.workplaceType),
     salary: posting.salary.slice(0, 500),
     salaryRange: posting.salary || 'Competitive',
-    expiryDate: posting.validThrough || new Date(crawledAt.getTime() + 90 * 24 * 60 * 60 * 1000),
+    expiryDate: posting.validThrough || null,
     ...(posting.datePosted ? { pubDate: posting.datePosted } : {}),
     applicationLink: posting.applicationUrl,
     source: 'aggregated',
@@ -528,7 +528,7 @@ const markMissingOrExpiredListings = async (rootUrl, crawledAt, seenKeys, discov
     {
       sourceProvider: provider,
       source: 'aggregated',
-      expiryDate: { $lte: crawledAt },
+      expiryDate: { $type: 'date', $lte: crawledAt },
       isActive: { $ne: false },
     },
     { $set: { isActive: false } },
@@ -547,7 +547,6 @@ const markMissingOrExpiredListings = async (rootUrl, crawledAt, seenKeys, discov
     {
       $set: {
         isActive: false,
-        expiryDate: crawledAt,
       },
     },
   );

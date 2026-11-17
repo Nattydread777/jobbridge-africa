@@ -166,7 +166,7 @@ export const normalizeHubstaffTalentListing = (listing, now = new Date()) => {
     categories: [],
     tags: Array.isArray(listing.tags) ? [...new Set(listing.tags.map(String).map(tag => tag.trim()).filter(Boolean))] : [],
     pubDate,
-    expiryDate: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+    expiryDate: null,
     isApproved: true,
     isActive: true,
   };

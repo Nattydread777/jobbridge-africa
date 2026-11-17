@@ -12,6 +12,9 @@ const Footer = () => (
           <p className="mt-3 max-w-sm text-sm leading-6 text-slate-400">
             Connecting African talent with meaningful work and opportunity worldwide.
           </p>
+          <p className="mt-4 rounded-xl border border-amber-300/40 bg-amber-300/10 p-3 text-sm font-semibold leading-6 text-amber-100">
+            Scam warning: JobBridge Africa never charges candidates an application fee.
+          </p>
           <div className="mt-3 flex gap-4 text-sm font-medium text-slate-400">
             <a href="https://facebook.com" target="_blank" rel="noreferrer" className="hover:text-amber-300">Facebook</a>
             <a href="https://twitter.com" target="_blank" rel="noreferrer" className="hover:text-amber-300">X</a>
@@ -55,7 +58,12 @@ const Footer = () => (
 
       <div className="mt-6 flex flex-col gap-2 border-t border-white/10 pt-4 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between">
         <p>© {new Date().getFullYear()} JobBridge Africa. All rights reserved.</p>
-        <p>Advancing decent work and economic growth · UN SDG 8</p>
+        <Link
+          to="/sdg-impact"
+          className="inline-flex w-fit rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 font-semibold text-emerald-200 hover:bg-emerald-300/20"
+        >
+          SDG 8 · Driving Decent Work &amp; Economic Growth across Africa
+        </Link>
         <p>By <NavLink to="/about" className="font-medium hover:text-white">Nathaniel Usikpedo</NavLink></p>
       </div>
     </div>

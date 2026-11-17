@@ -7,6 +7,7 @@ const Home = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [country, setCountry] = useState("");
   const [city, setCity] = useState("");
+  const [workplaceType, setWorkplaceType] = useState("");
   const [jobType, setJobType] = useState("All");
   const [currentSlide, setCurrentSlide] = useState(0);
   const [statsVisible, setStatsVisible] = useState(false);
@@ -22,6 +23,7 @@ const Home = () => {
     if (country) params.set("country", country);
     if (city && country !== "Worldwide") params.set("city", city);
     if (country === "Worldwide") params.set("isRemote", "true");
+    if (workplaceType) params.set("workplaceType", workplaceType);
     if (jobType && jobType !== "All") params.set("jobType", jobType);
     navigate(`/jobs${params.size ? `?${params.toString()}` : ""}`);
   };
@@ -54,10 +56,11 @@ const Home = () => {
       });
     }, observerOptions);
 
-    if (statsRef.current) statsObserver.observe(statsRef.current);
+    const statsElement = statsRef.current;
+    if (statsElement) statsObserver.observe(statsElement);
 
     return () => {
-      if (statsRef.current) statsObserver.unobserve(statsRef.current);
+      if (statsElement) statsObserver.unobserve(statsElement);
     };
   }, [statsVisible]);
 
@@ -69,6 +72,9 @@ const Home = () => {
     const featuresSection = document.getElementById("features-section");
     featuresSection?.scrollIntoView({ behavior: "smooth" });
   };
+  const selectedCountry = Array.isArray(locations)
+    ? locations.find((location) => location.country === country)
+    : null;
 
   return (
     <div className="bg-neutral">
@@ -111,7 +117,7 @@ const Home = () => {
                   Find Your Dream Job in Africa
                 </h1>
                 <p className="text-sm sm:text-base md:text-lg mb-4 md:mb-8 text-gray-100 max-w-2xl mx-auto leading-relaxed">
-                  AI-powered matching connecting African youth and professionals
+                  AI-enabled matching connecting African youth and professionals
                   with decent work opportunities across the continent.
                 </p>
                 <form
@@ -143,7 +149,7 @@ const Home = () => {
                     ))}
                   </div>
 
-                  <div className="grid grid-cols-1 gap-1.5 mb-1.5 md:mb-0 md:grid-cols-4 md:gap-4">
+                  <div className="grid grid-cols-1 gap-1.5 mb-1.5 md:mb-0 md:grid-cols-5 md:gap-4">
                     <label className="flex items-center md:border-r md:border-gray-300 md:pr-4">
                       <span className="sr-only">Job title or keyword</span>
                       <span
@@ -170,7 +176,7 @@ const Home = () => {
                         className="w-full p-1.5 md:p-2 rounded bg-white/80 text-gray-800 text-sm md:text-base"
                       >
                         <option value="">All locations</option>
-                        {locations.map((loc) => (
+                        {(Array.isArray(locations) ? locations : []).map((loc) => (
                           <option key={loc.country} value={loc.country}>
                             {loc.country}
                           </option>
@@ -188,15 +194,25 @@ const Home = () => {
                         className="w-full p-1.5 md:p-2 rounded bg-white/80 text-gray-800 text-sm md:text-base"
                       >
                         <option value="">All cities</option>
-                        {locations
-                          .find((l) => l.country === country)
-                          ?.cities?.map((c) => (
+                        {(Array.isArray(selectedCountry?.cities) ? selectedCountry.cities : []).map((c) => (
                             <option key={c} value={c}>
                               {c}
                             </option>
                           ))}
                       </select>
                     </div>
+
+                    <select
+                      value={workplaceType}
+                      onChange={(event) => setWorkplaceType(event.target.value)}
+                      aria-label="Work mode"
+                      className="w-full rounded bg-white/80 p-1.5 text-sm text-gray-800 md:p-2 md:text-base"
+                    >
+                      <option value="">Any work mode</option>
+                      <option value="remote">Remote</option>
+                      <option value="hybrid">Hybrid</option>
+                      <option value="on-site">On-site</option>
+                    </select>
 
                     <button
                       type="submit"
@@ -211,6 +227,7 @@ const Home = () => {
                     <button
                       type="button"
                       onClick={() => setSearchTerm("Software Engineer")}
+                      aria-pressed={searchTerm === "Software Engineer"}
                       className="underline hover:text-gray-800"
                     >
                       Software Engineer
@@ -219,6 +236,7 @@ const Home = () => {
                     <button
                       type="button"
                       onClick={() => setSearchTerm("Data Analyst")}
+                      aria-pressed={searchTerm === "Data Analyst"}
                       className="underline hover:text-gray-800"
                     >
                       Data Analyst
@@ -227,6 +245,7 @@ const Home = () => {
                     <button
                       type="button"
                       onClick={() => setSearchTerm("Product Manager")}
+                      aria-pressed={searchTerm === "Product Manager"}
                       className="underline hover:text-gray-800"
                     >
                       Product Manager

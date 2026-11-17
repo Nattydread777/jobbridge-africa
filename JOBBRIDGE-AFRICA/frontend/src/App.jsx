@@ -59,6 +59,7 @@ function App() {
                 element={<PanAfricanNetwork />}
               />
               <Route path="/sdg-impact" element={<SDGImpact />} />
+              <Route path="/mission" element={<SDGImpact />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/upload-resume" element={<UploadResume />} />

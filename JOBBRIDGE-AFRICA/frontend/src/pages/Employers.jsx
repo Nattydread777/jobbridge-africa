@@ -1,8 +1,24 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import PageBreadcrumb from "../components/PageBreadcrumb";
 
-const Employers = () => (
-  <>
+const Employers = () => {
+  const { isAuthenticated, loading, user } = useAuth();
+  const [showSignupModal, setShowSignupModal] = useState(false);
+  const navigate = useNavigate();
+
+  const handlePostJob = () => {
+    if (loading) return;
+    if (isAuthenticated && user?.role === "employer") {
+      navigate("/post-job");
+      return;
+    }
+    setShowSignupModal(true);
+  };
+
+  return (
+    <>
     <PageBreadcrumb />
     <main className="w-full px-4 pb-16 pt-8 sm:px-6 md:px-10 xl:px-14">
       <div className="mx-auto max-w-screen-2xl">
@@ -19,12 +35,14 @@ const Employers = () => (
               job listings and relevant candidate matching.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
-              <Link
-                to="/post-job"
+              <button
+                type="button"
+                onClick={handlePostJob}
+                disabled={loading}
                 className="rounded-xl bg-amber-400 px-5 py-3 font-bold text-charcoal transition hover:bg-amber-300"
               >
-                Post a job
-              </Link>
+                {loading ? "Checking access..." : "Post a job"}
+              </button>
               <Link
                 to="/contact"
                 className="rounded-xl border border-white/30 px-5 py-3 font-semibold text-white transition hover:bg-white/10"
@@ -52,7 +70,65 @@ const Employers = () => (
         </section>
       </div>
     </main>
+    {showSignupModal && (
+      <div
+        className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setShowSignupModal(false);
+        }}
+      >
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="employer-signup-title"
+          className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl sm:p-8"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-wide text-terracotta">Employer access</p>
+              <h2 id="employer-signup-title" className="mt-2 text-2xl font-black text-charcoal">
+                {isAuthenticated ? "Employer account required" : "Ready to hire?"}
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSignupModal(false)}
+              aria-label="Close employer sign-up dialog"
+              className="rounded-lg px-3 py-1 text-2xl text-slate-500 hover:bg-slate-100"
+            >
+              ×
+            </button>
+          </div>
+          <p className="mt-3 leading-relaxed text-slate-600">
+            {isAuthenticated
+              ? "Job posting is available to employer accounts. Contact our team if you need help setting up your organization."
+              : "Create a free employer account to post a role and connect with African talent."}
+          </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            {!isAuthenticated && (
+              <Link
+                to="/register?role=employer"
+                onClick={() => setShowSignupModal(false)}
+                className="rounded-xl bg-terracotta px-5 py-3 text-center font-bold text-white hover:bg-terracotta-dark"
+              >
+                Sign up as an employer
+              </Link>
+            )}
+            {isAuthenticated ? (
+              <Link to="/contact" onClick={() => setShowSignupModal(false)} className="rounded-xl bg-terracotta px-5 py-3 text-center font-bold text-white hover:bg-terracotta-dark">
+                Contact support
+              </Link>
+            ) : (
+              <Link to="/login" onClick={() => setShowSignupModal(false)} className="rounded-xl border border-slate-300 px-5 py-3 text-center font-semibold text-slate-700 hover:bg-slate-50">
+                I already have an account
+              </Link>
+            )}
+          </div>
+        </section>
+      </div>
+    )}
   </>
-);
+  );
+};
 
 export default Employers;

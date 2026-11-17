@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../services/api";
 import PageBreadcrumb from "../components/PageBreadcrumb";
 
 const Contact = () => {
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    subject: "",
+    subject: searchParams.get("subject") || "",
     message: "",
   });
   const [status, setStatus] = useState({ type: "", message: "" });
@@ -101,11 +103,12 @@ const Contact = () => {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="contact-name" className="block text-sm font-medium text-gray-700 mb-2">
                   Your Name <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
+                  id="contact-name"
                   required
                   value={formData.name}
                   onChange={(e) =>
@@ -117,11 +120,12 @@ const Contact = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="contact-email" className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="email"
+                  id="contact-email"
                   required
                   value={formData.email}
                   onChange={(e) =>
@@ -133,11 +137,12 @@ const Contact = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="contact-subject" className="block text-sm font-medium text-gray-700 mb-2">
                   Subject <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
+                  id="contact-subject"
                   required
                   value={formData.subject}
                   onChange={(e) =>
@@ -149,10 +154,11 @@ const Contact = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="contact-message" className="block text-sm font-medium text-gray-700 mb-2">
                   Message <span className="text-red-500">*</span>
                 </label>
                 <textarea
+                  id="contact-message"
                   required
                   rows={6}
                   value={formData.message}
@@ -262,34 +268,26 @@ const Contact = () => {
             </div>
 
             {/* FAQ */}
-            <div className="bg-gradient-to-br from-green-50 to-yellow-50 rounded-lg shadow-md p-8 border border-green-100">
+            <section className="bg-gradient-to-br from-green-50 to-yellow-50 rounded-lg shadow-md p-8 border border-green-100">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">
                 Frequently Asked
               </h2>
-              <ul className="space-y-3 text-sm text-gray-700">
-                <li className="flex items-start">
-                  <span className="text-green-600 mr-2">•</span>
-                  <span>
-                    <strong>For Job Seekers:</strong> Profile issues,
-                    application status, resume tips
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-green-600 mr-2">•</span>
-                  <span>
-                    <strong>For Employers:</strong> Job posting help, candidate
-                    search, billing questions
-                  </span>
-                </li>
-                <li className="flex items-start">
-                  <span className="text-green-600 mr-2">•</span>
-                  <span>
-                    <strong>General:</strong> Platform features, partnerships,
-                    feedback
-                  </span>
-                </li>
-              </ul>
-            </div>
+              <div className="space-y-3">
+                {[
+                  ["For job seekers", "For profile, resume, or application support, include the job title and the email on your account. Applications for partner-feed jobs are handled on the employer’s official website."],
+                  ["For employers", "Contact us with your organization name and the role you are trying to post. Employer job postings are available to registered employer accounts."],
+                  ["Plans and payments", "Paid-plan checkout is not enabled yet. Use the early-access request form; never send card or bank details by email."],
+                  ["Fees and safety", "JobBridge Africa never charges candidates an application fee. Report anyone asking you to pay to apply."],
+                ].map(([question, answer]) => (
+                  <details key={question} className="rounded-xl border border-green-200 bg-white/80 p-4">
+                    <summary className="cursor-pointer font-semibold text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-green-700">
+                      {question}
+                    </summary>
+                    <p className="mt-3 text-sm leading-relaxed text-gray-700">{answer}</p>
+                  </details>
+                ))}
+              </div>
+            </section>
           </div>
         </div>
       </div>
