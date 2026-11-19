@@ -156,6 +156,9 @@ const About = () => {
                 <p className="mt-2 text-sm leading-relaxed text-slate-600">
                   An educational inspiration and skills-development partner whose work to expand technology skills for African youth informs our mission.
                 </p>
+                <a href="https://powerlearnproject.org" target="_blank" rel="noreferrer" className="mt-3 inline-block font-semibold text-terracotta underline">
+                  Visit Power Learn Project
+                </a>
               </article>
               <article className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center shadow-sm">
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-3xl" aria-hidden="true">🤝</div>
@@ -165,6 +168,15 @@ const About = () => {
                 </p>
               </article>
             </div>
+          </div>
+        </section>
+
+        <section className="mb-10 rounded-3xl border border-slate-200 bg-white p-7 shadow-sm md:p-10">
+          <h2 className="text-2xl font-bold text-charcoal">Registration and business details</h2>
+          <p className="mt-3 leading-relaxed text-slate-700">JobBridge Africa is the name of this employment platform. A separate legal entity name, business registration number, and registered street address for JobBridge Africa have not been provided for publication; contact us at <a className="font-semibold text-terracotta underline" href="mailto:info@jobbridgeafrica.com">info@jobbridgeafrica.com</a> for organizational enquiries.</p>
+          <div className="mt-5 rounded-2xl bg-amber-50 p-5">
+            <h3 className="font-bold text-slate-900">Cooperative partner registration</h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-700">Royal Merchant Multipurpose Cooperative Society Ltd Ughelli reports registration with Delta State Trade and Commerce, Asaba, on 9 January 2023. A registration number and street address were not supplied. See the <a href="/royal-merchant" className="font-semibold text-terracotta underline">cooperative study-support page</a> for partner disclosures and terms.</p>
           </div>
         </section>
 

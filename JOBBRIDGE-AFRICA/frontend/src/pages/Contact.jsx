@@ -10,6 +10,7 @@ const Contact = () => {
     email: "",
     subject: searchParams.get("subject") || "",
     message: "",
+    website: "",
   });
   const [status, setStatus] = useState({ type: "", message: "" });
   const [loading, setLoading] = useState(false);
@@ -56,7 +57,7 @@ const Contact = () => {
         message:
           "Thank you! Your message has been sent successfully. We'll get back to you soon.",
       });
-      setFormData({ name: "", email: "", subject: "", message: "" });
+      setFormData({ name: "", email: "", subject: "", message: "", website: "" });
     } catch (error) {
       setStatus({
         type: "error",
@@ -102,6 +103,18 @@ const Contact = () => {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="absolute -left-[9999px]" aria-hidden="true">
+                <label htmlFor="contact-website">Leave this field empty</label>
+                <input
+                  id="contact-website"
+                  name="website"
+                  type="text"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={formData.website}
+                  onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                />
+              </div>
               <div>
                 <label htmlFor="contact-name" className="block text-sm font-medium text-gray-700 mb-2">
                   Your Name <span className="text-red-500">*</span>
@@ -215,6 +228,16 @@ const Contact = () => {
                     >
                       info@jobbridgeafrica.com
                     </a>
+                  </div>
+
+                  <div className="flex items-start">
+                    <span className="mr-3 mt-1 text-xl text-green-600" aria-hidden="true">💬</span>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">WhatsApp</h3>
+                      <a href="https://wa.me/2348073208945" target="_blank" rel="noreferrer" className="text-green-600 hover:underline">
+                        Message JobBridge Africa
+                      </a>
+                    </div>
                   </div>
                 </div>
 

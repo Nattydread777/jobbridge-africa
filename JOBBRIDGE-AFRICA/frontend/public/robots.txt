@@ -1,4 +1,15 @@
 User-agent: *
 Allow: /
+Disallow: /login
+Disallow: /register
+Disallow: /dashboard
+Disallow: /employer-dashboard
+Disallow: /profile
+Disallow: /profile-view
+Disallow: /my-jobs
+Disallow: /post-job
+Disallow: /admin/
+Disallow: /reset-password/
+Disallow: /verify-email/
 
 Sitemap: https://jobbridgeafrica.com/sitemap.xml

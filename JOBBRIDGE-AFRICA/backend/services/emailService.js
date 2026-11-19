@@ -120,3 +120,30 @@ export const sendPasswordResetEmail = async ({ recipient, name, resetUrl }) => {
       <p>This link expires in 60 minutes and can only be used once. If you did not request this, you can ignore this email.</p>`,
   });
 };
+
+export const sendEmailVerification = async ({ recipient, name, verificationUrl }) => {
+  if (!recipient || !verificationUrl) {
+    throw new Error('Email verification requires a recipient and verification URL.');
+  }
+  const transporter = createTransporter();
+  const safeName = escapeHtml(name || 'there');
+  const safeUrl = escapeHtml(verificationUrl);
+
+  return transporter.sendMail({
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+    to: recipient,
+    subject: 'Verify your JobBridge Africa email',
+    text: [
+      `Hello ${name || 'there'},`,
+      '',
+      'Confirm your email address to activate your JobBridge Africa account.',
+      `Verify your email: ${verificationUrl}`,
+      '',
+      'This link expires in 24 hours. If you did not create an account, you can ignore this email.',
+    ].join('\n'),
+    html: `<p>Hello ${safeName},</p>
+      <p>Confirm your email address to activate your JobBridge Africa account.</p>
+      <p><a href="${safeUrl}">Verify your email</a></p>
+      <p>This link expires in 24 hours. If you did not create an account, you can ignore this email.</p>`,
+  });
+};

@@ -16,11 +16,12 @@ const applicationSchema = new mongoose.Schema({
   },
   resumeUrl: { 
     type: String, 
-    required: true 
+    default: ''
   },
   resumePublicId: { 
     type: String 
   },
+  resumeDeletedAt: { type: Date },
   status: {
     type: String,
     enum: ['pending', 'reviewed', 'shortlisted', 'rejected', 'accepted'],

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import PageBreadcrumb from "../components/PageBreadcrumb";
+import { updatePageMetadata } from "../utils/pageMetadata";
 
 const JobDetails = () => {
   const { id } = useParams();
@@ -19,6 +20,12 @@ const JobDetails = () => {
     resume: null,
   });
   const [submitting, setSubmitting] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("inaccurate");
+  const [reportDetails, setReportDetails] = useState("");
+  const [reportEmail, setReportEmail] = useState("");
+  const [reportStatus, setReportStatus] = useState("");
+  const [reporting, setReporting] = useState(false);
   const salaryLabel = [job?.salary, job?.salaryRange]
     .map((value) => String(value || "").trim())
     .find((value) => value && !/^competitive$/i.test(value)) || "";
@@ -27,6 +34,22 @@ const JobDetails = () => {
     hybrid: "Hybrid",
     "on-site": "On-site",
   }[job?.workplaceType] || "";
+  const postedDate = job?.pubDate || job?.createdAt;
+  const postedTimestamp = postedDate ? new Date(postedDate).getTime() : Number.NaN;
+  const postedDays = Number.isNaN(postedTimestamp)
+    ? null
+    : Math.max(0, Math.floor((Date.now() - postedTimestamp) / 86400000));
+  const sourceLabel = job?.sourceName || job?.sourceProvider || (job?.source === "employer" ? "Direct employer" : "External source");
+  const remoteScope = job?.locationRestriction || job?.location || "";
+  const isGlobalRemote = /\b(worldwide|global(?:ly)?|anywhere|any location)\b/i.test(remoteScope);
+  const remoteEligibilityLabel = isGlobalRemote
+    ? "Global"
+    : remoteScope && !/\bremote\b/i.test(remoteScope)
+      ? remoteScope
+      : "eligibility not specified";
+  const remoteEligibility = job?.isRemote || job?.workplaceType === "remote" || job?.jobType === "Remote"
+    ? `Remote – ${remoteEligibilityLabel}`
+    : "";
 
   useEffect(() => {
     setLoading(true);
@@ -34,6 +57,15 @@ const JobDetails = () => {
       .get(`/jobs/${id}`)
       .then((res) => {
         setJob(res.data);
+        const title = `${res.data.title} at ${res.data.companyName} | JobBridge Africa`;
+        const description = String(res.data.excerpt || res.data.fullDescription || res.data.description || "")
+          .replace(/\s+/g, " ")
+          .slice(0, 155);
+        updatePageMetadata({
+          title,
+          description: description || `View ${res.data.title} at ${res.data.companyName} on JobBridge Africa.`,
+          path: location.pathname,
+        });
         setLoading(false);
         // Auto-open the application form when arriving from a listing CTA.
         const isDirectPosting = res.data.source === "employer"
@@ -47,7 +79,7 @@ const JobDetails = () => {
         setError("Failed to load job details. Please try again.");
         setLoading(false);
       });
-  }, [id, location.hash, isAuthenticated, user, navigate]);
+  }, [id, location.hash, location.pathname, isAuthenticated, user, navigate]);
 
   const handleApplyClick = () => {
     if (job && job.source !== "employer" && job.isDirectPosting !== true) return;
@@ -126,6 +158,26 @@ const JobDetails = () => {
     }
   };
 
+  const handleReportSubmit = async (event) => {
+    event.preventDefault();
+    setReporting(true);
+    setReportStatus("");
+    try {
+      const { data } = await api.post(`/jobs/${id}/report`, {
+        reason: reportReason,
+        details: reportDetails,
+        email: reportEmail,
+      });
+      setReportStatus(data.message);
+      setReportDetails("");
+      setReportEmail("");
+    } catch (requestError) {
+      setReportStatus(requestError.response?.data?.message || "We couldn't submit this report. Please try again.");
+    } finally {
+      setReporting(false);
+    }
+  };
+
   if (loading)
     return <div className="max-w-4xl mx-auto p-6">Loading job details...</div>;
   if (error)
@@ -142,7 +194,10 @@ const JobDetails = () => {
         <div className="flex flex-wrap gap-4 mb-6 text-sm text-gray-600">
           <span>📍 {job.location}</span>
           <span>💼 {job.jobType}{workMode && job.jobType !== workMode ? ` · ${workMode}` : ""}</span>
+          {remoteEligibility && <span>{remoteEligibility}</span>}
           {salaryLabel && <span>💰 {salaryLabel}</span>}
+          {postedDays !== null && <span>Posted {postedDays} {postedDays === 1 ? "day" : "days"} ago</span>}
+          <span>Source: {sourceLabel}</span>
           {job.expiryDate && (
             <span>
               ⏰ Apply by: {new Date(job.expiryDate).toLocaleDateString()}
@@ -155,14 +210,14 @@ const JobDetails = () => {
           </p>
         ) : job.source !== "employer" && job.isDirectPosting !== true && (
           <p className="mb-6 rounded-lg bg-amber-50 p-4 text-sm text-amber-950">
-            This is an external {job.isWorldwideRemote ? "worldwide remote" : "Africa-accessible remote"} listing
+            This is an external {isGlobalRemote ? "worldwide remote" : `remote listing with eligibility: ${remoteEligibilityLabel}`} listing
             from our Worldwide Remote Network. Applications are handled on the official employer career site.
           </p>
         )}
 
         <div className="mb-6">
           <h2 className="text-2xl font-bold mb-3">Job Description</h2>
-          <p className="text-gray-700 whitespace-pre-line">{job.description}</p>
+          <p className="text-gray-700 whitespace-pre-line">{job.fullDescription || job.description}</p>
         </div>
 
         {job.requirements && (
@@ -171,6 +226,13 @@ const JobDetails = () => {
             <p className="text-gray-700 whitespace-pre-line">
               {job.requirements}
             </p>
+          </div>
+        )}
+
+        {job.qualifications && (
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold mb-3">Qualifications</h2>
+            <p className="text-gray-700 whitespace-pre-line">{job.qualifications}</p>
           </div>
         )}
 
@@ -190,18 +252,24 @@ const JobDetails = () => {
           </div>
         )}
 
-        {job.applicationEmail && (
+        {(job.applicationInstructions || job.applicationEmail) && (
           <div className="mb-6">
-            <p className="text-gray-600">
-              <strong>How to Apply:</strong> Send your application to{" "}
-              <a
-                href={`mailto:${job.applicationEmail}`}
-                className="text-primary hover:underline"
-              >
-                {job.applicationEmail}
-              </a>
-            </p>
+            <h2 className="mb-2 text-2xl font-bold">How to Apply</h2>
+            {job.applicationInstructions && <p className="mb-2 whitespace-pre-line text-gray-700">{job.applicationInstructions}</p>}
+            {job.applicationEmail && (
+              <p className="text-gray-600">
+                Send your application to{" "}
+                <a href={`mailto:${job.applicationEmail}`} className="text-primary hover:underline">
+                  {job.applicationEmail}
+                </a>
+              </p>
+            )}
           </div>
+        )}
+        {job.applicationLink && (
+          <p className="mb-6 break-all text-sm text-gray-600">
+            Application link: <a href={job.applicationLink} target="_blank" rel="noopener noreferrer" className="text-primary underline">{job.applicationLink}</a>
+          </p>
         )}
 
         <div className="flex gap-4">
@@ -242,7 +310,48 @@ const JobDetails = () => {
             Browse More Jobs
           </Link>
         </div>
+        <button type="button" onClick={() => setReportOpen(true)} className="mt-6 text-sm font-semibold text-red-700 underline hover:text-red-900">
+          Report this job
+        </button>
       </div>
+
+      {reportOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="job-report-title" className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="job-report-title" className="text-2xl font-bold">Report this job</h2>
+                <p className="mt-1 text-sm text-slate-600">Tell us what should be reviewed.</p>
+              </div>
+              <button type="button" onClick={() => setReportOpen(false)} aria-label="Close report dialog" className="text-2xl text-slate-500">×</button>
+            </div>
+            {reportStatus && <p role="status" className="mt-4 rounded-lg bg-slate-100 p-3 text-sm">{reportStatus}</p>}
+            <form onSubmit={handleReportSubmit} className="mt-4 space-y-4">
+              <label className="block text-sm font-semibold">
+                Reason
+                <select value={reportReason} onChange={(event) => setReportReason(event.target.value)} className="mt-1 w-full rounded-lg border p-3">
+                  <option value="inaccurate">Inaccurate information</option>
+                  <option value="scam">Possible scam or unsafe request</option>
+                  <option value="misleading">Misleading or discriminatory</option>
+                  <option value="expired">Expired or no longer available</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+              <label className="block text-sm font-semibold">
+                Details (optional)
+                <textarea value={reportDetails} onChange={(event) => setReportDetails(event.target.value)} maxLength={2000} rows={4} className="mt-1 w-full rounded-lg border p-3" />
+              </label>
+              <label className="block text-sm font-semibold">
+                Email for follow-up (optional)
+                <input type="email" value={reportEmail} onChange={(event) => setReportEmail(event.target.value)} className="mt-1 w-full rounded-lg border p-3" />
+              </label>
+              <button type="submit" disabled={reporting} className="rounded-lg bg-red-700 px-5 py-3 font-semibold text-white disabled:opacity-60">
+                {reporting ? "Submitting…" : "Submit report"}
+              </button>
+            </form>
+          </section>
+        </div>
+      )}
 
       {/* Application Modal */}
       {showApplicationModal && (

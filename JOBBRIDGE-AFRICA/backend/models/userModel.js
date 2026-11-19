@@ -5,6 +5,11 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
+  emailVerified: { type: Boolean, default: true },
+  emailVerificationToken: { type: String, select: false },
+  emailVerificationExpires: { type: Date, select: false },
+  termsAcceptedAt: { type: Date },
+  privacyAcceptedAt: { type: Date },
   role: {
     type: String,
     enum: ['job_seeker', 'employer', 'admin'],

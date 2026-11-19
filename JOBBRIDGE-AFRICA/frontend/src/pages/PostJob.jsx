@@ -16,8 +16,10 @@ const PostJob = () => {
     salaryRange: "",
     description: "",
     requirements: "",
+    qualifications: "",
     responsibilities: "",
     benefits: "",
+    applicationInstructions: "",
     expiryDate: "",
     applicationEmail: user?.email || "",
   });
@@ -42,9 +44,12 @@ const PostJob = () => {
         workplaceType: formData.workplaceType,
         salaryRange: formData.salaryRange,
         description: formData.description,
+        fullDescription: formData.description,
         requirements: formData.requirements,
+        qualifications: formData.qualifications,
         responsibilities: formData.responsibilities,
         benefits: formData.benefits,
+        applicationInstructions: formData.applicationInstructions,
         expiryDate: formData.expiryDate,
         applicationEmail: formData.applicationEmail,
       };
@@ -92,6 +97,18 @@ const PostJob = () => {
             />
           </div>
 
+          <div>
+            <label className="mb-2 block text-sm font-medium">Qualifications</label>
+            <textarea
+              name="qualifications"
+              value={formData.qualifications}
+              onChange={handleChange}
+              rows="3"
+              className="w-full rounded border px-4 py-2"
+              placeholder="Additional education, certification, or experience criteria..."
+            />
+          </div>
+
           {/* Company Name */}
           <div>
             <label className="block text-sm font-medium mb-2">
@@ -104,6 +121,18 @@ const PostJob = () => {
               onChange={handleChange}
               required
               className="w-full border rounded px-4 py-2"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-medium">Application instructions</label>
+            <textarea
+              name="applicationInstructions"
+              value={formData.applicationInstructions}
+              onChange={handleChange}
+              rows="3"
+              className="w-full rounded border px-4 py-2"
+              placeholder="Include documents to submit and any steps candidates should follow..."
             />
           </div>
 

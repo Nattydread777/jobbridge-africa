@@ -1,19 +1,33 @@
 import asyncHandler from 'express-async-handler';
 import { createHash, randomBytes } from 'node:crypto';
+import { OAuth2Client } from 'google-auth-library';
 import User from '../models/userModel.js';
 import generateToken from '../utils/generateToken.js';
 import cloudinary from '../config/cloudinary.js';
-import { isEmailConfigured, sendPasswordResetEmail } from '../services/emailService.js';
+import {
+  isEmailConfigured,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+} from '../services/emailService.js';
+import Application from '../models/Application.js';
 
 export const registerUser = asyncHandler(async (req, res) => {
   const {
     name, email, password, role, companyName, country, phone, bio,
-    skills, education, experience,
+    skills, education, experience, termsAccepted, privacyAccepted,
   } = req.body;
 
   if (!name || !email || !password || !role) {
     res.status(400);
     throw new Error('Please fill in all required fields.');
+  }
+  if (typeof password !== 'string' || password.length < 8 || password.length > 128) {
+    res.status(400);
+    throw new Error('Password must be between 8 and 128 characters.');
+  }
+  if (termsAccepted !== true || privacyAccepted !== true) {
+    res.status(400);
+    throw new Error('Accept the Terms of Use and Privacy Policy to create an account.');
   }
 
   const userExists = await User.findOne({ email });
@@ -27,11 +41,18 @@ export const registerUser = asyncHandler(async (req, res) => {
     throw new Error('Choose a valid account type.');
   }
 
+  const verificationToken = randomBytes(32).toString('hex');
+  const acceptedAt = new Date();
   const user = await User.create({
     name: name.trim(),
     email: email.trim().toLowerCase(),
     password,
     role,
+    emailVerified: false,
+    emailVerificationToken: createHash('sha256').update(verificationToken).digest('hex'),
+    emailVerificationExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    termsAcceptedAt: acceptedAt,
+    privacyAcceptedAt: acceptedAt,
     companyName,
     ...(role === 'job_seeker' && {
       country,
@@ -44,19 +65,23 @@ export const registerUser = asyncHandler(async (req, res) => {
   });
 
   if (user) {
-    generateToken(res, user._id);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const verificationUrl = new URL(`/verify-email/${verificationToken}`, frontendUrl).toString();
+    try {
+      await sendEmailVerification({
+        recipient: user.email,
+        name: user.name,
+        verificationUrl,
+      });
+    } catch (error) {
+      console.error('Email verification delivery failed:', error.message);
+      return res.status(503).json({
+        message: 'Your account was created, but the verification email could not be sent. Request a new email when delivery is available.',
+      });
+    }
     res.status(201).json({
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      country: user.country,
-      phone: user.phone,
-      bio: user.bio,
-      skills: user.skills,
-      education: user.education,
-      experience: user.experience,
-      resumeUrl: user.resumeUrl,
+      message: 'Account created. Check your email for a verification link to finish registration.',
+      verificationRequired: true,
     });
   } else {
     res.status(400);
@@ -66,9 +91,13 @@ export const registerUser = asyncHandler(async (req, res) => {
 
 export const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email: String(email || '').trim().toLowerCase() });
 
   if (user && await user.matchPassword(password)) {
+    if (user.emailVerified === false) {
+      res.status(403);
+      throw new Error('Verify your email before signing in. You can request a new verification email.');
+    }
     generateToken(res, user._id);
     res.status(200).json({
       _id: user._id,
@@ -80,6 +109,117 @@ export const loginUser = asyncHandler(async (req, res) => {
     res.status(401);
     throw new Error('Invalid email or password');
   }
+});
+
+export const verifyEmail = asyncHandler(async (req, res) => {
+  const { token } = req.params;
+  if (typeof token !== 'string' || !/^[a-f0-9]{64}$/i.test(token)) {
+    res.status(400);
+    throw new Error('This verification link is invalid or has expired.');
+  }
+  const hashedToken = createHash('sha256').update(token).digest('hex');
+  const user = await User.findOne({
+    emailVerificationToken: hashedToken,
+    emailVerificationExpires: { $gt: new Date() },
+  }).select('+emailVerificationToken +emailVerificationExpires');
+  if (!user) {
+    res.status(400);
+    throw new Error('This verification link is invalid or has expired.');
+  }
+  user.emailVerified = true;
+  user.emailVerificationToken = undefined;
+  user.emailVerificationExpires = undefined;
+  await user.save();
+  res.json({ message: 'Your email is verified. You can now sign in.' });
+});
+
+export const resendVerificationEmail = asyncHandler(async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    res.status(400);
+    throw new Error('Enter a valid email address.');
+  }
+  const genericMessage = 'If an unverified account exists for that email, a verification link will be sent.';
+  const user = await User.findOne({ email }).select('+emailVerificationToken +emailVerificationExpires');
+  if (!user || user.emailVerified !== false) {
+    return res.json({ message: genericMessage });
+  }
+  if (!isEmailConfigured()) {
+    res.status(503);
+    throw new Error('Email verification is temporarily unavailable. Please try again later.');
+  }
+  const token = randomBytes(32).toString('hex');
+  user.emailVerificationToken = createHash('sha256').update(token).digest('hex');
+  user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  await user.save();
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const verificationUrl = new URL(`/verify-email/${token}`, frontendUrl).toString();
+  await sendEmailVerification({ recipient: user.email, name: user.name, verificationUrl });
+  res.json({ message: genericMessage });
+});
+
+export const googleAuth = asyncHandler(async (req, res) => {
+  if (!process.env.GOOGLE_CLIENT_ID) {
+    res.status(503);
+    throw new Error('Google sign-in is not configured.');
+  }
+  const credential = req.body?.credential;
+  if (typeof credential !== 'string' || credential.length > 10000) {
+    res.status(400);
+    throw new Error('A valid Google credential is required.');
+  }
+  let payload;
+  try {
+    const ticket = await new OAuth2Client().verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    payload = ticket.getPayload();
+  } catch {
+    res.status(401);
+    throw new Error('Google sign-in could not verify this account.');
+  }
+  if (!payload?.email || payload.email_verified !== true) {
+    res.status(401);
+    throw new Error('Google must verify your email address before sign-in.');
+  }
+
+  const email = payload.email.trim().toLowerCase();
+  let user = await User.findOne({ email }).select('+password');
+  if (!user) {
+    const { role, companyName, termsAccepted, privacyAccepted } = req.body;
+    if (!['job_seeker', 'employer'].includes(role)) {
+      res.status(400);
+      throw new Error('Choose a valid account type.');
+    }
+    if (termsAccepted !== true || privacyAccepted !== true) {
+      res.status(400);
+      throw new Error('Accept the Terms of Use and Privacy Policy to create an account.');
+    }
+    if (role === 'employer' && !String(companyName || '').trim()) {
+      res.status(400);
+      throw new Error('Company name is required for employer accounts.');
+    }
+    const acceptedAt = new Date();
+    user = await User.create({
+      name: payload.name || email,
+      email,
+      password: randomBytes(48).toString('hex'),
+      role,
+      companyName: role === 'employer' ? String(companyName).trim() : undefined,
+      emailVerified: true,
+      termsAcceptedAt: acceptedAt,
+      privacyAcceptedAt: acceptedAt,
+    });
+  } else if (user.emailVerified === false) {
+    user.emailVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
+  }
+
+  generateToken(res, user._id);
+  res.status(200).json({ _id: user._id, name: user.name, email: user.email, role: user.role });
 });
 
 export const forgotPassword = asyncHandler(async (req, res) => {
@@ -277,6 +417,49 @@ export const uploadResume = asyncHandler(async (req, res) => {
     resumeUrl: user.resumeUrl,
     resumePublicId: user.resumePublicId,
     message: 'Resume uploaded successfully.',
+  });
+});
+
+export const deleteMyCvData = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found.');
+  }
+
+  const applications = await Application.find({ applicant: user._id }).select('resumePublicId');
+  const publicIds = [...new Set([
+    user.resumePublicId,
+    ...applications.map((application) => application.resumePublicId),
+  ].filter(Boolean))];
+  const deletions = await Promise.allSettled(publicIds.map(async (publicId) => {
+    const result = await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
+    return { publicId, result: result.result };
+  }));
+  const failedDeletion = deletions.find((deletion) =>
+    deletion.status === 'rejected'
+    || !['ok', 'not found'].includes(deletion.value?.result));
+  if (failedDeletion) {
+    res.status(502);
+    throw new Error('Some CV files could not be removed from storage. Please retry or contact support.');
+  }
+
+  const deletedAt = new Date();
+  await Promise.all([
+    User.updateOne(
+      { _id: user._id },
+      { $unset: { resumeUrl: '', resumePublicId: '' } },
+    ),
+    Application.updateMany(
+      { applicant: user._id },
+      {
+        $set: { resumeUrl: '', resumeDeletedAt: deletedAt },
+        $unset: { resumePublicId: '' },
+      },
+    ),
+  ]);
+  res.status(200).json({
+    message: 'Your saved profile CV and application CV files were removed from JobBridge-managed storage.',
   });
 });
 

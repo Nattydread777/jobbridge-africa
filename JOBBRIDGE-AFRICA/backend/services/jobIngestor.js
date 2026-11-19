@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import Job from '../models/Job.js';
-import { cleanHtmlSnippet } from '../utils/sanitizer.js';
+import { cleanHtmlDescription, cleanHtmlSnippet } from '../utils/sanitizer.js';
 
 const HIMALAYAS_API = 'https://himalayas.app/jobs/api';
 const PAGE_SIZE = 20;
@@ -65,7 +65,7 @@ const normalizeJob = (job) => {
   const companySlug = asText(job.companySlug || job.company?.slug)
     || companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const title = asText(job.title);
-  const description = cleanHtmlSnippet(job.description || job.excerpt);
+  const description = cleanHtmlDescription(job.fullDescription || job.description || job.excerpt);
   const excerpt = cleanHtmlSnippet(job.excerpt) || description.slice(0, 400);
   const locationRestriction = asText(
     job.locationRestriction || job.locationRestrictions || job.location,
@@ -98,6 +98,13 @@ const normalizeJob = (job) => {
   const categories = asList(job.categories);
   const tags = asList(job.tags);
   const seniority = asText(job.seniority || job.experienceLevel);
+  const requirements = cleanHtmlDescription(asText(job.requirements || job.qualifications));
+  const responsibilities = cleanHtmlDescription(asText(job.responsibilities));
+  const benefits = cleanHtmlDescription(asText(job.benefits));
+  const qualifications = cleanHtmlDescription(asText(job.qualifications));
+  const applicationInstructions = cleanHtmlDescription(asText(
+    job.applicationInstructions || job.howToApply || job.applicationInstructionsText,
+  ));
   const expiryDate = asDate(job.expiryDate);
 
   return {
@@ -113,6 +120,12 @@ const normalizeJob = (job) => {
     companySlug,
     excerpt,
     description,
+    fullDescription: description,
+    requirements,
+    responsibilities,
+    benefits,
+    qualifications,
+    applicationInstructions,
     pubDate: safePubDate,
     applicationLink,
     locationRestriction,

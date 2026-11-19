@@ -83,9 +83,12 @@ const Header = () => {
             >
               AI CV Tool
             </NavLink>
-            <a href="/#royal-merchant" className="hover:text-gray-200 transition">
-              Upskilling loans
-            </a>
+            <NavLink
+              to="/royal-merchant"
+              className={({ isActive }) => isActive ? "font-semibold border-b-2 border-white pb-1" : "hover:text-gray-200 transition"}
+            >
+              Study support
+            </NavLink>
             <NavLink
               to="/employers"
               className={({ isActive }) =>
@@ -236,9 +239,9 @@ const Header = () => {
             >
               AI CV Tool
             </NavLink>
-            <a href="/#royal-merchant" onClick={() => setMobileMenuOpen(false)} className="block rounded px-4 py-2 text-white transition hover:bg-white/10 hover:text-amber-200">
-              Royal Merchant loans
-            </a>
+            <NavLink to="/royal-merchant" onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => `block rounded px-4 py-2 text-white transition hover:bg-white/10 hover:text-amber-200 ${isActive ? "bg-white/15 font-semibold text-amber-300" : ""}`}>
+              Royal Merchant study support
+            </NavLink>
             <NavLink
               to="/employers"
               onClick={() => setMobileMenuOpen(false)}

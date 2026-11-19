@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ForgotPasswordModal from "../components/ForgotPasswordModal";
+import GoogleSignInButton from "../components/GoogleSignInButton";
+import ResendVerification from "../components/ResendVerification";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -91,6 +93,11 @@ const Login = () => {
             >
               Forgot password?
             </button>
+            <div className="border-t border-slate-200 pt-5">
+              <p className="mb-3 text-center text-sm font-semibold text-slate-600">Or sign in with Google</p>
+              <GoogleSignInButton onComplete={() => navigate("/profile-view", { replace: true })} />
+            </div>
+            <ResendVerification initialEmail={email} />
           </div>
           <button
             type="submit"

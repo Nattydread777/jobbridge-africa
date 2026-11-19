@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import PropTypes from "prop-types";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { getJobPath } from "../utils/jobUrl";
 
 const getRelativePostedTime = (value) => {
   const postedDate = new Date(value);
@@ -39,13 +40,25 @@ const JobCard = ({ job }) => {
   const deadlineLabel = getDeadlineLabel(job.expiryDate);
   const companyInitial = job.companyName?.trim()?.[0]?.toUpperCase() || "?";
   const companyLogo = job.companyLogoUrl || job.companyLogo;
-  const jobUrl = `${window.location.origin}/jobs/${job._id}`;
+  const jobPath = getJobPath(job);
+  const jobUrl = `${window.location.origin}${jobPath}`;
   const shareText = `${job.title} at ${job.companyName} - ${jobUrl}`;
   const workMode = {
     remote: "Remote",
     hybrid: "Hybrid",
     "on-site": "On-site",
   }[job.workplaceType] || job.jobType;
+  const remoteScope = job.locationRestriction || job.location || "";
+  const isGlobalRemote = /\b(worldwide|global(?:ly)?|anywhere|any location)\b/i.test(remoteScope);
+  const remoteEligibility = isGlobalRemote
+    ? "Global"
+    : remoteScope && !/\bremote\b/i.test(remoteScope)
+      ? remoteScope
+      : "eligibility not specified";
+  const locationEligibility = workMode === "Remote"
+    ? `Remote · ${remoteEligibility}`
+    : `${workMode} · ${job.locationRestriction || job.location}`;
+  const sourceLabel = job.sourceName || job.sourceProvider || (isDirectPosting ? "Direct employer" : "External source");
   const salaryLabel = [job.salary, job.salaryRange]
     .map((value) => String(value || "").trim())
     .find((value) => value && !/^competitive$/i.test(value)) || "";
@@ -57,7 +70,7 @@ const JobCard = ({ job }) => {
       return;
     }
     // Redirect to job details page to submit full application
-    navigate(`/jobs/${job._id}#apply`);
+    navigate(`${jobPath}#apply`);
   };
 
   return (
@@ -76,7 +89,7 @@ const JobCard = ({ job }) => {
       <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium">
         <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">📍 {job.location}</span>
         <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-900">
-          {workMode}
+          {workMode === "Remote" ? locationEligibility : workMode}
         </span>
         {job.jobType && job.jobType !== workMode && (
           <span className="rounded-full bg-violet-50 px-3 py-1 text-violet-900">
@@ -94,10 +107,7 @@ const JobCard = ({ job }) => {
         </p>
       ) : (
         <p className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-terracotta-dark">
-          {job.isWorldwideRemote
-            ? "Worldwide remote"
-            : `Remote · ${job.locationRestriction || job.location}`}
-          {" · Global Partner Feed"}
+          {locationEligibility} · {sourceLabel}
         </p>
       )}
       {salaryLabel && (
@@ -122,7 +132,7 @@ const JobCard = ({ job }) => {
       </p>
       <div className="mt-4 flex gap-3">
         <Link
-          to={`/jobs/${job._id}`}
+          to={jobPath}
           className="text-accent hover:underline font-medium"
         >
           View Details →

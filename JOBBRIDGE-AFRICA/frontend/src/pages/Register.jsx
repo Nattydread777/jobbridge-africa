@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ForgotPasswordModal from "../components/ForgotPasswordModal";
-import api from "../services/api";
 import africaLocations from "../data/jobLocations";
 import { extractResumeText, parseResumeText } from "../utils/resumeParser";
+import GoogleSignInButton from "../components/GoogleSignInButton";
+import ResendVerification from "../components/ResendVerification";
 
 const emptyParsed = {
   name: "",
@@ -28,8 +29,11 @@ const Register = () => {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [hasRegistered, setHasRegistered] = useState(false);
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
-  const { register, refreshUser, isAuthenticated } = useAuth();
+  const { register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -86,25 +90,21 @@ const Register = () => {
         education: parsed.education,
         experience: parsed.experience,
       } : {};
-      await register({ ...form, ...profileData });
+      await register({
+        ...form,
+        ...profileData,
+        termsAccepted,
+        privacyAccepted,
+      });
       setHasRegistered(true);
-      if (resume && form.role === "job_seeker") {
-        const data = new FormData();
-        data.append("resume", resume);
-        try {
-          await api.post("/auth/upload-resume", data);
-          await refreshUser();
-        } catch (uploadError) {
-          navigate("/profile-view", {
-            replace: true,
-            state: { notice: uploadError.response?.data?.message || "Your account was created, but the resume upload did not finish. Upload it from your profile." },
-          });
-          return;
-        }
-      }
-      navigate("/profile-view", { replace: true });
+      setVerificationSent(true);
     } catch (registrationError) {
-      setError(registrationError.response?.data?.message || "We couldn't create your account. Check your connection and try again.");
+      const message = registrationError.response?.data?.message || "We couldn't create your account. Check your connection and try again.";
+      setError(message);
+      if (registrationError.response?.status === 503 && message.toLowerCase().includes("account was created")) {
+        setHasRegistered(true);
+        setVerificationSent(true);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -128,11 +128,18 @@ const Register = () => {
           <p className="mt-2 text-slate-600">Resume suggestions are editable in your profile after registration.</p>
         </div>
         {error && <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
+        {verificationSent && (
+          <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+            <p className="font-semibold">Account created. Verify your email before signing in.</p>
+            <p className="mt-1">We sent a one-time verification link to {form.email}. If you don’t see it, check your spam folder or request another link.</p>
+            <ResendVerification initialEmail={form.email} />
+          </div>
+        )}
 
         {form.role === "job_seeker" && (
           <div className="mb-7 rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
             <h3 className="font-bold text-slate-900">Add your CV to prefill your profile</h3>
-            <p className="mt-1 text-sm text-slate-600">PDF, DOCX, or TXT. Text is extracted in your browser; scanned image-only PDFs may need pasted text.</p>
+            <p className="mt-1 text-sm text-slate-600">PDF, DOCX, or TXT. Text is extracted in your browser; the file itself is not uploaded until you choose to add it to your profile after verifying your account.</p>
             <label htmlFor="registration-resume" className="mt-4 flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-amber-400 bg-white px-4 py-5 text-center font-semibold text-amber-900 hover:bg-amber-50">
               {resume ? `Selected: ${resume.name}` : "Choose a resume file"}
               <input id="registration-resume" type="file" accept=".pdf,.docx,.txt" onChange={handleResume} className="sr-only" />
@@ -223,7 +230,17 @@ const Register = () => {
               </div>
             </>
           )}
-          <button type="submit" disabled={submitting} aria-busy={submitting} className="mt-2 inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-5 py-3 font-bold text-slate-950 transition hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60 sm:col-span-2">
+          <div className="grid gap-3 sm:col-span-2">
+            <label className="flex items-start gap-2 text-sm leading-6 text-slate-700">
+              <input type="checkbox" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} required className="mt-1" />
+              <span>I agree to the <Link to="/terms" className="font-semibold text-amber-700 underline">Terms of Use</Link>.</span>
+            </label>
+            <label className="flex items-start gap-2 text-sm leading-6 text-slate-700">
+              <input type="checkbox" checked={privacyAccepted} onChange={(event) => setPrivacyAccepted(event.target.checked)} required className="mt-1" />
+              <span>I acknowledge the <Link to="/privacy" className="font-semibold text-amber-700 underline">Privacy Policy</Link>.</span>
+            </label>
+          </div>
+          <button type="submit" disabled={submitting || verificationSent || !termsAccepted || !privacyAccepted} aria-busy={submitting} className="mt-2 inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-5 py-3 font-bold text-slate-950 transition hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60 sm:col-span-2">
             {submitting && <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" aria-hidden="true" />}
             {submitting ? "Creating your account..." : "Create free account"}
           </button>
@@ -231,6 +248,17 @@ const Register = () => {
             {submitting ? "Creating your account." : ""}
           </p>
         </form>
+        <div className="mt-6 border-t border-slate-200 pt-5">
+          <p className="mb-3 text-center text-sm font-semibold text-slate-600">Or continue with Google</p>
+          <GoogleSignInButton
+            role={form.role}
+            companyName={form.companyName}
+            termsAccepted={termsAccepted}
+            privacyAccepted={privacyAccepted}
+            enabled={termsAccepted && privacyAccepted && (form.role !== "employer" || Boolean(form.companyName.trim()))}
+            onComplete={() => navigate("/profile-view", { replace: true })}
+          />
+        </div>
         <p className="mt-5 text-center text-sm text-slate-600">Already have an account? <Link to="/login" className="font-bold text-amber-700 hover:underline">Sign in</Link></p>
       </section>
       {forgotPasswordOpen && (

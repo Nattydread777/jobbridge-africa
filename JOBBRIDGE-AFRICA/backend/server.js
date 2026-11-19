@@ -14,12 +14,15 @@ import mongoose from 'mongoose';
 import connectDB from './config/db.js'; // MUST include .js extension
 import authRoutes from './routes/authRoutes.js'; // Assuming this route exists
 import jobRoutes from './routes/jobRoutes.js'; // Assuming this route exists
+import jobAlertRoutes from './routes/jobAlertRoutes.js';
 import applicationRoutes from './routes/applicationRoutes.js'; // Application routes
 import aiRoutes from './routes/aiRoutes.js'; // AI routes
 import contactRoutes from './routes/contactRoutes.js'; // Contact form routes
 import teamRoutes from './routes/teamRoutes.js'; // Team member routes
 import userAdminRoutes from './routes/userAdminRoutes.js'; // Admin user management
 import employerRoutes from './routes/employerRoutes.js';
+import seoRoutes from './routes/seoRoutes.js';
+import impactRoutes from './routes/impactRoutes.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js'; // MUST include .js extension
 import { scheduleCareerScrapes } from './services/careerScraperService.js';
 import { scheduleRemoteApiIngestion } from './services/remoteApiIngestor.js';
@@ -76,13 +79,6 @@ const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 20, // limit each IP to 20 requests per windowMs
   message: 'Too many authentication attempts, please try again later.',
-});
-
-// Stricter rate limit for contact form
-const contactLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5, // limit each IP to 5 contact form submissions per hour
-  message: 'Too many contact form submissions, please try again later.',
 });
 
 // -------------------
@@ -176,12 +172,15 @@ const requireDatabase = (req, res, next) => {
 // -------------------
 app.use('/api/auth', requireDatabase, authLimiter, authRoutes);
 app.use('/api/jobs', requireDatabase, jobRoutes);
+app.use('/api/impact', requireDatabase, impactRoutes);
+app.use('/api/job-alerts', requireDatabase, jobAlertRoutes);
 app.use('/api/applications', requireDatabase, applicationRoutes);
 app.use('/api/ai', requireDatabase, aiRoutes);
-app.use('/api/contact', contactLimiter, contactRoutes);
+app.use('/api/contact', contactRoutes);
 app.use('/api/team', requireDatabase, teamRoutes);
 app.use('/api/users', requireDatabase, userAdminRoutes);
 app.use('/api/employers', requireDatabase, employerRoutes);
+app.use('/', seoRoutes);
 
 // Error Handling Middleware (must be last)
 app.use(notFound);

@@ -47,6 +47,8 @@ const Footer = () => (
               ["Contact", "/contact"],
               ["Privacy policy", "/privacy"],
               ["Terms of service", "/terms"],
+              ["Cookie notice", "/cookies"],
+              ["FAQs", "/faq"],
             ]}
           />
           <div className="mt-3 space-y-1 text-xs text-slate-400">

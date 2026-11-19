@@ -2,6 +2,7 @@ import asyncHandler from 'express-async-handler';
 import mongoose from 'mongoose';
 import Job from '../models/Job.js';
 import User from '../models/userModel.js';
+import JobReport from '../models/JobReport.js';
 import { buildActiveJobFilter } from '../utils/jobFilters.js';
 
 const AFRICAN_LOCATION_PATTERN = '\\b(?:africa|algeria|angola|benin|botswana|burkina faso|burundi|cabo verde|cameroon|central african republic|chad|comoros|democratic republic of the congo|djibouti|egypt|equatorial guinea|eritrea|eswatini|ethiopia|gabon|gambia|ghana|guinea|guinea-bissau|ivory coast|kenya|lesotho|liberia|libya|madagascar|malawi|mali|mauritania|mauritius|morocco|mozambique|namibia|niger|nigeria|republic of the congo|rwanda|sao tome and principe|senegal|seychelles|sierra leone|somalia|south africa|south sudan|sudan|tanzania|togo|tunisia|uganda|zambia|zimbabwe)\\b';
@@ -40,7 +41,9 @@ export const getJobs = asyncHandler(async (req, res) => {
     employmentType,
     seniority,
     isRemote,
+    remote,
     workplaceType,
+    category,
     datePosted,
     page = 1,
     cursor,
@@ -48,7 +51,7 @@ export const getJobs = asyncHandler(async (req, res) => {
   } = req.query;
   const pageNumber = Math.max(1, Number.parseInt(page, 10) || 1);
   const pageSize = Math.min(50, Math.max(1, Number.parseInt(limit, 10) || 12));
-  const remoteFilter = parseBoolean(isRemote, 'isRemote', res);
+  const remoteFilter = parseBoolean(isRemote !== undefined ? isRemote : remote, 'remote', res);
   const selectedWorkplace = workplaceType === undefined
     ? undefined
     : String(workplaceType).trim().toLowerCase();
@@ -100,6 +103,15 @@ export const getJobs = asyncHandler(async (req, res) => {
 
   const typeFilter = employmentType || jobType;
   if (typeFilter) filters.push({ jobType: String(typeFilter) });
+  if (category) {
+    const escapedCategory = escapeRegex(String(category).trim());
+    filters.push({
+      $or: [
+        { categories: { $regex: escapedCategory, $options: 'i' } },
+        { tags: { $regex: escapedCategory, $options: 'i' } },
+      ],
+    });
+  }
   if (selectedWorkplace) {
     if (selectedWorkplace === 'remote') {
       filters.push({
@@ -344,13 +356,57 @@ export const getEmployerJobs = asyncHandler(async (req, res) => {
 // @route   GET /api/jobs/:id
 // @access  Public
 export const getJobById = asyncHandler(async (req, res) => {
-  const job = await Job.findById(req.params.id).populate('postedBy', 'name email');
+  const requestedId = String(req.params.id);
+  const id = requestedId.match(/([a-f\d]{24})$/i)?.[1];
+  if (!id || !mongoose.isValidObjectId(id)) {
+    res.status(400);
+    throw new Error('Invalid job ID');
+  }
+  const job = await Job.findById(id).populate('postedBy', 'name email');
   if (job) {
     res.status(200).json(job);
   } else {
     res.status(404);
     throw new Error('Job not found');
   }
+});
+
+export const reportJob = asyncHandler(async (req, res) => {
+  const { reason, details = '', email = '' } = req.body || {};
+  const validReasons = ['scam', 'misleading', 'expired', 'inaccurate', 'other'];
+  const normalizedDetails = typeof details === 'string' ? details.trim() : '';
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+
+  if (!validReasons.includes(reason)) {
+    res.status(400);
+    throw new Error('Choose a valid reason for reporting this job.');
+  }
+  if (typeof details !== 'string' || normalizedDetails.length > 2000) {
+    res.status(400);
+    throw new Error('Report details must be 2,000 characters or fewer.');
+  }
+  if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    res.status(400);
+    throw new Error('Enter a valid email address.');
+  }
+  const reportJobId = String(req.params.id).match(/([a-f\d]{24})$/i)?.[1];
+  if (!mongoose.isValidObjectId(reportJobId)) {
+    res.status(400);
+    throw new Error('Invalid job ID.');
+  }
+  const jobExists = await Job.exists({ _id: reportJobId });
+  if (!jobExists) {
+    res.status(404);
+    throw new Error('Job not found.');
+  }
+
+  await JobReport.create({
+    job: reportJobId,
+    reason,
+    details: normalizedDetails,
+    email: normalizedEmail,
+  });
+  res.status(201).json({ message: 'Thank you. Your report has been sent for review.' });
 });
 
 // @desc    Create a new job (employer only)
@@ -364,9 +420,12 @@ export const createJob = asyncHandler(async (req, res) => {
     workplaceType,
     salaryRange, 
     description, 
+    fullDescription,
     requirements,
+    qualifications,
     responsibilities,
     benefits,
+    applicationInstructions,
     expiryDate,
     applicationEmail 
   } = req.body;
@@ -401,10 +460,13 @@ export const createJob = asyncHandler(async (req, res) => {
     isWorldwideRemote: normalizedWorkplaceType === 'remote'
       && /\b(worldwide|global(?:ly)?|anywhere|africa)\b/i.test(location),
     salaryRange,
-    description,
+    description: fullDescription || description,
+    fullDescription: fullDescription || description,
     requirements,
+    qualifications,
     responsibilities,
     benefits,
+    applicationInstructions,
     expiryDate: parsedExpiryDate,
     applicationEmail: applicationEmail || req.user.email,
     postedBy: req.user._id,
@@ -447,10 +509,13 @@ export const updateJob = asyncHandler(async (req, res) => {
       && /\b(worldwide|global(?:ly)?|anywhere|africa)\b/i.test(job.location);
   }
   job.salaryRange = req.body.salaryRange || job.salaryRange;
-  job.description = req.body.description || job.description;
+  job.description = req.body.fullDescription || req.body.description || job.description;
+  job.fullDescription = req.body.fullDescription || req.body.description || job.fullDescription || job.description;
   job.requirements = req.body.requirements || job.requirements;
+  job.qualifications = req.body.qualifications ?? job.qualifications;
   job.responsibilities = req.body.responsibilities || job.responsibilities;
   job.benefits = req.body.benefits || job.benefits;
+  job.applicationInstructions = req.body.applicationInstructions ?? job.applicationInstructions;
   if (Object.prototype.hasOwnProperty.call(req.body, 'expiryDate')) {
     job.expiryDate = parseOptionalExpiryDate(req.body.expiryDate, res);
   }

@@ -21,9 +21,12 @@ const jobSchema = new mongoose.Schema({
   },
   salaryRange: { type: String, default: 'Competitive' },
   description: { type: String, required: true },
+  fullDescription: { type: String, default: '' },
   requirements: { type: String }, // Changed from array to string for easier text input
+  qualifications: { type: String, default: '' },
   responsibilities: { type: String },
   benefits: { type: String },
+  applicationInstructions: { type: String, default: '' },
   expiryDate: { type: Date, default: null }, // Optional job application deadline
   applicationEmail: { type: String },
   postedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

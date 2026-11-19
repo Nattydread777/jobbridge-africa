@@ -4,9 +4,8 @@ import PageBreadcrumb from "../components/PageBreadcrumb";
 const plans = [
   {
     name: "Free",
-    usd: "$0",
     ngn: "₦0",
-    cadence: "forever",
+    cadence: "during launch",
     description: "The essentials to explore opportunities and build your profile.",
     features: [
       "Core job search and filters",
@@ -17,13 +16,12 @@ const plans = [
   },
   {
     name: "Job Seeker Pro",
-    usd: "$5",
     ngn: "₦7,500",
     cadence: "per month",
     description: "Stay ahead with personalized job discovery and alerts.",
     features: [
-      "Advanced AI job matching",
-      "Priority application review",
+      "Personalized job discovery",
+      "Job alerts",
     ],
     action: "Request early access",
     to: "/contact?subject=Early%20access%20-%20Job%20Seeker%20Pro",
@@ -31,13 +29,12 @@ const plans = [
   },
   {
     name: "AI Career Suite",
-    usd: "$10",
     ngn: "₦12,500",
     cadence: "per month",
     description: "Practical AI-assisted tools for every stage of your search.",
     features: [
       "Everything in Job Seeker Pro",
-      "Unlimited CV Refinisher",
+      "CV Refinisher access",
       "Custom skill recommendations",
       "Direct recruiter visibility",
     ],
@@ -57,7 +54,7 @@ const Pricing = () => (
         Invest in your next opportunity
       </h1>
       <p className="mt-4 text-stone-600">
-        Start for free. Upgrade when you need more support. Prices are shown in USD and NGN.
+        Free during launch. Job seekers are never charged to search or apply. Proposed paid tiers are shown in Nigerian Naira and are not available yet.
       </p>
     </header>
 
@@ -82,12 +79,9 @@ const Pricing = () => (
               {plan.description}
             </p>
             <div className="my-6">
-              <p className="text-3xl font-black">
-                {plan.usd}
-                {plan.cadence !== "forever" && <span className="text-base font-medium"> / mo</span>}
-              </p>
+              <p className="text-3xl font-black">{plan.ngn}</p>
               <p className={`mt-1 text-sm ${plan.highlighted ? "text-stone-300" : "text-stone-500"}`}>
-                {plan.ngn}{plan.cadence === "forever" ? " · forever" : " / month (approx.)"}
+                {plan.cadence === "during launch" ? "Free during launch" : "per month · planned, not available"}
               </p>
             </div>
             <ul className="space-y-3">
@@ -113,7 +107,10 @@ const Pricing = () => (
       ))}
     </div>
     <p className="mx-auto mt-6 max-w-6xl text-xs text-stone-500">
-      Paystack and Flutterwave checkout are not enabled yet. Paid plans are shown for planning only; contact us to request early access. Do not send payment details by email.
+      Employer job posting is free during launch. No employer charge is currently collected. If paid employer services are introduced, the price, delivery, cancellation, and refund terms will be shown before checkout; no payment is due unless those terms are accepted. Contact support promptly about an incorrect charge or service not delivered.
+    </p>
+    <p className="mx-auto mt-3 max-w-6xl text-xs text-stone-500">
+      The ₦7,500 and ₦12,500 job-seeker tiers are proposals only; paid checkout is not enabled. Do not send payment details by email.
     </p>
   </div>
 );

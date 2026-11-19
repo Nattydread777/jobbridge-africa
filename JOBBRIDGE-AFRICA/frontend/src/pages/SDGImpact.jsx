@@ -1,7 +1,18 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import PageBreadcrumb from "../components/PageBreadcrumb";
+import api from "../services/api";
 
 const SDGImpact = () => {
+  const [metrics, setMetrics] = useState(null);
+  const [metricsError, setMetricsError] = useState("");
+
+  useEffect(() => {
+    api.get("/impact")
+      .then(({ data }) => setMetrics(data))
+      .catch(() => setMetricsError("Live metrics are temporarily unavailable."));
+  }, []);
+
   return (
     <main className="w-full px-4 pb-16 text-slate-800 sm:px-6 md:px-10 xl:px-14">
       <PageBreadcrumb />
@@ -16,9 +27,7 @@ const SDGImpact = () => {
 
               <div className="prose max-w-none">
                 <p className="mb-6 text-lg text-slate-200">
-                  JobBridge Africa is committed to advancing the United Nations Sustainable
-                  Development Goal 8, promoting sustained, inclusive, and sustainable
-                  economic growth, full and productive employment, and decent work for all.
+                    JobBridge Africa supports the aims of United Nations Sustainable Development Goal 8 by helping users discover work opportunities and career resources. We are an independent platform and are not affiliated with or endorsed by the United Nations.
                 </p>
               </div>
             </div>
@@ -53,14 +62,13 @@ const SDGImpact = () => {
                 <span className="text-2xl">👔</span> Decent work opportunities
               </h3>
               <p className="mb-3 text-gray-700">
-                We ensure all job listings meet standards for fair employment, competitive
-                compensation, and professional growth.
+                JobBridge Africa aims to make job information easier to discover and compare. Listings are supplied by employers and external sources, so candidates should review the original terms and report inaccurate or unsafe postings.
               </p>
               <ul className="ml-6 space-y-1 text-gray-600">
                 <li>• Transparent salary ranges</li>
                 <li>• Clear job requirements and responsibilities</li>
-                <li>• Equal opportunity employer verification</li>
-                <li>• Safe working conditions standards</li>
+                <li>• A report option for job listings</li>
+                <li>• Clear source and application information where available</li>
               </ul>
             </div>
 
@@ -73,8 +81,8 @@ const SDGImpact = () => {
                 development and productivity.
               </p>
               <ul className="ml-6 space-y-1 text-gray-600">
-                <li>• Supporting 5,000+ African companies</li>
-                <li>• Facilitating 10,000+ job placements annually</li>
+                <li>• Publishing active job opportunities from direct employers and external feeds</li>
+                <li>• Connecting users to employer application channels</li>
                 <li>• Enabling cross-border employment</li>
                 <li>• Promoting skills development</li>
               </ul>
@@ -112,24 +120,27 @@ const SDGImpact = () => {
             </div>
           </div>
 
-          <h2 className="md:col-span-2 mt-8 mb-4 text-2xl font-bold">Impact metrics</h2>
+          <h2 className="md:col-span-2 mt-8 mb-1 text-2xl font-bold">Platform metrics</h2>
+          <p className="md:col-span-2 text-sm text-gray-600">
+            {metrics?.asOf ? `Snapshot as of ${new Date(metrics.asOf).toLocaleDateString()}.` : metricsError || "Loading current platform counts…"}
+          </p>
           <div className="md:col-span-2 mb-4 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-lg bg-gradient-to-br from-primary to-yellow-600 p-6 text-white">
-              <div className="mb-2 text-4xl font-bold">50,000+</div>
-              <p className="text-lg">Job seekers empowered</p>
-            </div>
-            <div className="rounded-lg bg-gradient-to-br from-secondary to-green-700 p-6 text-white">
-              <div className="mb-2 text-4xl font-bold">5,000+</div>
-              <p className="text-lg">Companies served</p>
-            </div>
-            <div className="rounded-lg bg-gradient-to-br from-accent to-red-700 p-6 text-white">
-              <div className="mb-2 text-4xl font-bold">54</div>
-              <p className="text-lg">Countries connected</p>
-            </div>
-            <div className="rounded-lg bg-gradient-to-br from-blue-500 to-blue-700 p-6 text-white">
-              <div className="mb-2 text-4xl font-bold">10,000+</div>
-              <p className="text-lg">Active job listings</p>
-            </div>
+            {[
+              ["Jobs listed", metrics?.jobsListed],
+              ["Job-seeker profiles", metrics?.candidates],
+              ["Countries represented", metrics?.countries],
+              ["Placements", metrics ? "Not tracked" : null],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-lg bg-gradient-to-br from-primary to-yellow-600 p-6 text-white">
+                <div className="mb-2 text-4xl font-bold">{typeof value === "number" ? value.toLocaleString() : value || "—"}</div>
+                <p className="text-lg">{label}</p>
+              </div>
+            ))}
+          </div>
+          <div className="md:col-span-2 mb-4 rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm leading-6 text-slate-700">
+            <h3 className="font-bold text-slate-900">Counting methodology</h3>
+            <p className="mt-2">Jobs are active, non-expired records currently in our database. Candidate and country counts come from job-seeker profiles with no explicit unverified status; a country is counted from the profile’s country field. Placements are not currently recorded, so no placement total is claimed.</p>
+            <a href="/funder-one-pager.txt" download className="mt-3 inline-flex font-semibold text-terracotta underline">Download the funder one-pager</a>
           </div>
 
           <h2 className="md:col-span-2 mt-8 mb-4 text-2xl font-bold">
@@ -168,10 +179,9 @@ const SDGImpact = () => {
           </div>
 
           <div className="md:col-span-2 mt-2 rounded-r-2xl border-l-4 border-accent bg-gray-50 p-6">
-            <h3 className="mb-2 text-lg font-bold">Join the movement</h3>
+            <h3 className="mb-2 text-lg font-bold">United Nations SDG 8 attribution</h3>
             <p className="mb-4 text-gray-700">
-              Be part of Africa’s sustainable economic growth. Find decent work or help
-              create opportunities for others.
+              “Decent Work and Economic Growth” is the official title of UN Sustainable Development Goal 8. JobBridge Africa references the goal to describe its mission; no UN logo is used and this page does not imply UN endorsement.
             </p>
             <div className="flex flex-wrap gap-4">
               <Link
@@ -181,7 +191,7 @@ const SDGImpact = () => {
                 Find jobs
               </Link>
               <Link
-                to="/post-job"
+                to="/employers"
                 className="inline-block rounded bg-secondary px-6 py-3 text-white transition hover:bg-green-700"
               >
                 Post jobs

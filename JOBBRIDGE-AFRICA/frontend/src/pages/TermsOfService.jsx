@@ -6,7 +6,7 @@ const TermsOfService = () => {
           Terms of Service
         </h1>
         <p className="text-base md:text-lg text-gray-700 mb-8">
-          Last Updated: November 13, 2025
+          Last Updated: November 19, 2026
         </p>
 
         <div className="space-y-8 text-gray-800">
@@ -89,8 +89,9 @@ const TermsOfService = () => {
             <p>
               We reserve the right to suspend or terminate accounts that violate
               these Terms, engage in fraudulent activity, or harm other users.
-              You may delete your account at any time through your dashboard
-              settings.
+              You may request account deletion at any time by contacting
+              info@jobbridgeafrica.com. Some information may be retained where
+              required by law or needed to resolve a dispute.
             </p>
           </section>
 
@@ -239,31 +240,16 @@ const TermsOfService = () => {
               resume, photo, bio) to improve match quality. Incomplete profiles
               may limit access to certain features.
             </p>
-            <p>
-              Our AI algorithms are designed to promote fairness and
-              inclusivity, avoiding bias based on protected characteristics (SDG
-              8.5 commitment to equal employment opportunity).
-            </p>
+            <p>Recommendations are informational and may be incomplete or inaccurate. They are not hiring decisions or a guarantee of an interview, employment, or income. The CV Refinisher uses rule-based keyword matching and generated text is not supplied by that tool. Review all suggestions and never add experience or skills you cannot verify.</p>
           </section>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mb-4">
               8. Fees and Payments
             </h2>
-            <p className="mb-4">
-              Currently, JobBridge Africa offers free services to job seekers.
-              Employers may be required to pay fees for premium features such as
-              featured job listings, advanced candidate search, and priority
-              support.
-            </p>
-            <p className="mb-4">
-              All fees will be clearly communicated before purchase. Payments
-              are non-refundable unless otherwise stated.
-            </p>
-            <p>
-              We reserve the right to introduce or modify pricing plans with{" "}
-              <strong>30 days notice</strong> to existing users.
-            </p>
+            <p className="mb-4">JobBridge Africa is free during launch. Job seekers are never charged by us to search or apply for a job. Employer job posting is also free during launch; paid checkout is not currently enabled.</p>
+            <p className="mb-4">If we introduce a paid employer service, the price, delivery terms, cancellation process, and any refund eligibility will be shown before payment. No payment is due unless you explicitly accept those terms at checkout. Contact us promptly about an incorrect charge or a service not delivered.</p>
+            <p>Future prices or plans will not apply retroactively to a completed transaction. We will provide notice of material changes to existing paid services where required by law.</p>
           </section>
 
           <section>

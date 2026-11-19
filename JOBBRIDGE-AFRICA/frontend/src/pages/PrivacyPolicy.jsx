@@ -6,7 +6,7 @@ const PrivacyPolicy = () => {
           Privacy Policy
         </h1>
         <p className="text-sm text-gray-600 mb-8">
-          Last Updated: November 13, 2025
+          Last Updated: November 19, 2026
         </p>
 
         <div className="space-y-8 text-gray-700">
@@ -56,8 +56,8 @@ const PrivacyPolicy = () => {
             </h3>
             <ul className="list-disc pl-6 space-y-2 mb-4">
               <li>IP address, browser type, and device information</li>
-              <li>Usage data (pages visited, time spent, features used)</li>
-              <li>Cookies and similar tracking technologies</li>
+              <li>Limited technical and request information processed by our hosting and security providers to operate and protect the platform</li>
+              <li>Essential cookies and stored preferences; analytics and advertising tracking are not currently active</li>
             </ul>
 
             <h3 className="text-xl font-medium text-gray-800 mb-3">
@@ -88,8 +88,8 @@ const PrivacyPolicy = () => {
                 and productive employment)
               </li>
               <li>
-                <strong>Communication:</strong> To send application updates, job
-                alerts, and platform notifications
+                <strong>Communication:</strong> To send account and application
+                messages and, if enabled, job-alert emails
               </li>
               <li>
                 <strong>Platform Improvement:</strong> To analyze usage patterns
@@ -139,6 +139,8 @@ const PrivacyPolicy = () => {
               <li>
                 <strong>Hosting:</strong> Vercel (for platform hosting)
               </li>
+              <li><strong>API hosting:</strong> Render (for backend requests and application processing)</li>
+              <li><strong>Sign-in and verification:</strong> Google Identity Services when you choose Google sign-in, Google reCAPTCHA when enabled on the contact form, and Resend or the configured SMTP provider (such as Zoho Mail) to deliver account or contact messages</li>
             </ul>
 
             <h3 className="text-xl font-medium text-gray-800 mb-3">
@@ -213,8 +215,7 @@ const PrivacyPolicy = () => {
                 associated data
               </li>
               <li>
-                <strong>Opt-Out:</strong> Unsubscribe from marketing emails (job
-                alerts remain active unless disabled)
+                <strong>Opt-Out:</strong> Unsubscribe from job alert emails by contacting us at the address below
               </li>
               <li>
                 <strong>Data Portability:</strong> Request your data in a
@@ -246,8 +247,7 @@ const PrivacyPolicy = () => {
                 and basic platform functionality
               </li>
               <li>
-                <strong>Performance Cookies:</strong> Help us understand how you
-                use the platform to improve services
+                <strong>Optional Cookies:</strong> Analytics and marketing cookies are not currently active; the cookie banner lets you record preferences if these categories are introduced
               </li>
               <li>
                 <strong>Preference Cookies:</strong> Remember your settings and
@@ -267,11 +267,11 @@ const PrivacyPolicy = () => {
             </h2>
             <p>
               We retain your personal information for as long as your account is
-              active or as needed to provide services. If you delete your
-              account, we will remove your personal data within{" "}
-              <strong>30 days</strong>, except where retention is required by
-              law or for legitimate business purposes (e.g., fraud prevention,
-              dispute resolution).
+              active or as needed to provide services. You may request account
+              deletion by contacting us at the address below; we aim to remove
+              account data within <strong>30 days</strong>, except where
+              retention is required by law or reasonably needed for fraud
+              prevention and dispute resolution.
             </p>
           </section>
 
@@ -345,6 +345,22 @@ const PrivacyPolicy = () => {
                 </a>
               </p>
             </div>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+              CV tools, uploads, and deletion
+            </h2>
+            <p className="mb-3">
+              The CV Refinisher reads selected PDF, DOCX, and text files in your browser. The extracted CV text and the job description you enter are sent to our backend for rule-based keyword comparison. The backend processes the text only for the duration of the analysis request and does not retain it afterward. The tool does not use a third-party generative AI service and does not save that request text or selected file to your JobBridge account or Cloudinary. Text remains in the open page until you clear it or leave the tool. Hosting and network providers may process connection data under their own policies.
+            </p>
+            <p className="mb-3">
+              A resume you upload to your account is different: it is stored with Cloudinary while linked to your profile or application. Use the CV tool’s “Delete my data” action while signed in to request immediate removal of your saved profile resume and CV files attached to applications from JobBridge-managed storage. Application details remain in your account, with resume links removed. Employers who already received an application may retain a copy they received; contact the employer separately to request its deletion.
+            </p>
+            <p>
+              Account data is otherwise subject to the retention terms described above. For access, correction, or deletion requests, contact{" "}
+              <a href="mailto:info@jobbridgeafrica.com" className="font-semibold text-green-700 underline">info@jobbridgeafrica.com</a>.
+            </p>
           </section>
 
           {/* SDG Commitment */}

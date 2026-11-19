@@ -4,6 +4,9 @@ import multer from 'multer';
 import { 
     registerUser, 
     loginUser, 
+    googleAuth,
+    verifyEmail,
+    resendVerificationEmail,
     forgotPassword,
     resetPassword,
     logoutUser,
@@ -11,6 +14,7 @@ import {
     updateUserProfile,
   uploadProfileImage,
     uploadResume,
+    deleteMyCvData,
     bootstrapAdmin
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
@@ -49,6 +53,9 @@ const resumeUpload = multer({
 // Public Routes
 router.post('/register', registerUser);
 router.post('/login', loginUser);
+router.post('/google', googleAuth);
+router.post('/verify-email/:token', verifyEmail);
+router.post('/resend-verification', resendVerificationEmail);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password/:token', resetPassword);
 // One-time bootstrap (no auth): requires ADMIN_SETUP_TOKEN and no existing admin
@@ -60,5 +67,6 @@ router.get('/me', protect, getUserProfile); // Uses the 'protect' middleware to 
 router.put('/profile', protect, updateUserProfile); // Update user profile
 router.post('/upload-profile-image', protect, upload.single('profileImage'), uploadProfileImage); // Upload profile image
 router.post('/upload-resume', protect, resumeUpload.single('resume'), uploadResume);
+router.delete('/cv-data', protect, deleteMyCvData);
 
 export default router;

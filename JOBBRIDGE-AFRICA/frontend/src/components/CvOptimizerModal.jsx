@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../services/api";
 import PageBreadcrumb from "./PageBreadcrumb";
+import { useAuth } from "../context/AuthContext";
 
 const extractResumeText = async (file) => {
   const extension = file.name.split(".").pop()?.toLowerCase();
@@ -85,6 +86,10 @@ const CvOptimizerModal = ({ onClose }) => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [readingFile, setReadingFile] = useState(false);
+  const [consentGiven, setConsentGiven] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteStatus, setDeleteStatus] = useState("");
+  const { isAuthenticated, refreshUser } = useAuth();
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -128,6 +133,10 @@ const CvOptimizerModal = ({ onClose }) => {
     event.preventDefault();
     setError("");
     setResult(null);
+    if (!consentGiven) {
+      setError("Please read and accept the CV processing disclosure before continuing.");
+      return;
+    }
     if (!cvText.trim() || !jobDescription.trim()) {
       setError("Add both your CV text and the target job description to continue.");
       return;
@@ -150,6 +159,23 @@ const CvOptimizerModal = ({ onClose }) => {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteData = async () => {
+    if (!window.confirm("Delete your saved profile CV and uploaded CV files attached to applications from JobBridge-managed storage?")) return;
+    setDeleting(true);
+    setDeleteStatus("");
+    try {
+      const { data } = await api.delete("/auth/cv-data");
+      setDeleteStatus(data.message);
+      setCvText("");
+      setResult(null);
+      await refreshUser();
+    } catch (requestError) {
+      setDeleteStatus(requestError.response?.data?.message || "We couldn't delete your saved CV data. Please try again or contact support.");
+    } finally {
+      setDeleting(false);
     }
   };
   const keywordCount = result
@@ -189,10 +215,20 @@ const CvOptimizerModal = ({ onClose }) => {
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-stone-600">
               Compare your CV with a role, identify keyword gaps, and surface relevant experience.
-              Your text is processed by a local rule-based matcher and is not stored.
+              The score is guidance only, not an employment guarantee or hiring decision.
             </p>
           </div>
         </div>
+
+        <section className="mb-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
+          <h2 className="font-bold">How your CV is processed</h2>
+          <p className="mt-1">The selected PDF, DOCX, or text file is read in your browser. Extracted CV text and the target job description are sent to JobBridge Africa’s backend and compared using a rule-based keyword matcher; no third-party AI service receives the text. The CV Refinisher does not save these inputs to your JobBridge account, application database, or file storage. The backend processes the text only for the duration of the analysis request and does not retain it afterward. Your entered text remains in this page until you clear it or leave.</p>
+          <p className="mt-2">A CV uploaded separately to your profile or job application is stored in Cloudinary until removed. Use “Delete my data” below to remove saved profile and application CV files from JobBridge-managed storage.</p>
+        </section>
+        <label className="mb-5 flex items-start gap-3 rounded-xl border border-slate-300 bg-white p-4 text-sm leading-6 text-slate-800">
+          <input type="checkbox" checked={consentGiven} onChange={(event) => setConsentGiven(event.target.checked)} className="mt-1" />
+          <span>I have read the CV processing disclosure and consent to sending the extracted CV text and job description to JobBridge Africa for this one-time analysis. See our <Link to="/privacy" className="font-semibold underline">Privacy Policy</Link>.</span>
+        </label>
 
         <form onSubmit={handleSubmit} className="grid gap-5">
           <label className="grid gap-2 text-sm font-semibold text-charcoal">
@@ -200,6 +236,7 @@ const CvOptimizerModal = ({ onClose }) => {
             <textarea
               value={cvText}
               onChange={(event) => setCvText(event.target.value)}
+              disabled={!consentGiven}
               maxLength={MAX_INPUT_LENGTH}
               required
               rows={8}
@@ -221,7 +258,7 @@ const CvOptimizerModal = ({ onClose }) => {
               type="file"
               accept=".txt,.md,.csv,.html,.htm,.rtf,.docx,.pdf,text/plain,text/markdown,text/csv,text/html,application/rtf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
               onChange={handleFile}
-              disabled={readingFile}
+              disabled={readingFile || !consentGiven}
               className="sr-only"
             />
           </label>
@@ -231,6 +268,7 @@ const CvOptimizerModal = ({ onClose }) => {
             <textarea
               value={jobDescription}
               onChange={(event) => setJobDescription(event.target.value)}
+              disabled={!consentGiven}
               maxLength={MAX_INPUT_LENGTH}
               required
               rows={7}
@@ -251,7 +289,7 @@ const CvOptimizerModal = ({ onClose }) => {
 
           <button
             type="submit"
-            disabled={loading || !cvText.trim() || !jobDescription.trim()}
+            disabled={loading || !consentGiven || !cvText.trim() || !jobDescription.trim()}
             aria-busy={loading}
             className="inline-flex w-fit items-center gap-2 rounded-xl bg-terracotta px-6 py-3 font-bold text-white transition hover:bg-terracotta-dark disabled:cursor-not-allowed disabled:opacity-60"
           >
@@ -262,6 +300,19 @@ const CvOptimizerModal = ({ onClose }) => {
             {loading ? "Analyzing your resume and job description." : ""}
           </p>
         </form>
+
+        <section className="mt-6 rounded-xl border border-stone-200 bg-white p-4">
+          <h2 className="font-bold text-charcoal">Delete my saved CV data</h2>
+          <p className="mt-1 text-sm leading-6 text-stone-600">This removes your profile CV and uploaded CV files attached to your applications from JobBridge-managed storage. Application details remain; employers who already received a copy may retain it.</p>
+          {isAuthenticated ? (
+            <button type="button" onClick={handleDeleteData} disabled={deleting} className="mt-3 rounded-lg border border-red-300 px-4 py-2 font-semibold text-red-800 hover:bg-red-50 disabled:opacity-60">
+              {deleting ? "Deleting…" : "Delete my data"}
+            </button>
+          ) : (
+            <p className="mt-3 text-sm">Sign in to delete saved CV files from your account. <Link to="/login" className="font-semibold text-terracotta underline">Sign in</Link></p>
+          )}
+          {deleteStatus && <p role="status" className="mt-3 text-sm text-slate-700">{deleteStatus}</p>}
+        </section>
 
         {result && (
           <div className="mt-8 space-y-5 border-t border-stone-200 pt-6">

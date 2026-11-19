@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
+import { getJobPath } from "../utils/jobUrl";
 
 // Demo AI matching function
 function matchJobs(userProfile, jobs) {
@@ -59,7 +60,7 @@ const demoProfile = {
 };
 
 const AIMatching = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [showDemo, setShowDemo] = useState(false);
   const matchedDemoJobs = matchJobs(demoProfile, demoJobs);
   const [loading, setLoading] = useState(false);
@@ -219,7 +220,7 @@ const AIMatching = () => {
                         </div>
                         <div>
                           <Link
-                            to={`/jobs/${job._id}`}
+                            to={getJobPath(job)}
                             className="text-primary hover:underline"
                           >
                             View Details →

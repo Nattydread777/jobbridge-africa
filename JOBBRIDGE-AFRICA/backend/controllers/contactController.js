@@ -1,15 +1,37 @@
 import nodemailer from 'nodemailer';
 import asyncHandler from 'express-async-handler';
 
+const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+}[character]));
+
 // @desc    Send contact form email
 // @route   POST /api/contact
 // @access  Public
 const sendContactEmail = asyncHandler(async (req, res) => {
-  const { name, email, subject, message, recaptchaToken } = req.body;
+  const { name, email, subject, message, recaptchaToken, website } = req.body;
+
+  if (typeof website === 'string' && website.trim()) {
+    res.status(400);
+    throw new Error('Unable to accept this submission.');
+  }
 
   if (!name || !email || !subject || !message) {
     res.status(400);
     throw new Error('Please fill in all fields');
+  }
+  if ([name, email, subject, message].some((value) => typeof value !== 'string')) {
+    res.status(400);
+    throw new Error('Contact form fields must be text.');
+  }
+  if (name.length > 120 || subject.length > 200 || message.length > 10000
+    || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    res.status(400);
+    throw new Error('Check your email address and keep the message within the allowed length.');
   }
 
   // Build SMTP configs
@@ -72,26 +94,30 @@ const sendContactEmail = asyncHandler(async (req, res) => {
   // Prepare email payloads BEFORE attempting any provider so variables exist.
   const defaultFrom = process.env.RESEND_FROM || 'JobBridge Africa <info@jobbridgeafrica.com>';
   const adminEmail = process.env.ADMIN_EMAIL || 'info@jobbridgeafrica.com';
+  const safeName = escapeHtml(name.trim());
+  const safeEmail = escapeHtml(email.trim());
+  const safeSubject = escapeHtml(subject.trim());
+  const safeMessage = escapeHtml(message.trim()).replace(/\r?\n/g, '<br>');
 
   const mailOptions = {
     from: defaultFrom,
     to: adminEmail,
     subject: `JobBridge Contact: ${subject}`,
-    replyTo: email,
+    replyTo: email.trim(),
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #16a34a;">New Contact Form Submission</h2>
         <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-          <p><strong>From:</strong> ${name}</p>
-          <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Subject:</strong> ${subject}</p>
+          <p><strong>From:</strong> ${safeName}</p>
+          <p><strong>Email:</strong> ${safeEmail}</p>
+          <p><strong>Subject:</strong> ${safeSubject}</p>
         </div>
         <div style="background-color: #ffffff; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
           <h3 style="color:#374151; margin-top:0;">Message:</h3>
-          <p style="color:#4b5563; line-height:1.6;">${message.replace(/\n/g, '<br>')}</p>
+          <p style="color:#4b5563; line-height:1.6;">${safeMessage}</p>
         </div>
         <div style="margin-top: 20px; padding: 15px; background-color: #ecfdf5; border-left: 4px solid #16a34a; border-radius: 4px;">
-          <p style="margin: 0; color: #065f46; font-size: 14px;">📧 <strong>Reply to:</strong> <a href="mailto:${email}" style="color:#16a34a;">${email}</a></p>
+          <p style="margin: 0; color: #065f46; font-size: 14px;">📧 <strong>Reply to:</strong> <a href="mailto:${safeEmail}" style="color:#16a34a;">${safeEmail}</a></p>
         </div>
         <p style="color: #9ca3af; font-size: 12px; margin-top: 30px;">This email was sent from the JobBridge Africa contact form.</p>
       </div>
@@ -100,7 +126,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
 
   const autoReplyOptions = {
     from: defaultFrom,
-    to: email,
+    to: email.trim(),
     subject: 'We received your message - JobBridge Africa',
     replyTo: 'info@jobbridgeafrica.com',
     html: `
@@ -110,11 +136,11 @@ const sendContactEmail = asyncHandler(async (req, res) => {
         </div>
         <div style="background-color: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
           <h2 style="color: #16a34a; margin-top: 0;">Thank you for contacting us!</h2>
-          <p style="color: #4b5563; line-height: 1.6;">Hi ${name},</p>
+          <p style="color: #4b5563; line-height: 1.6;">Hi ${safeName},</p>
           <p style="color: #4b5563; line-height: 1.6;">We've received your message and our team will get back to you within 24-48 hours.</p>
           <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <p style="margin: 0; color: #6b7280; font-size: 14px;"><strong>Your message:</strong></p>
-            <p style="color: #4b5563; margin-top: 10px;">${message.substring(0, 200)}${message.length > 200 ? '...' : ''}</p>
+            <p style="color: #4b5563; margin-top: 10px;">${escapeHtml(message.trim().substring(0, 200))}${message.length > 200 ? '...' : ''}</p>
           </div>
           <div style="margin: 30px 0;">
             <a href="https://jobbridgeafrica.com/jobs" style="background-color: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">Browse Jobs</a>

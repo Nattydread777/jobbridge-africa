@@ -24,7 +24,7 @@ import {
   normalizeHubstaffTalentListing,
   parseHubstaffTalentListings,
 } from '../services/hubstaffTalentScraper.js';
-import { cleanHtmlSnippet } from '../utils/sanitizer.js';
+import { cleanHtmlDescription, cleanHtmlSnippet } from '../utils/sanitizer.js';
 
 const employer = {
   _id: '64c000000000000000000001',
@@ -337,6 +337,14 @@ test('cleans raw HTML, style markup, and encoded entities from job text', () => 
     description: '<p style="font-size:12px">Build &amp; maintain <b>services</b>.</p>',
     location: 'Worldwide',
     url: 'https://remotive.com/remote-jobs/example-engineer',
+  });
+
+  test('preserves full job-description sections and removes unsafe markup', () => {
+    const description = cleanHtmlDescription(
+      '<h2>Responsibilities</h2><ul><li>Own delivery.</li><li>Support customers.</li></ul><script>unsafe()</script>',
+    );
+    assert.equal(description, 'Responsibilities\nOwn delivery.\nSupport customers.');
+    assert.equal(cleanHtmlDescription(`<p>${'Full description. '.repeat(400)}</p>`).length > 5000, true);
   });
   assert.equal(normalizedRemote.description, 'Build & maintain services.');
   assert.equal(normalizedRemote.excerpt, 'Build & maintain services.');

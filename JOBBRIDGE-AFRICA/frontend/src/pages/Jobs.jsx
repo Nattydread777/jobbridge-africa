@@ -24,10 +24,34 @@ const Jobs = () => {
     salary: searchParams.get("salary") || "",
     datePosted: searchParams.get("datePosted") || "",
     experience: searchParams.get("experience") || "",
+    category: searchParams.get("category") || "",
   });
 
   const [email, setEmail] = useState("");
+  const [alertConsent, setAlertConsent] = useState(false);
+  const [alertStatus, setAlertStatus] = useState("");
+  const [alertSubmitting, setAlertSubmitting] = useState(false);
   const { search } = useLocation();
+
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const seniority = params.get("seniority") || "";
+    setFilters({
+      search: params.get("q") || params.get("search") || "",
+      location: params.get("location") || "",
+      country: params.get("country") || "",
+      city: params.get("city") || "",
+      jobType: params.get("jobType") || "",
+      isRemote: params.get("remote") || params.get("isRemote") || "",
+      workplaceType: params.get("workplaceType") || "",
+      salary: params.get("salary") || "",
+      datePosted: params.get("datePosted") || "",
+      experience: params.get("experience") || (
+        seniority === "entry" ? "entry" : seniority === "mid" ? "mid" : seniority === "senior" ? "senior" : ""
+      ),
+      category: params.get("category") || "",
+    });
+  }, [search]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -96,7 +120,7 @@ const Jobs = () => {
     });
     if (newFilters.country && !newFilters.location) params.set("country", newFilters.country);
     if (newFilters.city && !newFilters.location) params.set("city", newFilters.city);
-    if (newFilters.isRemote && !newFilters.workplaceType) params.set("isRemote", newFilters.isRemote);
+    if (newFilters.isRemote && !newFilters.workplaceType) params.set("remote", newFilters.isRemote);
     if (newFilters.experience) {
       const seniority = {
         entry: "entry",
@@ -105,15 +129,55 @@ const Jobs = () => {
       }[newFilters.experience];
       if (seniority) params.set("seniority", seniority);
       if (newFilters.experience === "internship") params.set("jobType", "Internship");
+      params.set("experience", newFilters.experience);
     }
     params.set("page", "1");
     setSearchParams(params);
   };
 
-  const handleNewsletterSubscribe = (e) => {
+  const handleNewsletterSubscribe = async (e) => {
     e.preventDefault();
-    alert(`Subscribed with email: ${email}`);
-    setEmail("");
+    setAlertStatus("");
+    setAlertSubmitting(true);
+    try {
+      const { data } = await api.post("/job-alerts", {
+        email,
+        keyword: filters.search,
+        location: filters.location || filters.city || filters.country,
+        remote: filters.workplaceType === "remote" || filters.isRemote === "true"
+          ? true
+          : filters.workplaceType || filters.isRemote === "false"
+            ? false
+            : null,
+        jobType: filters.jobType,
+        category: filters.category,
+        consent: alertConsent,
+      });
+      setAlertStatus(data.message);
+      setEmail("");
+      setAlertConsent(false);
+    } catch (requestError) {
+      setAlertStatus(requestError.response?.data?.message || "We couldn't save your job alert. Please try again.");
+    } finally {
+      setAlertSubmitting(false);
+    }
+  };
+
+  const resetFilters = () => {
+    setFilters({
+      search: "",
+      location: "",
+      country: "",
+      city: "",
+      jobType: "",
+      isRemote: "",
+      workplaceType: "",
+      salary: "",
+      datePosted: "",
+      experience: "",
+      category: "",
+    });
+    setSearchParams({});
   };
 
   return (
@@ -145,6 +209,18 @@ const Jobs = () => {
               value={filters.search}
               onChange={(event) => handleFilterChange("search", event.target.value)}
               placeholder="Title, company, or keyword"
+              className="w-full rounded border p-2"
+            />
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow">
+            <label htmlFor="job-category" className="mb-2 block font-bold">Category</label>
+            <input
+              id="job-category"
+              type="search"
+              value={filters.category}
+              onChange={(event) => handleFilterChange("category", event.target.value)}
+              placeholder="e.g. Engineering"
               className="w-full rounded border p-2"
             />
           </div>
@@ -293,9 +369,9 @@ const Jobs = () => {
 
           {/* Newsletter Subscription */}
           <div className="bg-primary/10 p-4 rounded-lg shadow">
-            <h3 className="font-bold mb-2">✉️ Email Latest Jobs</h3>
+            <h3 className="font-bold mb-2">✉️ Save a Job Alert</h3>
             <p className="text-sm text-gray-600 mb-3">
-              Subscribe our Newsletter for latest job updates
+              Save your email and current search filters for job-alert updates. Automated email delivery is not active yet.
             </p>
             <form onSubmit={handleNewsletterSubscribe}>
               <input
@@ -306,12 +382,18 @@ const Jobs = () => {
                 className="w-full p-2 border rounded mb-2"
                 required
               />
+              <label className="mb-3 flex items-start gap-2 text-xs text-gray-700">
+                <input type="checkbox" checked={alertConsent} onChange={(e) => setAlertConsent(e.target.checked)} required className="mt-0.5" />
+                <span>I agree to receive job-alert emails if delivery becomes available. I can unsubscribe by contacting JobBridge Africa.</span>
+              </label>
               <button
                 type="submit"
-                className="w-full bg-primary text-black px-4 py-2 rounded hover:brightness-95 transition font-semibold"
+                disabled={alertSubmitting}
+                className="w-full bg-primary text-black px-4 py-2 rounded hover:brightness-95 transition font-semibold disabled:opacity-60"
               >
-                Subscribe
+                {alertSubmitting ? "Saving…" : "Save alert preferences"}
               </button>
+              {alertStatus && <p role="status" className="mt-3 text-sm text-gray-700">{alertStatus}</p>}
             </form>
           </div>
 
@@ -321,9 +403,9 @@ const Jobs = () => {
             <p className="text-sm text-gray-600 mb-3">
               Upload your resume here to get noticed faster by Top Companies.
             </p>
-            <button className="w-full bg-secondary text-white px-4 py-2 rounded hover:brightness-95 transition font-semibold">
+            <Link to="/upload-resume" className="block w-full rounded bg-secondary px-4 py-2 text-center font-semibold text-white transition hover:brightness-95">
               Upload Resume
-            </button>
+            </Link>
           </div>
         </aside>
 
@@ -354,7 +436,13 @@ const Jobs = () => {
               Loading opportunities…
             </div>
           ) : jobs.length === 0 ? (
-            <p className="text-gray-600">No jobs available at the moment.</p>
+            <section className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+              <h3 className="text-xl font-bold text-slate-900">No jobs match these filters</h3>
+              <p className="mt-2 text-slate-600">Try a broader keyword or location, or reset your filters to see all available jobs.</p>
+              <button type="button" onClick={resetFilters} className="mt-5 rounded-lg bg-primary px-5 py-3 font-semibold text-white hover:brightness-95">
+                Reset Filters
+              </button>
+            </section>
           ) : (
             <>
               <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">

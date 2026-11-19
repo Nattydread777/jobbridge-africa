@@ -3,6 +3,7 @@ import api from "../services/api";
 
 const AuthContext = createContext();
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -21,7 +22,7 @@ export const AuthProvider = ({ children }) => {
       try {
         const { data } = await api.get("/auth/me");
         setUser(data);
-      } catch (error) {
+      } catch {
         setUser(null);
       } finally {
         setLoading(false);
@@ -31,7 +32,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const login = async (email, password) => {
-    const { data } = await api.post("/auth/login", { email, password });
+    await api.post("/auth/login", { email, password });
     // Fetch complete user profile after login
     const { data: userData } = await api.get("/auth/me");
     setUser(userData);
@@ -40,10 +41,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (formData) => {
     const { data } = await api.post("/auth/register", formData);
-    // Fetch complete user profile after registration
-    const { data: userData } = await api.get("/auth/me");
-    setUser(userData);
-    return userData;
+    return data;
   };
 
   const logout = async () => {

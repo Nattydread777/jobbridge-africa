@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import heroImg from "../assets/hero.jpg";
 import locations from "../data/jobLocations";
+import api from "../services/api";
+import { getJobPath } from "../utils/jobUrl";
 
 const Home = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -10,11 +12,30 @@ const Home = () => {
   const [workplaceType, setWorkplaceType] = useState("");
   const [jobType, setJobType] = useState("All");
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [statsVisible, setStatsVisible] = useState(false);
+  const [jobCount, setJobCount] = useState(null);
+  const [featuredEmployers, setFeaturedEmployers] = useState([]);
+  const [sampleJob, setSampleJob] = useState(null);
   const [isPaused, setIsPaused] = useState(false);
   const navigate = useNavigate();
-  const statsRef = useRef(null);
   const slides = 2; // Total number of hero slides
+
+  useEffect(() => {
+    let active = true;
+    api.get("/jobs?limit=8").then(({ data }) => {
+      if (!active) return;
+      const jobs = Array.isArray(data?.jobs) ? data.jobs : [];
+      setJobCount(Number.isFinite(data?.total) ? data.total : jobs.length);
+      setFeaturedEmployers([...new Set(jobs
+        .filter((job) => job.sourceProvider !== "jobbridge-fallback")
+        .map((job) => job.companyName)
+        .filter(Boolean))].slice(0, 4));
+      const representative = jobs.find((job) => job.sourceProvider !== "jobbridge-fallback");
+      if (representative) setSampleJob(representative);
+    }).catch((error) => {
+      console.error("Could not load live job count:", error);
+    });
+    return () => { active = false; };
+  }, []);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -42,28 +63,6 @@ const Home = () => {
 
     return () => clearInterval(interval);
   }, [isPaused]); // Intersection Observer for stats animation
-  useEffect(() => {
-    const observerOptions = {
-      threshold: 0.2,
-      rootMargin: "0px 0px -100px 0px",
-    };
-
-    const statsObserver = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting && !statsVisible) {
-          setStatsVisible(true);
-        }
-      });
-    }, observerOptions);
-
-    const statsElement = statsRef.current;
-    if (statsElement) statsObserver.observe(statsElement);
-
-    return () => {
-      if (statsElement) statsObserver.unobserve(statsElement);
-    };
-  }, [statsVisible]);
-
   const goToSlide = (index) => {
     setCurrentSlide(index);
   };
@@ -117,9 +116,8 @@ const Home = () => {
                   Find Your Dream Job in Africa
                 </h1>
                 <p className="text-sm sm:text-base md:text-lg mb-4 md:mb-8 text-gray-100 max-w-2xl mx-auto leading-relaxed">
-                  AI-enabled matching connecting African youth and professionals
-                  with decent work opportunities across the continent.
-                </p>
+                      Find relevant jobs across Africa and access direct application information in one place.
+                    </p>
                 <form
                   onSubmit={handleSearch}
                   className="bg-white/90 backdrop-blur-md rounded-md md:rounded-xl shadow-2xl p-2 md:p-6 max-w-4xl mx-auto"
@@ -427,25 +425,69 @@ const Home = () => {
             Open CV Refinisher
           </Link>
         </article>
-        <article
-          id="royal-merchant"
-          className="scroll-mt-28 rounded-3xl bg-amber-100 p-8 text-charcoal shadow-lg"
-        >
+        <article className="rounded-3xl bg-amber-100 p-8 text-charcoal shadow-lg">
           <p className="text-sm font-bold uppercase tracking-[0.16em] text-terracotta">
-            Educational financing partner
+            Cooperative training support
           </p>
           <h2 className="mt-3 text-3xl font-black">Royal Merchant MPCS</h2>
           <p className="mt-3 leading-relaxed text-stone-700">
-            Royal Merchant MPCS is featured as JobBridge Africa&apos;s lending backbone, supporting
-            access to micro-loans and short-course funding for job-ready upskilling.
+            Learn about cooperative membership and training support for approved skills programs, including eligibility and repayment details.
           </p>
           <Link
-            to="/career-resources"
+            to="/royal-merchant"
             className="mt-6 inline-flex rounded-xl bg-terracotta px-5 py-3 font-bold text-white hover:bg-terracotta-dark"
           >
-            Explore career resources
+            Explore study support
           </Link>
         </article>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-6 py-8 md:px-8">
+        <div className="grid gap-6 lg:grid-cols-3">
+          <article className="rounded-2xl bg-white p-6 shadow-sm lg:col-span-2">
+            <h2 className="text-2xl font-bold text-charcoal">How JobBridge works</h2>
+            <ol className="mt-5 grid gap-4 sm:grid-cols-3">
+              {[
+                ["1. Discover", "Search jobs by role, location, work arrangement, and type."],
+                ["2. Prepare", "Review the full job description and tailor your application."],
+                ["3. Apply", "Apply directly or continue to the employer’s official site."],
+              ].map(([title, detail]) => <li key={title} className="rounded-xl bg-slate-50 p-4"><h3 className="font-bold">{title}</h3><p className="mt-2 text-sm text-slate-600">{detail}</p></li>)}
+            </ol>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Link to="/employers" className="rounded-lg bg-terracotta px-5 py-3 font-semibold text-white">I’m an employer</Link>
+              <Link to="/jobs" className="rounded-lg border border-slate-300 px-5 py-3 font-semibold text-slate-800">Explore jobs</Link>
+            </div>
+          </article>
+          <article className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
+            <p className="text-sm font-bold uppercase tracking-wide text-terracotta">A sample match</p>
+            {sampleJob ? (
+              <>
+                <h3 className="mt-3 text-xl font-bold text-charcoal">{sampleJob.title}</h3>
+                <p className="mt-1 text-slate-700">{sampleJob.companyName} · {sampleJob.location}</p>
+                <p className="mt-3 text-sm text-slate-600">This example is selected from a current listing; check the full description for location and eligibility requirements.</p>
+                <Link to={getJobPath(sampleJob)} className="mt-4 inline-block font-semibold text-terracotta underline">View this role</Link>
+              </>
+            ) : (
+              <>
+                <h3 className="mt-3 text-xl font-bold text-charcoal">Roles matched to your search</h3>
+                <p className="mt-2 text-slate-700">Filter opportunities by location and work arrangement, then review the employer’s complete requirements before applying.</p>
+                <Link to="/jobs" className="mt-4 inline-block font-semibold text-terracotta underline">Browse job matches</Link>
+              </>
+            )}
+          </article>
+        </div>
+        <div className="mt-6 rounded-xl bg-charcoal p-5 text-white">
+          <p className="text-sm text-slate-300">Current active listings on JobBridge Africa</p>
+          <p className="mt-1 text-3xl font-black">{jobCount === null ? "Loading…" : jobCount.toLocaleString()}</p>
+        </div>
+        {featuredEmployers.length > 0 && (
+          <section className="mt-8 rounded-2xl bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-bold text-charcoal">Featured employers in current listings</h2>
+            <ul className="mt-4 flex flex-wrap gap-3">
+              {featuredEmployers.map((employer) => <li key={employer} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">{employer}</li>)}
+            </ul>
+          </section>
+        )}
       </section>
 
       <section className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-4 px-6 pb-12 text-sm text-stone-600 md:flex-row md:items-center md:px-8">
@@ -458,76 +500,6 @@ const Home = () => {
         </Link>
       </section>
 
-      {/* Stats Section */}
-      <section
-        ref={statsRef}
-        className={`bg-secondary text-white py-12 transition-all duration-1000 ${
-          statsVisible ? "opacity-100" : "opacity-0"
-        }`}
-      >
-        <div className="max-w-7xl mx-auto px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
-            <StatCard
-              end={10000}
-              suffix="+"
-              label="Active Jobs"
-              isVisible={statsVisible}
-            />
-            <StatCard
-              end={5000}
-              suffix="+"
-              label="Companies"
-              isVisible={statsVisible}
-            />
-            <StatCard
-              end={50000}
-              suffix="+"
-              label="Job Seekers"
-              isVisible={statsVisible}
-            />
-            <StatCard
-              end={54}
-              suffix=""
-              label="African Countries"
-              isVisible={statsVisible}
-            />
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-};
-
-// Stat card component with counter animation
-const StatCard = ({ end, suffix, label, isVisible }) => {
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    if (!isVisible) return;
-
-    let startTime;
-    const duration = 2000;
-
-    const step = (timestamp) => {
-      if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / duration, 1);
-      setCount(Math.floor(progress * end));
-
-      if (progress < 1) {
-        requestAnimationFrame(step);
-      }
-    };
-
-    requestAnimationFrame(step);
-  }, [end, isVisible]);
-
-  return (
-    <div>
-      <div className="text-4xl font-bold">
-        {count.toLocaleString()}
-        {suffix}
-      </div>
-      <div className="text-gray-200 mt-2">{label}</div>
     </div>
   );
 };

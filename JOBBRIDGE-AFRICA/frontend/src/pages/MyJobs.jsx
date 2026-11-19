@@ -2,6 +2,7 @@ import { useAuth } from "../context/AuthContext";
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../services/api";
+import { getJobPath } from "../utils/jobUrl";
 
 const MyJobs = () => {
   const { user } = useAuth();
@@ -163,7 +164,7 @@ const MyJobs = () => {
                   {new Date(application.createdAt).toLocaleDateString()}
                 </p>
                 <Link
-                  to={`/jobs/${application.job._id}`}
+                  to={getJobPath(application.job)}
                   className="text-primary hover:underline"
                 >
                   View Job Details →

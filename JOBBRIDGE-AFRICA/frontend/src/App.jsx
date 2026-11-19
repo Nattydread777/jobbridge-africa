@@ -26,15 +26,20 @@ import UploadResume from "./pages/UploadResume";
 import CareerResources from "./pages/CareerResources";
 import Pricing from "./pages/Pricing";
 import AICvTool from "./pages/AICvTool";
+import RouteMetadata from "./components/RouteMetadata";
+import CookieConsentBanner from "./components/CookieConsentBanner";
+import Cookies from "./pages/Cookies";
+import FAQ from "./pages/FAQ";
+import RoyalMerchant from "./pages/RoyalMerchant";
+import NotFound from "./pages/NotFound";
+import VerifyEmail from "./pages/VerifyEmail";
 
-function App() {
-  return (
-    <AuthProvider>
-      <Router>
-        <div className="min-h-screen flex flex-col">
-          <Header />
-          <main className="flex-1 pt-20">
-            <Routes>
+export const AppContent = () => (
+  <div className="min-h-screen flex flex-col">
+    <RouteMetadata />
+    <Header />
+    <main className="flex-1 pt-20">
+      <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/jobs" element={<Jobs />} />
               <Route path="/jobs/:id" element={<JobDetails />} />
@@ -43,6 +48,7 @@ function App() {
               <Route path="/contact" element={<Contact />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/verify-email/:token" element={<VerifyEmail />} />
               <Route path="/reset-password/:token" element={<ResetPassword />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/profile-view" element={<ProfileView />} />
@@ -66,10 +72,22 @@ function App() {
               <Route path="/career-resources" element={<CareerResources />} />
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/ai-cv-tool" element={<AICvTool />} />
-            </Routes>
-          </main>
-          <Footer />
-        </div>
+              <Route path="/royal-merchant" element={<RoyalMerchant />} />
+              <Route path="/cookies" element={<Cookies />} />
+              <Route path="/faq" element={<FAQ />} />
+              <Route path="*" element={<NotFound />} />
+      </Routes>
+    </main>
+    <Footer />
+    <CookieConsentBanner />
+  </div>
+);
+
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <AppContent />
       </Router>
     </AuthProvider>
   );
