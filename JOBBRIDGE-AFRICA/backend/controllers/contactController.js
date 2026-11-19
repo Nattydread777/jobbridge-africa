@@ -70,8 +70,9 @@ const sendContactEmail = asyncHandler(async (req, res) => {
   }
 
   // Prepare email payloads BEFORE attempting any provider so variables exist.
-  const defaultFrom = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'info@jobbridgeafrica.com';
+  const defaultFrom = process.env.RESEND_FROM || 'JobBridge Africa <info@jobbridgeafrica.com>';
   const adminEmail = process.env.ADMIN_EMAIL || 'info@jobbridgeafrica.com';
+
   const mailOptions = {
     from: defaultFrom,
     to: adminEmail,
@@ -87,7 +88,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
         </div>
         <div style="background-color: #ffffff; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
           <h3 style="color:#374151; margin-top:0;">Message:</h3>
-          <p style="color:#4b5563; line-height:1.6;">${message.replace(/\n/g,'<br>')}</p>
+          <p style="color:#4b5563; line-height:1.6;">${message.replace(/\n/g, '<br>')}</p>
         </div>
         <div style="margin-top: 20px; padding: 15px; background-color: #ecfdf5; border-left: 4px solid #16a34a; border-radius: 4px;">
           <p style="margin: 0; color: #065f46; font-size: 14px;">📧 <strong>Reply to:</strong> <a href="mailto:${email}" style="color:#16a34a;">${email}</a></p>
@@ -96,6 +97,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
       </div>
     `,
   };
+
   const autoReplyOptions = {
     from: defaultFrom,
     to: email,
@@ -134,7 +136,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     try {
       const sendViaResend = async (mailData) => {
         const payload = {
-          from: process.env.RESEND_FROM || 'onboarding@resend.dev',
+          from: mailData.from,
           to: [mailData.to],
           subject: mailData.subject,
           html: mailData.html,
@@ -153,11 +155,22 @@ const sendContactEmail = asyncHandler(async (req, res) => {
           throw new Error(`Resend API error: ${response.status} - ${errorBody}`);
         }
       };
+
       diagnostics.attempts.push({ provider: 'resend-api', init: true });
+
+      // 1. Send admin notification (critical)
       await sendViaResend(mailOptions);
       diagnostics.attempts.push({ provider: 'resend-api', admin_sent: true, to: mailOptions.to });
-      await sendViaResend(autoReplyOptions);
-      diagnostics.attempts.push({ provider: 'resend-api', auto_reply_sent: true, to: autoReplyOptions.to });
+
+      // 2. Send auto-reply to visitor (isolated so an invalid visitor email never fails the submission)
+      try {
+        await sendViaResend(autoReplyOptions);
+        diagnostics.attempts.push({ provider: 'resend-api', auto_reply_sent: true, to: autoReplyOptions.to });
+      } catch (replyError) {
+        diagnostics.attempts.push({ provider: 'resend-api', auto_reply_failed: true, error: replyError?.message || String(replyError) });
+        console.error('Resend auto-reply error:', replyError?.message || String(replyError));
+      }
+
       diagnostics.providerUsed = 'resend-api';
       const payload = { success: true, message: 'Message sent successfully', transport: diagnostics.providerUsed };
       if (process.env.NODE_ENV !== 'production') payload.diagnostics = diagnostics;
@@ -168,7 +181,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     }
   }
 
-  // Try primary
+  // Try primary SMTP
   try {
     transporter = nodemailer.createTransport(primaryConfig);
     const start = Date.now();
@@ -178,7 +191,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     diagnostics.providerUsed = 'smtp-primary';
   } catch (e) {
     diagnostics.attempts.push({ provider: 'smtp', config: 'primary', ok: false, error: e?.message || String(e) });
-    // Try fallback
+    // Try fallback SMTP
     try {
       transporter = nodemailer.createTransport(fallbackConfig);
       const start2 = Date.now();
@@ -190,7 +203,6 @@ const sendContactEmail = asyncHandler(async (req, res) => {
       diagnostics.attempts.push({ provider: 'smtp', config: 'fallback', ok: false, error: e2?.message || String(e2) });
     }
   }
-
 
   try {
     if (!smtpReady) throw new Error('No email transport available (SMTP unavailable and Resend failed or is not configured).');
@@ -216,12 +228,10 @@ export { sendContactEmail };
 // @route   GET /api/contact/health
 // @access  Public (read-only)
 export const checkEmailHealth = asyncHandler(async (req, res) => {
-  // Debug: Log environment variable status
   const hasResendKey = Boolean(process.env.RESEND_API_KEY);
   console.log('RESEND_API_KEY present:', hasResendKey);
   console.log('NODE_ENV:', process.env.NODE_ENV);
-  
-  // Report configured API delivery without sending a test email.
+
   if (hasResendKey) {
     return res.json({
       ok: true,
@@ -229,6 +239,7 @@ export const checkEmailHealth = asyncHandler(async (req, res) => {
       results: [{ provider: 'resend-api', ok: true, method: 'REST API (no email sent)' }],
     });
   }
+
   const port = Number(process.env.EMAIL_PORT || 587);
   const secure = process.env.EMAIL_SECURE !== undefined
     ? String(process.env.EMAIL_SECURE).toLowerCase() === 'true'
@@ -255,7 +266,6 @@ export const checkEmailHealth = asyncHandler(async (req, res) => {
 
   const results = [];
 
-  // Try primary
   try {
     const t1 = nodemailer.createTransport(primaryConfig);
     await t1.verify();
@@ -265,7 +275,6 @@ export const checkEmailHealth = asyncHandler(async (req, res) => {
     results.push({ config: 'primary', host: primaryConfig.host, port: primaryConfig.port, secure: primaryConfig.secure, ok: false, error: e?.message || String(e) });
   }
 
-  // Try fallback
   try {
     const t2 = nodemailer.createTransport(fallbackConfig);
     await t2.verify();
