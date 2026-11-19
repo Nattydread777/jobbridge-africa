@@ -26,6 +26,10 @@ const JobDetails = () => {
   const [reportEmail, setReportEmail] = useState("");
   const [reportStatus, setReportStatus] = useState("");
   const [reporting, setReporting] = useState(false);
+  const [fitContext, setFitContext] = useState(null);
+  const [fitLoading, setFitLoading] = useState(false);
+  const [fitError, setFitError] = useState("");
+  const jobId = job?._id;
   const salaryLabel = [job?.salary, job?.salaryRange]
     .map((value) => String(value || "").trim())
     .find((value) => value && !/^competitive$/i.test(value)) || "";
@@ -80,6 +84,30 @@ const JobDetails = () => {
         setLoading(false);
       });
   }, [id, location.hash, location.pathname, isAuthenticated, user, navigate]);
+
+  useEffect(() => {
+    let active = true;
+    if (!jobId || !isAuthenticated || user?.role !== "job_seeker") {
+      setFitContext(null);
+      setFitError("");
+      return () => { active = false; };
+    }
+    setFitLoading(true);
+    setFitError("");
+    api.get(`/ai/match?jobId=${encodeURIComponent(jobId)}`)
+      .then(({ data }) => {
+        if (active) setFitContext(Array.isArray(data) ? data[0]?.fit_context || null : null);
+      })
+      .catch((requestError) => {
+        if (active) {
+          setFitError(requestError.response?.data?.message || "Your job-fit context could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (active) setFitLoading(false);
+      });
+    return () => { active = false; };
+  }, [jobId, isAuthenticated, user?.role]);
 
   const handleApplyClick = () => {
     if (job && job.source !== "employer" && job.isDirectPosting !== true) return;
@@ -215,6 +243,27 @@ const JobDetails = () => {
           </p>
         )}
 
+        {isAuthenticated && user?.role === "job_seeker" && (
+          <section className="mb-6 rounded-xl border border-sky-200 bg-sky-50 p-4">
+            <h2 className="font-bold text-sky-950">Your job-fit context</h2>
+            {fitLoading && <p className="mt-2 text-sm text-sky-900">Checking your profile against this role…</p>}
+            {fitError && <p role="status" className="mt-2 text-sm text-amber-900">{fitError}</p>}
+            {fitContext && (
+              <>
+                <p className="mt-2 text-sm text-sky-900">Weighted recommendation score: {fitContext.overall_score}% — guidance only, not a hiring decision.</p>
+                <div className="mt-3 grid gap-3 text-sm text-sky-950 sm:grid-cols-3">
+                  <p><strong>Skills:</strong> {fitContext.skills.score}% ({fitContext.skills.matched.length}/{fitContext.skills.required.length || "n/a"} recognized requirements)</p>
+                  <p><strong>Experience:</strong> {fitContext.experience.status.replaceAll("_", " ")}. {fitContext.experience.notes}</p>
+                  <p><strong>Logistics &amp; eligibility:</strong> {fitContext.logistics.status.replaceAll("_", " ")}. {fitContext.logistics.notes.join(" ") || "Confirm work location, schedule, and authorization with the employer."}</p>
+                </div>
+                {fitContext.must_have_gaps.length > 0 && (
+                  <p className="mt-3 text-sm text-sky-950"><strong>Top requirements to review:</strong> {fitContext.must_have_gaps.map((gap) => gap.skill).join("; ")}</p>
+                )}
+              </>
+            )}
+          </section>
+        )}
+
         <div className="mb-6">
           <h2 className="text-2xl font-bold mb-3">Job Description</h2>
           <p className="text-gray-700 whitespace-pre-line">{job.fullDescription || job.description}</p>
@@ -272,7 +321,13 @@ const JobDetails = () => {
           </p>
         )}
 
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-4">
+          <Link
+            to={`/ai-cv-tool?jobId=${encodeURIComponent(job._id)}`}
+            className="rounded border border-primary px-6 py-3 font-semibold text-primary hover:bg-primary/10"
+          >
+            Check my CV fit
+          </Link>
           {job.source !== "employer" && job.isDirectPosting !== true ? (
             job.applicationLink ? (
               <a

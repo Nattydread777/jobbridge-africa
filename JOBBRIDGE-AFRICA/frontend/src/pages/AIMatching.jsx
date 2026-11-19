@@ -200,33 +200,39 @@ const AIMatching = () => {
                   Your AI-Recommended Jobs
                 </h3>
                 <ul className="divide-y">
-                  {aiMatches.map(({ job, score }) => (
+                  {aiMatches.map(({ job, score, fit_context: fitContext }) => (
                     <li
                       key={job._id}
-                      className="py-4 flex items-start justify-between gap-4"
+                      className="py-4"
                     >
-                      <div>
-                        <div className="text-lg font-semibold text-secondary">
-                          {job.title}
-                        </div>
-                        <div className="text-gray-600">{job.companyName}</div>
-                        <div className="text-sm text-gray-500">
-                          {job.location} • {job.jobType}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="inline-block bg-primary text-white px-3 py-1 rounded-full text-sm font-semibold mb-2">
-                          Match: {(score * 100).toFixed(0)}%
-                        </div>
+                      <div className="flex flex-wrap items-start justify-between gap-4">
                         <div>
-                          <Link
-                            to={getJobPath(job)}
-                            className="text-primary hover:underline"
-                          >
-                            View Details →
-                          </Link>
+                          <div className="text-lg font-semibold text-secondary">{job.title}</div>
+                          <div className="text-gray-600">{job.companyName}</div>
+                          <div className="text-sm text-gray-500">{job.location} • {job.jobType}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="inline-block bg-primary text-white px-3 py-1 rounded-full text-sm font-semibold mb-2">
+                            Recommendation: {(score * 100).toFixed(0)}%
+                          </div>
+                          <div>
+                            <Link to={getJobPath(job)} className="text-primary hover:underline">View Details →</Link>
+                          </div>
+                          <div>
+                            <Link to={`/ai-cv-tool?jobId=${encodeURIComponent(job._id)}`} className="text-sm text-primary hover:underline">Compare my CV</Link>
+                          </div>
                         </div>
                       </div>
+                      {fitContext && (
+                        <div className="mt-3 grid gap-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-700 sm:grid-cols-3">
+                          <p><strong>Skill fit:</strong> {fitContext.skills.score}% ({fitContext.skills.matched.length}/{fitContext.skills.required.length || "n/a"} recognized requirements)</p>
+                          <p><strong>Experience:</strong> {fitContext.experience.status.replaceAll("_", " ")} — {fitContext.experience.notes}</p>
+                          <p><strong>Logistics:</strong> {fitContext.logistics.status.replaceAll("_", " ")}{fitContext.logistics.notes.length ? ` — ${fitContext.logistics.notes.join(" ")}` : " — confirm role conditions with the employer."}</p>
+                          {fitContext.must_have_gaps.length > 0 && (
+                            <p className="sm:col-span-3"><strong>Top requirements to review:</strong> {fitContext.must_have_gaps.map((gap) => gap.skill).join("; ")}</p>
+                          )}
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>

@@ -352,10 +352,16 @@ const PrivacyPolicy = () => {
               CV tools, uploads, and deletion
             </h2>
             <p className="mb-3">
-              The CV Refinisher reads selected PDF, DOCX, and text files in your browser. The extracted CV text and the job description you enter are sent to our backend for rule-based keyword comparison. The backend processes the text only for the duration of the analysis request and does not retain it afterward. The tool does not use a third-party generative AI service and does not save that request text or selected file to your JobBridge account or Cloudinary. Text remains in the open page until you clear it or leave the tool. Hosting and network providers may process connection data under their own policies.
+              The CV Refinisher reads selected PDF, DOCX, and text files in your browser. Its free diagnostic sends the extracted CV and job information to our backend for rule-based analysis; we do not retain the request text after the analysis request. Optional AI review is disabled unless you separately opt in. If you do, direct contact information and the detected candidate name are redacted before the remaining CV/job text is sent to OpenAI to generate suggested edits. OpenAI API abuse-monitoring retention is generally up to 30 days, subject to OpenAI's current policies and any account-specific data controls; JobBridge Africa does not control provider retention. Do not enable AI review if you do not agree. Redaction reduces exposure but cannot guarantee that all identifying information is removed.
             </p>
             <p className="mb-3">
-              A resume you upload to your account is different: it is stored with Cloudinary while linked to your profile or application. Use the CV tool’s “Delete my data” action while signed in to request immediate removal of your saved profile resume and CV files attached to applications from JobBridge-managed storage. Application details remain in your account, with resume links removed. Employers who already received an application may retain a copy they received; contact the employer separately to request its deletion.
+              CV text and files submitted to the CV Refinisher are not saved to your account or application records by this tool. Text remains in your open browser page until you clear it or leave; backend request handling is transient. A resume separately uploaded to your account is stored with Cloudinary while linked to your profile or application. Use the CV tool’s “Delete my data” action while signed in to remove your saved profile resume and CV files attached to applications from JobBridge-managed storage. Application details remain in your account, with resume links removed. Employers who already received an application may retain a copy they received; contact the employer separately to request its deletion.
+            </p>
+            <p className="mb-3">
+              AI-generated summaries or rewrites are not verified facts, hiring decisions, or guarantees of employment. Review every suggestion and only use statements that are accurate and supported by your actual experience.
+            </p>
+            <p className="mb-3">
+              To enforce daily free usage limits, the backend stores a one-way hash of your account identifier or IP address and a daily request count; these usage records are scheduled to expire after 35 days. CV contents are not stored in these records.
             </p>
             <p>
               Account data is otherwise subject to the retention terms described above. For access, correction, or deletion requests, contact{" "}

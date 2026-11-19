@@ -20,6 +20,23 @@ export const protect = asyncHandler(async (req, res, next) => {
   }
 });
 
+export const optionalProtect = asyncHandler(async (req, res, next) => {
+  const token = req.cookies?.jwt;
+  if (!token) return next();
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+      return next();
+    }
+    throw error;
+  }
+  req.user = await User.findById(decoded.userId).select('-password');
+  return next();
+});
+
 export const employer = (req, res, next) => {
   if (req.user && req.user.role === 'employer') {
     next();
