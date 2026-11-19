@@ -128,48 +128,43 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     `,
   };
 
-  // Prefer SendGrid REST API first (avoids blocked SMTP on some hosts)
-  const canUseSendGrid = Boolean(process.env.SENDGRID_API_KEY);
-  if (canUseSendGrid) {
+  // Prefer Resend REST API first; keep SMTP as a fallback.
+  const canUseResend = Boolean(process.env.RESEND_API_KEY);
+  if (canUseResend) {
     try {
-      const sendViaSendGrid = async (mailData) => {
+      const sendViaResend = async (mailData) => {
         const payload = {
-          personalizations: [{ to: [{ email: mailData.to }] }],
-          from: { email: mailData.from },
+          from: process.env.RESEND_FROM || 'onboarding@resend.dev',
+          to: [mailData.to],
           subject: mailData.subject,
-          content: [{ type: 'text/html', value: mailData.html }],
-          reply_to: mailData.replyTo ? { email: mailData.replyTo } : undefined,
+          html: mailData.html,
+          reply_to: mailData.replyTo,
         };
-        console.log(`[SendGrid] Sending to: ${mailData.to}, from: ${mailData.from}, subject: ${mailData.subject}`);
-        const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+        const response = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`,
+            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(payload),
         });
         if (!response.ok) {
           const errorBody = await response.text();
-          console.error(`[SendGrid] Error ${response.status}: ${errorBody}`);
-          throw new Error(`SendGrid API error: ${response.status}`);
+          throw new Error(`Resend API error: ${response.status} - ${errorBody}`);
         }
-        console.log(`[SendGrid] Successfully sent to ${mailData.to}, status: ${response.status}`);
       };
-      diagnostics.attempts.push({ provider: 'sendgrid-api', init: true });
-      console.log('[SendGrid] Sending admin notification...');
-      await sendViaSendGrid(mailOptions);
-      diagnostics.attempts.push({ provider: 'sendgrid-api', admin_sent: true, to: mailOptions.to });
-      console.log('[SendGrid] Sending auto-reply...');
-      await sendViaSendGrid(autoReplyOptions);
-      diagnostics.attempts.push({ provider: 'sendgrid-api', auto_reply_sent: true, to: autoReplyOptions.to });
-      diagnostics.providerUsed = 'sendgrid-api';
-      const payload = { success: true, message: 'Message sent via SendGrid API', transport: diagnostics.providerUsed };
+      diagnostics.attempts.push({ provider: 'resend-api', init: true });
+      await sendViaResend(mailOptions);
+      diagnostics.attempts.push({ provider: 'resend-api', admin_sent: true, to: mailOptions.to });
+      await sendViaResend(autoReplyOptions);
+      diagnostics.attempts.push({ provider: 'resend-api', auto_reply_sent: true, to: autoReplyOptions.to });
+      diagnostics.providerUsed = 'resend-api';
+      const payload = { success: true, message: 'Message sent successfully', transport: diagnostics.providerUsed };
       if (process.env.NODE_ENV !== 'production') payload.diagnostics = diagnostics;
       return res.status(200).json(payload);
-    } catch (e) {
-      diagnostics.attempts.push({ provider: 'sendgrid-api', send_failed: true, error: e?.message || String(e) });
-      // Fall through to SMTP attempts
+    } catch (error) {
+      diagnostics.attempts.push({ provider: 'resend-api', send_failed: true, error: error?.message || String(error) });
+      console.error('Resend error:', error?.message || String(error));
     }
   }
 
@@ -198,7 +193,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
 
 
   try {
-    if (!smtpReady) throw new Error('No email transport available (SMTP unavailable and SendGrid failed).');
+    if (!smtpReady) throw new Error('No email transport available (SMTP unavailable and Resend failed or is not configured).');
     await transporter.sendMail(mailOptions);
     await transporter.sendMail(autoReplyOptions);
     const payload = { success: true, message: 'Message sent via SMTP', transport: diagnostics.providerUsed };
@@ -222,28 +217,17 @@ export { sendContactEmail };
 // @access  Public (read-only)
 export const checkEmailHealth = asyncHandler(async (req, res) => {
   // Debug: Log environment variable status
-  const hasSendGridKey = Boolean(process.env.SENDGRID_API_KEY);
-  console.log('SENDGRID_API_KEY present:', hasSendGridKey);
+  const hasResendKey = Boolean(process.env.RESEND_API_KEY);
+  console.log('RESEND_API_KEY present:', hasResendKey);
   console.log('NODE_ENV:', process.env.NODE_ENV);
   
-  // Prefer SendGrid health check in production when an API key is present - use REST API
-  if (process.env.SENDGRID_API_KEY) {
-    try {
-      // Just confirm we can construct a request - don't actually send
-      return res.json({ 
-        ok: true, 
-        using: 'sendgrid-api', 
-        results: [{ 
-          provider: 'sendgrid-api', 
-          ok: true, 
-          method: 'REST API (no npm package needed)',
-          debug: { hasSendGridKey, nodeEnv: process.env.NODE_ENV } 
-        }] 
-      });
-    } catch (e) {
-      console.error('SendGrid health check failed:', e.message);
-      return res.json({ ok: false, using: 'sendgrid_failed', error: e.message, results: [{ provider: 'sendgrid', ok: false, error: e.message }] });
-    }
+  // Report configured API delivery without sending a test email.
+  if (hasResendKey) {
+    return res.json({
+      ok: true,
+      using: 'resend-api',
+      results: [{ provider: 'resend-api', ok: true, method: 'REST API (no email sent)' }],
+    });
   }
   const port = Number(process.env.EMAIL_PORT || 587);
   const secure = process.env.EMAIL_SECURE !== undefined

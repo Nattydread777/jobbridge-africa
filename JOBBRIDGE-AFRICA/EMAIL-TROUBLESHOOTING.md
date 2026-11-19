@@ -1,155 +1,41 @@
 # Email Delivery Troubleshooting
 
-## Current Issue: Admin Email Not Received
+## Contact form delivery
 
-### Symptoms
+The contact form tries Resend first when `RESEND_API_KEY` is configured. If Resend
+fails or is not configured, it falls back to the primary and secondary SMTP
+transports. Password-reset emails continue to use SMTP.
 
-- ✅ Auto-reply sent successfully to user
-- ❌ Admin notification to `info@jobbridgeafrica.com` **not received**
+Configure these values in Render's environment settings:
 
-### Root Cause Analysis
-
-SendGrid has strict sender authentication requirements:
-
-1. **Verified Sender**: The `from` address MUST be verified in SendGrid
-2. **Domain Authentication**: SPF, DKIM, and DMARC records should be configured for `jobbridgeafrica.com`
-
-### Immediate Fixes
-
-#### Option 1: Use SendGrid Verified Sender (Recommended)
-
-1. Log into SendGrid → Settings → Sender Authentication
-2. Verify `info@jobbridgeafrica.com` OR authenticate the entire `jobbridgeafrica.com` domain
-3. Set environment variable on Render:
-   ```
-   EMAIL_FROM=info@jobbridgeafrica.com
-   ```
-4. Ensure SendGrid accepts emails sent FROM this address
-
-#### Option 2: Check SendGrid Activity Log
-
-1. Go to SendGrid Dashboard → Activity
-2. Search for recent sends to `info@jobbridgeafrica.com`
-3. Check for:
-   - **Dropped**: Sender not verified
-   - **Bounced**: Invalid recipient
-   - **Deferred**: Temporary issue
-
-### Current Configuration
-
-**Backend** (`contactController.js`):
-
-```javascript
-const defaultFrom =
-  process.env.EMAIL_FROM ||
-  process.env.EMAIL_USER ||
-  "info@jobbridgeafrica.com";
-
-// Admin notification
-const mailOptions = {
-  from: defaultFrom,
-  to: "info@jobbridgeafrica.com", // ← Admin receives this
-  subject: `JobBridge Contact: ${subject}`,
-  replyTo: email, // ← User's email for easy reply
-  html: "...",
-};
-
-// Auto-reply
-const autoReplyOptions = {
-  from: defaultFrom,
-  to: email, // ← User receives this ✅
-  subject: "We received your message - JobBridge Africa",
-  replyTo: "info@jobbridgeafrica.com",
-  html: "...",
-};
-```
-
-### Required Render Environment Variables
-
-```bash
+```text
+RESEND_API_KEY=<Resend API key>
+RESEND_FROM=<sender address verified in Resend>
+EMAIL_USER=info@jobbridgeafrica.com
+EMAIL_PASS=<SMTP app password>
 EMAIL_FROM=info@jobbridgeafrica.com
-SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxxxxxxx
+ADMIN_EMAIL=info@jobbridgeafrica.com
 ```
 
-### Verification Steps
+`RESEND_FROM` defaults to `onboarding@resend.dev` for testing. That sender can be
+restricted to Resend's test use; configure a sender on a verified domain before
+sending contact form messages to arbitrary visitors in production. Never put API
+keys or SMTP passwords in source control.
 
-1. **Check SendGrid Activity**:
+## Troubleshooting
 
-   - Look for the admin email in Activity Feed
-   - Note any error codes (e.g., 550, 551)
+- Check the Render logs for `Resend error:` and the provider response details.
+- `GET /api/contact/health` reports configured delivery settings; it does not send
+  a test message or validate the API key with Resend.
+- If Resend rejects delivery, confirm `RESEND_API_KEY` is valid and `RESEND_FROM`
+  is verified in the same Resend account.
+- If SMTP fallback is needed, verify `EMAIL_USER` and `EMAIL_PASS`; try
+  `EMAIL_PORT=587` with `EMAIL_SECURE=false` if port 465 is unavailable.
+- Check the Resend or SMTP provider's delivery logs and the recipient's spam folder.
 
-2. **Verify Sender Authentication**:
+## Domain authentication
 
-   ```
-   SendGrid → Settings → Sender Authentication → Single Sender Verification
-   OR
-   SendGrid → Settings → Sender Authentication → Authenticate Your Domain
-   ```
-
-3. **Test Email Send**:
-   ```powershell
-   $body = @{ name = 'Test'; email = 'your-personal-email@gmail.com'; subject = 'Admin Test'; message = 'Check if admin receives this' } | ConvertTo-Json
-   Invoke-RestMethod -Method Post -Uri 'https://jobbridge-backend.onrender.com/api/contact' -ContentType 'application/json' -Body $body
-   ```
-   - Check if auto-reply arrives at `your-personal-email@gmail.com`
-   - Check if admin email arrives at `info@jobbridgeafrica.com` (Zoho)
-
-### Additional Checks
-
-#### Zoho Mail
-
-- Log into Zoho Mail at mail.zoho.com
-- Check **Spam/Junk** folder
-- Check **All Mail** folder
-- Verify inbox filters aren't routing SendGrid emails
-
-#### SendGrid Suppressions
-
-```
-SendGrid → Suppressions → Check for info@jobbridgeafrica.com
-```
-
-- If found in Bounces, Blocks, or Spam Reports → Remove it
-
-### DNS Records (Optional but Recommended)
-
-Add these to `jobbridgeafrica.com` DNS:
-
-**SPF Record**:
-
-```
-TXT @ v=spf1 include:sendgrid.net ~all
-```
-
-**DKIM** (provided by SendGrid after domain authentication)
-
-**DMARC**:
-
-```
-TXT _dmarc v=DMARC1; p=none; rua=mailto:info@jobbridgeafrica.com
-```
-
-### Next Steps
-
-1. ✅ Added `EMAIL_FROM` to backend `.env` and `render.yaml`
-2. ⏳ Set `EMAIL_FROM=info@jobbridgeafrica.com` on Render dashboard
-3. ⏳ Verify `info@jobbridgeafrica.com` in SendGrid
-4. ⏳ Check SendGrid Activity for dropped/bounced admin emails
-5. ⏳ Redeploy backend after setting env var
-6. ✅ Pushed changes to trigger Vercel redeploy
-
----
-
-## SendGrid API Response Codes
-
-| Code | Meaning      | Action                      |
-| ---- | ------------ | --------------------------- |
-| 202  | Accepted     | Email queued successfully   |
-| 400  | Bad Request  | Check FROM address, API key |
-| 401  | Unauthorized | Invalid API key             |
-| 403  | Forbidden    | Sender not verified         |
-| 429  | Rate Limit   | Too many requests           |
-
----
-
-**Last Updated**: 2025-11-19
+For production delivery, follow Resend's domain verification instructions and add
+the SPF/DKIM records it provides to `jobbridgeafrica.com`. Keep any existing SPF
+record consolidated rather than publishing multiple SPF records. A DMARC policy
+is also recommended.

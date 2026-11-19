@@ -70,9 +70,11 @@ Click **Advanced** → **Add Environment Variable** and add these one by one:
 | `CLOUDINARY_CLIENT_API`    | Your Cloudinary API key                                               | From local `.env`                   |
 | `CLOUDINARY_CLIENT_SECRET` | Your Cloudinary API secret                                            | From local `.env`                   |
 | `EMAIL_USER`               | `info@jobbridgeafrica.com`                                            | -                                   |
-| `EMAIL_PASS`               | `pBC7sZeQYAB9`                                                        | Your Zoho app password              |
+| `EMAIL_PASS` | Set as a deployment secret | Keep SMTP credentials private |
 | `EMAIL_FROM`               | `info@jobbridgeafrica.com`                                            | Optional: preferred sender address  |
 | `ADMIN_EMAIL`              | `info@jobbridgeafrica.com`                                            | Contact form recipient              |
+| `RESEND_API_KEY`           | Set in Render secret settings                                         | Optional: preferred contact email provider |
+| `RESEND_FROM`              | Sender verified in Resend                                             | Required for production Resend delivery |
 | `CORS_ORIGIN`              | `https://jobbridgeafrica.com,https://www.jobbridgeafrica.com,https://jobbridge-africa.vercel.app` | Comma-separated frontend origins |
 | `FRONTEND_URL`             | `https://jobbridgeafrica.com`                                         | Public frontend URL for password-reset links |
 
@@ -189,11 +191,9 @@ Should return:
 - Check Render logs: Dashboard → Your Service → Logs
 - Look for "SMTP verify failed" or "EAUTH" errors
 - Try setting `EMAIL_PORT=587` and `EMAIL_SECURE=false`
-- If Render blocks SMTP, add a SendGrid API key and prefer using SendGrid in production:
-  1. Create a SendGrid account (https://app.sendgrid.com)
-  2. Settings → API Keys → Create API Key → copy the key
-  3. Render Dashboard → Your Service → Environment → Add `SENDGRID_API_KEY` and paste the key
-  4. The backend prefers SendGrid in production automatically; check `GET /api/contact/health` for `using: "sendgrid"`
+- The contact form prefers Resend when `RESEND_API_KEY` is set and falls back to SMTP on failure.
+- Set `RESEND_FROM` to a sender verified for your Resend account before production use.
+- Check `GET /api/contact/health` for the configured provider (the endpoint does not send a test email).
 
 ### MongoDB Connection Failed
 

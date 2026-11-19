@@ -398,7 +398,7 @@ Notes
 - Cloudinary credentials are optional for local job browsing, but required for media and resume uploads and in production.
 - In development, the API allows Vite origins on `localhost` and `127.0.0.1` at ports 5173 and 5174. Production allows `jobbridgeafrica.com`, `www.jobbridgeafrica.com`, and `jobbridge-africa.vercel.app`; configure additional comma-separated origins with `CORS_ORIGIN`.
 - The frontend uses `VITE_API_URL` (or `VITE_API_BASE`) when configured, adds one `/api` suffix, and otherwise defaults to `http://localhost:4000/api`.
-- Password reset email requires SMTP credentials (`EMAIL_USER` and `EMAIL_PASS`). Set `EMAIL_FROM`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, and the public `FRONTEND_URL` for the deployed environment.
+- Password reset email requires SMTP credentials (`EMAIL_USER` and `EMAIL_PASS`). Contact-form email prefers Resend when `RESEND_API_KEY` is configured and falls back to SMTP; set `RESEND_FROM` to a sender verified in Resend for production. Set `EMAIL_FROM`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, and the public `FRONTEND_URL` for the deployed environment.
 
 Optional frontend `.env`
 
@@ -419,6 +419,8 @@ EMAIL_USER=info@jobbridgeafrica.com
 EMAIL_PASS=<zoho_app_password>
 EMAIL_FROM=info@jobbridgeafrica.com
 ADMIN_EMAIL=info@jobbridgeafrica.com
+RESEND_API_KEY=<resend_api_key>
+RESEND_FROM=<verified_sender@jobbridgeafrica.com>
 FRONTEND_URL=https://jobbridgeafrica.com
 
 # CORS origins (comma-separated)
@@ -433,7 +435,7 @@ Troubleshooting:
 
 - Timeouts: Often host egress restrictions; try switching ports or confirm outbound rules.
 - Zoho + 2FA: Use an App Password (Zoho Mail Settings → Security → App Passwords).
-- SendGrid: Verify domain & sender identity to avoid silent drops.
+- Resend: Verify the production sender domain and identity to avoid rejected deliveries.
 - Improve deliverability: Add SPF + DKIM records for `jobbridgeafrica.com` (recommended future step).
 
 ---
