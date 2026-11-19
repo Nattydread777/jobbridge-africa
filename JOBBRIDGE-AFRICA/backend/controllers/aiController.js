@@ -18,6 +18,18 @@ const JOB_TEXT_LIMIT = 15000;
 const COVER_LETTER_LIMIT = 10000;
 const REQUEST_BYTE_LIMIT = 250000;
 
+const getAiApiKey = () => process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
+const getAiBaseUrl = () => (
+  process.env.AI_BASE_URL
+  || (process.env.GEMINI_API_KEY
+    ? 'https://generativelanguage.googleapis.com/v1beta/openai/'
+    : 'https://api.openai.com/v1')
+).replace(/\/+$/, '');
+const getAiModel = () => (
+  process.env.AI_MODEL
+  || (process.env.GEMINI_API_KEY ? 'gemini-2.5-flash' : 'gpt-4o-mini')
+);
+
 const getDailyLimit = () => {
   const parsed = Number.parseInt(process.env.CV_DAILY_FREE_LIMIT || '5', 10);
   return Number.isInteger(parsed) ? Math.min(20, Math.max(1, parsed)) : 5;
@@ -75,18 +87,24 @@ const getRequestedJob = async (jobId, res) => {
 
 const requestAiReview = async (cvText, jobDescription) => {
   const prompt = createAiReviewPrompt(cvText, jobDescription);
+  const apiKey = getAiApiKey();
+  if (!apiKey) {
+    const configurationError = new Error('Optional AI review is not configured. You can still use the free diagnostic review.');
+    configurationError.status = 503;
+    throw configurationError;
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20000);
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch(`${getAiBaseUrl()}/chat/completions`, {
       method: 'POST',
       signal: controller.signal,
       headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        model: getAiModel(),
         temperature: 0.1,
         response_format: { type: 'json_object' },
         messages: [
@@ -161,7 +179,7 @@ export const optimizeCv = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Separate consent is required before using optional third-party AI review.');
   }
-  if (aiReview && !process.env.OPENAI_API_KEY) {
+  if (aiReview && !getAiApiKey()) {
     res.status(503);
     throw new Error('Optional AI review is not configured. You can still use the free diagnostic review.');
   }
@@ -221,8 +239,10 @@ export const optimizeCv = asyncHandler(async (req, res) => {
       cover_letter_detected: Boolean(sections.coverLetter),
     },
     ai_review_used: aiReview,
-    ai_review_available: Boolean(process.env.OPENAI_API_KEY),
-    ai_provider: aiReview ? 'OpenAI' : null,
+    ai_review_available: Boolean(getAiApiKey()),
+    ai_provider: aiReview
+      ? (process.env.GEMINI_API_KEY ? 'Gemini' : 'OpenAI')
+      : null,
     job: job ? { _id: job._id, title: job.title, companyName: job.companyName } : null,
     daily_allowance: allowance,
     note: aiReview
