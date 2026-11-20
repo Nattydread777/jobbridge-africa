@@ -1,6 +1,8 @@
 import asyncHandler from 'express-async-handler';
+import mongoose from 'mongoose';
 import Application from '../models/Application.js';
 import Job from '../models/Job.js';
+import TailoredCv from '../models/TailoredCv.js';
 import User from '../models/userModel.js';
 import cloudinary from '../config/cloudinary.js';
 import { sendEmployerApplicationNotification } from '../services/emailService.js';
@@ -9,7 +11,7 @@ import { sendEmployerApplicationNotification } from '../services/emailService.js
 // @route   POST /api/applications
 // @access  Private (Job Seekers only)
 export const submitApplication = asyncHandler(async (req, res) => {
-  const { jobId, coverLetter } = req.body;
+  const { jobId, coverLetter, tailoredCvId } = req.body;
 
   if (!jobId) {
     res.status(400);
@@ -50,7 +52,23 @@ export const submitApplication = asyncHandler(async (req, res) => {
     res.status(403);
     throw new Error('Only job seekers can apply for jobs.');
   }
-  if (!req.file && !applicant.resumeUrl) {
+  let tailoredCv = null;
+  if (tailoredCvId) {
+    if (!mongoose.isValidObjectId(tailoredCvId)) {
+      res.status(400);
+      throw new Error('The saved tailored CV reference is invalid.');
+    }
+    tailoredCv = await TailoredCv.findOne({
+      _id: tailoredCvId,
+      applicant: applicant._id,
+      job: job._id,
+    });
+    if (!tailoredCv) {
+      res.status(404);
+      throw new Error('That saved tailored CV does not belong to you or this job.');
+    }
+  }
+  if (!req.file && !applicant.resumeUrl && !tailoredCv) {
     res.status(400);
     throw new Error('Upload a resume to your profile or attach one to this application.');
   }
@@ -76,10 +94,12 @@ export const submitApplication = asyncHandler(async (req, res) => {
       coverLetter: coverLetter || '',
       resumeUrl,
       resumePublicId,
+      tailoredCv: tailoredCv?._id,
     });
 
     await application.populate('job', 'title companyName location');
     await application.populate('applicant', 'name email phone country bio skills education experience');
+    await application.populate('tailoredCv', 'sections source updatedAt');
 
     let notificationSent = false;
     const employer = await User.findById(job.postedBy).select('name email');
@@ -146,6 +166,7 @@ export const getJobApplications = asyncHandler(async (req, res) => {
 
   const applications = await Application.find({ job: jobId })
     .populate('applicant', 'name email phone country bio skills education experience resumeUrl')
+    .populate('tailoredCv', 'sections source updatedAt')
     .sort('-createdAt');
 
   res.status(200).json(applications);

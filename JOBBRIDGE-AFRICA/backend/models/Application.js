@@ -11,6 +11,11 @@ const applicationSchema = new mongoose.Schema({
     ref: 'User', 
     required: true 
   },
+  tailoredCv: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'TailoredCv',
+  },
+  tailoredCvDeletedAt: { type: Date },
   coverLetter: { 
     type: String 
   },

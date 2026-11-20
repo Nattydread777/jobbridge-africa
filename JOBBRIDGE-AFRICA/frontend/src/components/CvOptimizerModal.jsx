@@ -1,19 +1,18 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../services/api";
 import PageBreadcrumb from "./PageBreadcrumb";
 import { useAuth } from "../context/AuthContext";
 import { extractResumeText, splitResumeSections } from "../utils/resumeParser";
+import { createCvDocxBlob, createCvPdf } from "../utils/cvExport";
 
 const CV_INPUT_LIMIT = 30000;
 const JOB_INPUT_LIMIT = 15000;
 const COVER_LETTER_LIMIT = 10000;
-const DOWNLOAD_SECTIONS = [
-  ["summary", "Professional Summary"],
-  ["skills", "Core Skills"],
-  ["experience", "Experience"],
-  ["education", "Education"],
-  ["certifications", "Certifications"],
+const AI_PROGRESS_STEPS = [
+  "Running job requirement, summary, skills, and experience analyses in parallel…",
+  "Checking generated experience edits against source bullets…",
+  "Provider network, timeout, and rate errors are automatically retried once…",
 ];
 
 const linesFrom = (value) => String(value || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -25,6 +24,28 @@ const downloadBlob = (blob, filename) => {
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+};
+
+const createStructuredDraft = (sections) => {
+  const parsed = sections.structured || {};
+  return {
+    contact: { ...(parsed.contact || {}) },
+    summary: parsed.summary || "",
+    skills: [...(parsed.skills || [])],
+    experience: (parsed.experience || []).map((role) => ({
+      ...role,
+      bullets: role.bullets.map((sourceBullet) => ({
+        sourceBullet,
+        tailoredBullet: "",
+        editedText: sourceBullet,
+        reason: "",
+        traceable: false,
+        accepted: false,
+      })),
+    })),
+    education: [...(parsed.education || [])],
+    certifications: [...(parsed.certifications || [])],
+  };
 };
 
 const CvOptimizerModal = ({ onClose, jobId: initialJobId = "" }) => {
@@ -44,7 +65,13 @@ const CvOptimizerModal = ({ onClose, jobId: initialJobId = "" }) => {
   const [deleting, setDeleting] = useState(false);
   const [deleteStatus, setDeleteStatus] = useState("");
   const [exporting, setExporting] = useState("");
+  const [aiProgress, setAiProgress] = useState("");
+  const [aiReviewLoading, setAiReviewLoading] = useState(false);
+  const [savingCv, setSavingCv] = useState(false);
+  const [savedCvId, setSavedCvId] = useState("");
+  const [saveStatus, setSaveStatus] = useState("");
   const { isAuthenticated, refreshUser } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -68,6 +95,20 @@ const CvOptimizerModal = ({ onClose, jobId: initialJobId = "" }) => {
       });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (!aiReviewLoading) {
+      setAiProgress("");
+      return undefined;
+    }
+    let step = 0;
+    setAiProgress(AI_PROGRESS_STEPS[step]);
+    const timer = setInterval(() => {
+      step = (step + 1) % AI_PROGRESS_STEPS.length;
+      setAiProgress(AI_PROGRESS_STEPS[step]);
+    }, 3500);
+    return () => clearInterval(timer);
+  }, [aiReviewLoading]);
 
   const handleFile = async (event) => {
     const file = event.target.files?.[0];
@@ -94,19 +135,12 @@ const CvOptimizerModal = ({ onClose, jobId: initialJobId = "" }) => {
     }
   };
 
-  const createDraft = (sections) => ({
-    header: sections.header,
-    summary: sections.summary,
-    skills: sections.skills.join("\n"),
-    experience: sections.experience.join("\n"),
-    education: sections.education.join("\n"),
-    certifications: sections.certifications.join("\n"),
-  });
-
   const invalidateReview = () => {
     setResult(null);
     setDraft(null);
     setAiConsentGiven(false);
+    setSavedCvId("");
+    setSaveStatus("");
   };
 
   const handleSubmit = async (event) => {
@@ -148,7 +182,7 @@ const CvOptimizerModal = ({ onClose, jobId: initialJobId = "" }) => {
         mode: "diagnostic",
       });
       setResult(response.data);
-      setDraft(createDraft(sections));
+      setDraft(createStructuredDraft(sections));
     } catch (requestError) {
       setError(requestError.response?.data?.message || "We couldn't process your CV right now. Please try again.");
     } finally {
@@ -163,6 +197,7 @@ const CvOptimizerModal = ({ onClose, jobId: initialJobId = "" }) => {
       return;
     }
     setLoading(true);
+    setAiReviewLoading(true);
     try {
       const response = await api.post("/ai/optimize-cv", {
         cvText,
@@ -174,51 +209,58 @@ const CvOptimizerModal = ({ onClose, jobId: initialJobId = "" }) => {
         mode: "ai_review",
       });
       setResult(response.data);
+      setSavedCvId("");
     } catch (requestError) {
       setError(requestError.response?.data?.message || "AI review is unavailable right now. Your diagnostic remains available.");
     } finally {
       setLoading(false);
+      setAiReviewLoading(false);
     }
-  };
-
-  const handleRewriteDecision = (index, accepted) => {
-    const rewrite = result?.rewrites?.[index];
-    if (!rewrite) return;
-    if (accepted !== rewrite.accepted && rewrite.suggested) {
-      const from = accepted ? rewrite.original : rewrite.suggested;
-      const to = accepted ? rewrite.suggested : rewrite.original;
-      setDraft((current) => {
-        if (!current) return current;
-        const next = { ...current };
-        for (const key of ["summary", "skills", "experience", "education", "certifications"]) {
-          if (next[key]?.includes(from)) {
-            next[key] = next[key].replace(from, to);
-            break;
-          }
-        }
-        return next;
-      });
-    }
-    setResult((current) => ({
-      ...current,
-      rewrites: current.rewrites.map((entry, currentIndex) => (
-        currentIndex === index ? { ...entry, accepted, rejected: !accepted } : entry
-      )),
-    }));
   };
 
   const handleSummaryDecision = (accepted) => {
-    const rewrite = result?.summary_rewrite;
-    if (!rewrite) return;
-    if (accepted !== rewrite.accepted && rewrite.suggested) {
-      setDraft((current) => current && {
-        ...current,
-        summary: accepted ? rewrite.suggested : rewrite.original,
-      });
-    }
+    const tailored = result?.tailored_cv?.summary;
+    if (!tailored) return;
+    setDraft((current) => current && {
+      ...current,
+      summary: accepted ? tailored.tailored : tailored.original,
+    });
     setResult((current) => ({
       ...current,
-      summary_rewrite: { ...current.summary_rewrite, accepted, rejected: !accepted },
+      tailored_cv: {
+        ...current.tailored_cv,
+        summary: { ...current.tailored_cv.summary, accepted },
+      },
+    }));
+  };
+
+  const handleSkillsDecision = (accepted) => {
+    const suggestedSkills = result?.tailored_cv?.skills;
+    if (!Array.isArray(suggestedSkills)) return;
+    setDraft((current) => ({
+      ...current,
+      skills: accepted ? suggestedSkills : result.cv_sections.skills,
+    }));
+    setResult((current) => ({ ...current, skills_tailoring_accepted: accepted }));
+  };
+
+  const handleBulletDecision = (roleIndex, bulletIndex, accepted) => {
+    const suggestion = result?.tailored_cv?.experience?.[roleIndex]?.bullets?.[bulletIndex];
+    if (!suggestion?.traceable) return;
+    setDraft((current) => ({
+      ...current,
+      experience: current.experience.map((role, currentRoleIndex) => (
+        currentRoleIndex !== roleIndex ? role : {
+          ...role,
+          bullets: role.bullets.map((bullet, currentBulletIndex) => (
+            currentBulletIndex !== bulletIndex ? bullet : {
+              ...bullet,
+              editedText: accepted ? suggestion.tailoredBullet : suggestion.sourceBullet,
+              accepted,
+            }
+          )),
+        }
+      )),
     }));
   };
 
@@ -233,6 +275,7 @@ const CvOptimizerModal = ({ onClose, jobId: initialJobId = "" }) => {
       setCoverLetterText("");
       setResult(null);
       setDraft(null);
+      setSavedCvId("");
       await refreshUser();
     } catch (requestError) {
       setDeleteStatus(requestError.response?.data?.message || "We couldn't delete your saved CV data. Please try again or contact support.");
@@ -241,25 +284,41 @@ const CvOptimizerModal = ({ onClose, jobId: initialJobId = "" }) => {
     }
   };
 
+  const handleSaveTailoredCv = async () => {
+    if (!draft || !selectedJobId || !isAuthenticated || !result?.ai_review_used) return;
+    setSavingCv(true);
+    setSaveStatus("");
+    try {
+      const { data } = await api.post("/ai/tailored-cvs", {
+        jobId: selectedJobId,
+        sections: draft,
+        source: "ai_assisted",
+      });
+      setSavedCvId(data.id);
+      setSaveStatus(data.message);
+    } catch (requestError) {
+      setSaveStatus(requestError.response?.data?.message || "Could not save this tailored CV. Please try again.");
+    } finally {
+      setSavingCv(false);
+    }
+  };
+
+  const applyWithSavedCv = () => {
+    if (!selectedJobId || !savedCvId) return;
+    const selectedJob = jobs.find((job) => job._id === selectedJobId);
+    const canApplyOnPlatform = selectedJob?.source === "employer" && selectedJob?.isDirectPosting !== false;
+    if (!canApplyOnPlatform) {
+      setSaveStatus("This listing uses an external application site. Use its application link instead.");
+      return;
+    }
+    navigate(`/jobs/${encodeURIComponent(selectedJobId)}?tailoredCvId=${encodeURIComponent(savedCvId)}#apply`);
+  };
+
   const exportWord = async () => {
     if (!draft) return;
     setExporting("word");
     try {
-      const { Document, HeadingLevel, Packer, Paragraph } = await import("docx");
-      const children = [
-        new Paragraph({ text: "Curriculum Vitae", heading: HeadingLevel.TITLE }),
-        ...linesFrom(draft.header).map((line) => new Paragraph({ text: line })),
-      ];
-      for (const [key, title] of DOWNLOAD_SECTIONS) {
-        const content = linesFrom(draft[key]);
-        if (!content.length) continue;
-        children.push(new Paragraph({ text: title, heading: HeadingLevel.HEADING_1 }));
-        children.push(...content.map((line) => new Paragraph({
-          text: line.replace(/^(?:[-*•▪◦‣]|\d+[.)])\s+/, ""),
-          ...(key === "experience" ? { bullet: { level: 0 } } : {}),
-        })));
-      }
-      const blob = await Packer.toBlob(new Document({ sections: [{ children }] }));
+      const blob = await createCvDocxBlob(draft);
       downloadBlob(blob, "jobbridge-cv.docx");
     } catch (exportError) {
       setError(`Word export failed: ${exportError.message}`);
@@ -272,34 +331,7 @@ const CvOptimizerModal = ({ onClose, jobId: initialJobId = "" }) => {
     if (!draft) return;
     setExporting("pdf");
     try {
-      const { jsPDF } = await import("jspdf");
-      const pdf = new jsPDF({ unit: "pt", format: "a4" });
-      const left = 52;
-      const width = 490;
-      let y = 52;
-      const addText = (text, size, bold = false) => {
-        pdf.setFont("helvetica", bold ? "bold" : "normal");
-        pdf.setFontSize(size);
-        const wrapped = pdf.splitTextToSize(text, width);
-        for (const line of wrapped) {
-          if (y > 780) {
-            pdf.addPage();
-            y = 52;
-          }
-          pdf.text(line, left, y);
-          y += size + 6;
-        }
-      };
-      addText("Curriculum Vitae", 20, true);
-      y += 6;
-      linesFrom(draft.header).forEach((line) => addText(line, 10));
-      for (const [key, title] of DOWNLOAD_SECTIONS) {
-        const content = linesFrom(draft[key]);
-        if (!content.length) continue;
-        y += 8;
-        addText(title, 13, true);
-        content.forEach((line) => addText(line, 10));
-      }
+      const pdf = await createCvPdf(draft);
       pdf.save("jobbridge-cv.pdf");
     } catch (exportError) {
       setError(`PDF export failed: ${exportError.message}`);
@@ -329,12 +361,12 @@ const CvOptimizerModal = ({ onClose, jobId: initialJobId = "" }) => {
 
           <section className="mb-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
             <h2 className="font-bold">How your CV is processed</h2>
-            <p className="mt-1">The free diagnostic sends your CV text and selected job information to JobBridge Africa's backend for rule-based analysis. It is not retained after the request. Optional AI review is a separate choice: if enabled, direct contact details and the detected candidate name are redacted before the text is sent to OpenAI, but the AI may still process other contextual information. OpenAI's API abuse-monitoring retention is generally up to 30 days under its current policies; provider-specific controls can differ. The AI output is guidance and must be checked for accuracy.</p>
-            <p className="mt-2">Your CV refinement inputs are not saved to your account or application records by this tool. Text stays in this page until you clear it or leave. CVs separately uploaded to a profile or application remain in JobBridge-managed storage until deleted. Use “Delete my data” below to remove saved profile and application CV files.</p>
+            <p className="mt-1">The free diagnostic sends your CV text and selected job information to JobBridge Africa's backend for rule-based analysis. It is not retained after the request. Optional AI tailoring is a separate choice: if enabled, direct contact details and the detected candidate name are redacted before the remaining CV is sent to the configured AI provider (Gemini or OpenAI). The provider may process contextual CV information under its own policies. AI-generated text is a suggestion, not a verified fact; review it and its source bullet before use.</p>
+            <p className="mt-2">Your CV inputs are not saved by this tool unless you explicitly choose “Save tailored CV for this job.” Saved versions are stored with your account and removed by “Delete my saved CV data.” Text otherwise stays in this page until you clear it or leave. Separately uploaded profile/application CVs remain in JobBridge-managed storage until deleted.</p>
           </section>
           <label className="mb-5 flex items-start gap-3 rounded-xl border border-slate-300 bg-white p-4 text-sm leading-6 text-slate-800">
             <input type="checkbox" checked={consentGiven} disabled={loading} onChange={(event) => { setConsentGiven(event.target.checked); if (!event.target.checked) invalidateReview(); }} className="mt-1" />
-            <span>I have read the CV processing disclosure and consent to sending my CV and job information to JobBridge Africa for analysis. Optional OpenAI processing requires a separate opt-in. See our <Link to="/privacy" className="font-semibold underline">Privacy Policy</Link>.</span>
+            <span>I have read the CV processing disclosure and consent to sending my CV and job information to JobBridge Africa for analysis. Optional third-party AI processing requires a separate opt-in. See our <Link to="/privacy" className="font-semibold underline">Privacy Policy</Link>.</span>
           </label>
 
           <form onSubmit={handleSubmit} className="grid gap-5">
@@ -408,58 +440,115 @@ const CvOptimizerModal = ({ onClose, jobId: initialJobId = "" }) => {
               </section>
               {result.ats_flags.length > 0 && <section className="rounded-xl border border-orange-200 bg-orange-50 p-4"><h2 className="font-bold text-orange-950">ATS parsing checks</h2><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-orange-900">{result.ats_flags.map((flag) => <li key={flag}>{flag}</li>)}</ul></section>}
 
+              {result.job_requirements && (
+                <section className="grid gap-4 md:grid-cols-2">
+                  <article className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                    <h2 className="font-bold text-rose-950">Job must-haves</h2>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-rose-900">
+                      {result.job_requirements.must_haves.map((item) => <li key={item}>{item}</li>)}
+                      {!result.job_requirements.must_haves.length && <li>No explicit must-haves detected.</li>}
+                    </ul>
+                  </article>
+                  <article className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                    <h2 className="font-bold text-indigo-950">Nice-to-haves</h2>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-indigo-900">
+                      {result.job_requirements.nice_to_haves.map((item) => <li key={item}>{item}</li>)}
+                      {!result.job_requirements.nice_to_haves.length && <li>No explicit nice-to-haves detected.</li>}
+                    </ul>
+                  </article>
+                </section>
+              )}
+              {result.ai_job_analysis_fallback && <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">The optional AI job-requirement extraction was unavailable, so the requirements shown use JobBridge Africa’s rule-based analysis.</p>}
+
               {result.ai_review_available && !result.ai_review_used && (
                 <section className="rounded-xl border border-violet-200 bg-violet-50 p-4">
-                  <h2 className="font-bold text-violet-950">Optional AI review</h2>
-                  <p className="mt-1 text-sm leading-6 text-violet-900">With your separate opt-in, direct contact details and your detected name are redacted before CV text is sent to OpenAI. AI-generated edits are suggestions only; review each one for accuracy before accepting.</p>
-                  <label className="mt-3 flex items-start gap-2 text-sm leading-6 text-violet-950"><input type="checkbox" checked={aiConsentGiven} onChange={(event) => setAiConsentGiven(event.target.checked)} className="mt-1" />I explicitly consent to optional OpenAI processing of the redacted CV and job description.</label>
-                  <button type="button" onClick={handleAiReview} disabled={loading || !aiConsentGiven} className="mt-3 rounded-lg bg-violet-800 px-4 py-2 font-semibold text-white disabled:opacity-50">{loading ? "Requesting AI review…" : "Let AI Review & Format My CV"}</button>
+                  <h2 className="font-bold text-violet-950">Optional AI tailoring</h2>
+                  <p className="mt-1 text-sm leading-6 text-violet-900">With separate opt-in, direct contact details and the detected candidate name are redacted before CV text is sent to the configured third-party AI provider. The service generates focused summary, skill, experience, and job-requirement results in parallel and retries transient failures once. Review all edits and source links before accepting.</p>
+                  <label className="mt-3 flex items-start gap-2 text-sm leading-6 text-violet-950"><input type="checkbox" checked={aiConsentGiven} disabled={loading} onChange={(event) => setAiConsentGiven(event.target.checked)} className="mt-1" />I explicitly consent to optional AI processing of the redacted CV and job description.</label>
+                  <button type="button" onClick={handleAiReview} disabled={loading || !aiConsentGiven} className="mt-3 rounded-lg bg-violet-800 px-4 py-2 font-semibold text-white disabled:opacity-50">{loading ? "Tailoring your CV…" : "Let AI Review & Tailor My CV"}</button>
+                  {result.daily_allowance && <p className="mt-2 text-xs text-violet-900">Free AI tailorings remaining today: {result.daily_allowance.aiTailoringsRemaining} of {result.daily_allowance.aiTailoringLimit}.</p>}
                 </section>
               )}
-              {result.ai_review_used && <p className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm text-violet-950">AI-assisted suggestions from {result.ai_provider} are ready. Verify every statement; unsupported additions are marked “Add only if true.”</p>}
-              {(result.summary_rewrite?.suggested || result.summary_rewrite?.add_only_if_true) && (
-                <section className="rounded-xl border border-violet-200 bg-white p-4">
-                  <h2 className="font-bold text-charcoal">Summary rewrite suggestion</h2>
-                  {result.summary_rewrite.add_only_if_true
-                    ? <p className="mt-2 text-sm font-semibold text-amber-800">Add only if true: {result.summary_rewrite.unverified_addition}</p>
-                    : <>
-                      <p className="mt-2 text-sm text-stone-600"><strong>Original:</strong> {result.summary_rewrite.original}</p>
-                      <p className="mt-2 text-sm text-stone-700"><strong>Suggested:</strong> {result.summary_rewrite.suggested}</p>
-                    </>}
-                  <p className="mt-1 text-xs text-stone-500">{result.summary_rewrite.reason}</p>
-                  {!result.summary_rewrite.add_only_if_true && <div className="mt-3 flex gap-2"><button type="button" onClick={() => handleSummaryDecision(true)} className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white">Accept</button><button type="button" onClick={() => handleSummaryDecision(false)} className="rounded-lg border border-stone-300 px-3 py-2 text-sm font-semibold">Reject</button></div>}
-                </section>
-              )}
-              {result.rewrites?.length > 0 && (
-                <section className="space-y-3">
-                  <h2 className="text-lg font-bold text-charcoal">Grounded rewrite suggestions</h2>
-                  {result.rewrites.map((rewrite, index) => (
-                    <article key={`${index}-${rewrite.original}`} className="rounded-xl border border-stone-200 bg-white p-4">
-                      {rewrite.add_only_if_true ? <p className="mb-2 text-sm font-bold text-amber-800">Add only if true: {rewrite.unverified_addition}</p> : <><p className="text-sm text-stone-600"><strong>Original:</strong> {rewrite.original}</p><p className="mt-2 text-sm text-charcoal"><strong>Suggested:</strong> {rewrite.suggested}</p></>}
-                      <p className="mt-1 text-xs text-stone-500">{rewrite.reason}</p>
-                      {!rewrite.add_only_if_true && <div className="mt-3 flex gap-2"><button type="button" onClick={() => handleRewriteDecision(index, true)} className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white">Accept</button><button type="button" onClick={() => handleRewriteDecision(index, false)} className="rounded-lg border border-stone-300 px-3 py-2 text-sm font-semibold">Reject</button></div>}
-                    </article>
-                  ))}
-                </section>
+              {aiReviewLoading && <p role="status" aria-live="polite" className="rounded-lg bg-violet-50 p-3 text-sm text-violet-950">{aiProgress || "Preparing focused review requests…"}</p>}
+              {result.ai_review_used && <p className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm text-violet-950">AI-assisted suggestions from {result.ai_provider} are ready. Unsupported or untraceable additions are listed under “Gaps: add only if true.” Review each source bullet before accepting.</p>}
+              {result.tailored_cv && (
+                <div className="space-y-4">
+                  <section className="rounded-xl border border-violet-200 bg-white p-4">
+                    <h2 className="font-bold text-charcoal">Summary: original vs tailored</h2>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <p className="rounded-lg bg-stone-50 p-3 text-sm"><strong>Original</strong><br />{result.tailored_cv.summary.original || "No summary section found."}</p>
+                      <p className="rounded-lg bg-violet-50 p-3 text-sm"><strong>Tailored</strong><br />{result.tailored_cv.summary.tailored || result.tailored_cv.summary.untraceableSuggestion || "No grounded summary suggestion."}</p>
+                    </div>
+                    {result.tailored_cv.summary.traceable && <div className="mt-3 flex gap-2"><button type="button" onClick={() => handleSummaryDecision(true)} className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white">Accept</button><button type="button" onClick={() => handleSummaryDecision(false)} className="rounded-lg border border-stone-300 px-3 py-2 text-sm font-semibold">Reject</button></div>}
+                  </section>
+                  <section className="rounded-xl border border-stone-200 bg-white p-4">
+                    <h2 className="font-bold text-charcoal">Skills: original vs tailored order</h2>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <p className="rounded-lg bg-stone-50 p-3 text-sm"><strong>Original</strong><br />{result.cv_sections.skills.join(", ") || "No labeled skills section found."}</p>
+                      <p className="rounded-lg bg-violet-50 p-3 text-sm"><strong>Suggested (source skills only)</strong><br />{result.tailored_cv.skills.join(", ") || "No skill ordering suggestion."}</p>
+                    </div>
+                    {result.tailored_cv.skills.length > 0 && <div className="mt-3 flex gap-2"><button type="button" onClick={() => handleSkillsDecision(true)} className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white">Accept</button><button type="button" onClick={() => handleSkillsDecision(false)} className="rounded-lg border border-stone-300 px-3 py-2 text-sm font-semibold">Reject</button></div>}
+                  </section>
+                  <section className="space-y-3">
+                    <h2 className="text-lg font-bold text-charcoal">Experience bullets: source vs tailored</h2>
+                    {result.tailored_cv.experience.flatMap((role, roleIndex) => role.bullets.map((bullet, bulletIndex) => (
+                      <article key={`${roleIndex}-${bulletIndex}`} className="rounded-xl border border-stone-200 bg-white p-4">
+                        <p className="mb-2 text-sm font-semibold">{[role.title, role.company, role.dates].filter(Boolean).join(" · ") || `Experience item ${roleIndex + 1}`}</p>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <p className="rounded-lg bg-stone-50 p-3 text-sm"><strong>Original</strong><br />{bullet.sourceBullet}</p>
+                          <p className="rounded-lg bg-violet-50 p-3 text-sm"><strong>Tailored</strong><br />{bullet.traceable ? bullet.tailoredBullet : bullet.untraceableSuggestion || "No source-traceable rewrite returned."}</p>
+                        </div>
+                        {bullet.traceable
+                          ? <div className="mt-3 flex gap-2"><button type="button" onClick={() => handleBulletDecision(roleIndex, bulletIndex, true)} className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-semibold text-white">Accept</button><button type="button" onClick={() => handleBulletDecision(roleIndex, bulletIndex, false)} className="rounded-lg border border-stone-300 px-3 py-2 text-sm font-semibold">Reject</button></div>
+                          : <p className="mt-2 text-xs font-semibold text-amber-800">Untraceable suggestion — not applied to your CV.</p>}
+                      </article>
+                    )))}
+                  </section>
+                  <section className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+                    <h2 className="font-bold text-amber-950">Gaps: add only if true</h2>
+                    {result.tailored_cv.gaps.length
+                      ? <ul className="mt-2 space-y-2 text-sm text-amber-950">{result.tailored_cv.gaps.map((gap, index) => <li key={`${gap.requirement}-${index}`}><strong>{gap.requirement}</strong><p>{gap.guidance}</p></li>)}</ul>
+                      : <p className="mt-2 text-sm text-amber-900">No unsupported requirements were detected.</p>}
+                  </section>
+                </div>
               )}
 
               {draft && (
                 <section className="space-y-4 rounded-2xl border border-stone-200 bg-white p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-bold text-charcoal">Editable ATS-friendly CV preview</h2><div className="flex gap-2"><button type="button" onClick={exportWord} disabled={Boolean(exporting)} className="rounded-lg border border-stone-300 px-3 py-2 text-sm font-semibold disabled:opacity-50">{exporting === "word" ? "Preparing…" : "Download Word (.docx)"}</button><button type="button" onClick={exportPdf} disabled={Boolean(exporting)} className="rounded-lg border border-stone-300 px-3 py-2 text-sm font-semibold disabled:opacity-50">{exporting === "pdf" ? "Preparing…" : "Download PDF"}</button></div></div>
+                  <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-bold text-charcoal">Editable ATS-friendly CV preview</h2><div className="flex flex-wrap gap-2"><button type="button" onClick={exportWord} disabled={Boolean(exporting)} className="rounded-lg border border-stone-300 px-3 py-2 text-sm font-semibold disabled:opacity-50">{exporting === "word" ? "Preparing…" : "Download Word (.docx)"}</button><button type="button" onClick={exportPdf} disabled={Boolean(exporting)} className="rounded-lg border border-stone-300 px-3 py-2 text-sm font-semibold disabled:opacity-50">{exporting === "pdf" ? "Preparing…" : "Download PDF"}</button></div></div>
+                  <h3 className="font-semibold">Header / Contact</h3>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {["name", "email", "phone", "location"].map((key) => <label key={key} className="grid gap-1 text-sm capitalize">{key}<input value={draft.contact[key] || ""} onChange={(event) => setDraft((current) => ({ ...current, contact: { ...current.contact, [key]: event.target.value } }))} className="rounded-lg border border-stone-300 p-2" /></label>)}
+                  </div>
+                  <label className="grid gap-2 text-sm font-semibold">Summary<textarea value={draft.summary} onChange={(event) => setDraft((current) => ({ ...current, summary: event.target.value }))} rows={4} className="w-full rounded-lg border border-stone-300 p-3 font-normal" /></label>
+                  <label className="grid gap-2 text-sm font-semibold">Core Skills<textarea value={draft.skills.join(", ")} onChange={(event) => setDraft((current) => ({ ...current, skills: event.target.value.split(/[,;\n]/).map((skill) => skill.trim()).filter(Boolean) }))} rows={3} className="w-full rounded-lg border border-stone-300 p-3 font-normal" /></label>
+                  <div className="space-y-4">
+                    <h3 className="font-semibold">Experience</h3>
+                    {draft.experience.map((role, roleIndex) => (
+                      <fieldset key={`${role.title}-${role.company}-${roleIndex}`} className="grid gap-2 rounded-lg border border-stone-200 p-3">
+                        <legend className="px-1 text-sm font-semibold">{role.title || `Role ${roleIndex + 1}`}</legend>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {["title", "company", "dates", "location"].map((key) => <label key={key} className="grid gap-1 text-xs capitalize">{key}<input value={role[key] || ""} onChange={(event) => setDraft((current) => ({ ...current, experience: current.experience.map((entry, index) => index === roleIndex ? { ...entry, [key]: event.target.value } : entry) }))} className="rounded border p-2 text-sm" /></label>)}
+                        </div>
+                        {role.bullets.map((bullet, bulletIndex) => <label key={`${bullet.sourceBullet}-${bulletIndex}`} className="grid gap-1 text-xs">Experience bullet<textarea value={bullet.editedText} onChange={(event) => setDraft((current) => ({ ...current, experience: current.experience.map((entry, index) => index === roleIndex ? { ...entry, bullets: entry.bullets.map((item, itemIndex) => itemIndex === bulletIndex ? { ...item, editedText: event.target.value } : item) } : entry) }))} rows={2} className="rounded border p-2 text-sm" /></label>)}
+                      </fieldset>
+                    ))}
+                  </div>
                   {[
-                    ["header", "Header & Contact"],
-                    ["summary", "Summary"],
-                    ["skills", "Core Skills"],
-                    ["experience", "Experience & Bullets"],
                     ["education", "Education"],
                     ["certifications", "Certifications"],
-                  ].map(([key, title]) => (
-                    <label key={key} className="grid gap-2 text-sm font-semibold text-charcoal">{title}<textarea value={draft[key]} onChange={(event) => setDraft((current) => ({ ...current, [key]: event.target.value }))} rows={key === "header" ? 3 : key === "experience" ? 7 : 4} className="w-full rounded-lg border border-stone-300 p-3 font-normal leading-6" /></label>
-                  ))}
+                  ].map(([key, title]) => <label key={key} className="grid gap-2 text-sm font-semibold">{title}<textarea value={draft[key].join("\n")} onChange={(event) => setDraft((current) => ({ ...current, [key]: linesFrom(event.target.value) }))} rows={3} className="w-full rounded-lg border border-stone-300 p-3 font-normal" /></label>)}
+                  {result.ai_review_used && selectedJobId && (
+                    <div className="flex flex-wrap gap-2 border-t pt-4">
+                      {isAuthenticated ? <button type="button" onClick={handleSaveTailoredCv} disabled={savingCv} className="rounded-lg bg-violet-800 px-4 py-2 font-semibold text-white disabled:opacity-50">{savingCv ? "Saving…" : "Save tailored CV for this job"}</button> : <Link to="/login" className="rounded-lg bg-violet-800 px-4 py-2 font-semibold text-white">Sign in to save this tailored CV</Link>}
+                      {savedCvId && <button type="button" onClick={applyWithSavedCv} className="rounded-lg bg-emerald-700 px-4 py-2 font-semibold text-white">Apply with this CV</button>}
+                    </div>
+                  )}
+                  {saveStatus && <p role="status" className="text-sm text-stone-700">{saveStatus}</p>}
                 </section>
               )}
               <p className="rounded-lg bg-stone-100 p-3 text-xs leading-relaxed text-stone-600">{result.note} Review all AI suggestions before export and do not include any detail that is not true.</p>
-              {result.daily_allowance && <p className="text-xs text-stone-500">Daily free reviews remaining: {result.daily_allowance.remaining} of {result.daily_allowance.dailyLimit}.</p>}
+              {result.daily_allowance && <p className="text-xs text-stone-500">Diagnostic uses remaining today: {result.daily_allowance.diagnosticsRemaining} of {result.daily_allowance.diagnosticLimit}; AI tailorings remaining: {result.daily_allowance.aiTailoringsRemaining} of {result.daily_allowance.aiTailoringLimit}.</p>}
             </div>
           )}
 

@@ -53,6 +53,7 @@ const SECTION_HEADINGS = [
   { key: 'projects', pattern: /^(?:selected\s+)?projects?$/i },
   { key: 'coverLetter', pattern: /^(?:cover letter|letter of motivation)$/i },
 ];
+const REQUIREMENT_SECTION_HEADING_PATTERN = /^(?:requirements|qualifications|must[- ]haves?|preferred|nice[- ]to[- ]haves?|bonus|desired|what you(?:'|’)ll need|what we(?:'|’)d love)[:\s]*$/i;
 
 const SKILL_STOP_WORDS = new Set([
   'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'have',
@@ -77,12 +78,195 @@ const containsPhrase = (text, phrase) => new RegExp(
   'i',
 ).test(text);
 
-const normalizeLines = (text) => String(text || '')
+const SECTION_HEADING_PATTERN = new RegExp(
+  `^(?:${SECTION_HEADINGS.map(({ pattern }) => pattern.source.replace(/\\^|\\$/g, '')).join('|')})$`,
+  'i',
+);
+
+export const normalizeCvText = (text) => String(text || '')
+  .replace(/\u00ad/g, '')
   .replace(/\u0000/g, ' ')
   .replace(/\r\n?/g, '\n')
+  .replace(/([a-z0-9])\s+-\s+([a-z0-9])/g, '$1-$2')
   .split('\n')
   .map((line) => line.replace(/[ \t]+$/g, '').trim())
-  .filter((line) => line.length > 0);
+  .filter((line) => line.length > 0)
+  .reduce((state, line) => {
+    const { normalized } = state;
+    const sectionHeading = SECTION_HEADINGS.find(({ pattern }) => pattern.test(line.replace(/[:\s]+$/, '')));
+    if (sectionHeading || REQUIREMENT_SECTION_HEADING_PATTERN.test(line)) {
+      if (sectionHeading) state.section = sectionHeading.key;
+      normalized.push(line);
+      return state;
+    }
+    const previous = normalized.at(-1);
+    if (!previous || /^(?:[-*•▪◦‣]|\d+[.)])\s+/.test(line)) {
+      normalized.push(line);
+      return state;
+    }
+
+    const previousIsBullet = isBulletLine(previous);
+    const hasDate = DATE_RANGE.test(previous) || DATE_RANGE.test(line);
+    const looksLikeRoleHeader = hasDate || /\s(?:\|| at )\s/i.test(line);
+    const resumesSentence = /^[a-z]/.test(line) || /[,;:]$/.test(previous);
+    const unfinishedParagraph = previous.length > 18
+      && !/[.!?]$/.test(previous)
+      && !hasDate
+      && state.section !== 'skills'
+      && !(state.section === 'experience' && !previousIsBullet)
+      && resumesSentence;
+    const continuedBullet = previousIsBullet
+      && !/[.!?]$/.test(previous)
+      && !NON_SKILL_REQUIREMENT_TERMS.test(line)
+      && !looksLikeRoleHeader;
+    if (continuedBullet || unfinishedParagraph) {
+      normalized[normalized.length - 1] = `${previous} ${line}`.replace(/\s+/g, ' ').trim();
+    } else {
+      normalized.push(line);
+    }
+    return state;
+  }, { normalized: [], section: '' }).normalized
+  .join('\n');
+
+const normalizeLines = (text) => normalizeCvText(text).split('\n');
+
+const DATE_RANGE = /\b(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:19|20)\d{2}\s*(?:-|–|to|through)\s*(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:(?:19|20)\d{2}|present|current)\b/i;
+const isBulletLine = (line) => /^(?:[-*•▪◦‣]|\d+[.)])\s+/.test(line);
+const cleanBullet = (line) => line.replace(/^(?:[-*•▪◦‣]|\d+[.)])\s+/, '').trim();
+
+const parseExperience = (lines) => {
+  const items = [];
+  let current = null;
+  const startRole = (header = '') => {
+    const dateMatch = header.match(DATE_RANGE);
+    const dates = dateMatch?.[0] || '';
+    const withoutDates = header.replace(DATE_RANGE, '').replace(/[|,;–—-]+$/g, '').trim();
+    const parts = withoutDates.split(/\s*(?:\||•|·| at )\s*/i).map((part) => part.trim()).filter(Boolean);
+    current = {
+      title: parts[0] || '',
+      company: parts[1] || '',
+      dates,
+      location: parts[2] || '',
+      bullets: [],
+    };
+    items.push(current);
+  };
+
+  for (const line of lines) {
+    if (isBulletLine(line)) {
+      if (!current) startRole();
+      current.bullets.push(cleanBullet(line));
+    } else if (DATE_RANGE.test(line) && current && !current.dates && !current.bullets.length) {
+      current.dates = line.match(DATE_RANGE)?.[0] || '';
+    } else if (!current || current.bullets.length || DATE_RANGE.test(line)) {
+      startRole(line);
+    } else if (!current.title) {
+      startRole(line);
+    } else if (!current.company) {
+      current.company = line;
+    } else if (!current.location) {
+      current.location = line;
+    } else {
+      current.bullets.push(line);
+    }
+  }
+  return items.filter((item) => item.title || item.company || item.dates || item.bullets.length);
+};
+
+const parseContact = (header) => {
+  const lines = String(header || '').split('\n').map((line) => line.trim()).filter(Boolean);
+  const email = String(header || '').match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || '';
+  const phone = String(header || '').match(/(?:\+?\d{1,3}[\s().-]?)?(?:\d[\s().-]?){7,14}\d/)?.[0] || '';
+  const name = lines.find((line) =>
+    !line.includes('@')
+    && !/\d/.test(line)
+    && !/^(?:curriculum vitae|resume|résumé|cv|contact)$/i.test(line),
+  ) || '';
+  const locationLine = lines.find((line) => /\b(?:address|location|based in)\b/i.test(line)) || '';
+  return { name, email, phone, location: locationLine.replace(/^(?:address|location|based in)\s*[:\-]?\s*/i, '') };
+};
+
+const parseEducationLines = (lines) => lines
+  .filter(Boolean)
+  .map((line) => {
+    const dates = line.match(DATE_RANGE)?.[0] || line.match(/\b(?:19|20)\d{2}\b(?:\s*[-–]\s*(?:19|20)\d{2})?/i)?.[0] || '';
+    return {
+      degree: line.replace(DATE_RANGE, '').trim(),
+      institution: '',
+      dates,
+      location: '',
+    };
+  });
+
+const parseSkillList = (lines) => [...new Set(
+  lines.flatMap((line) => line.split(/[,;|•·]\s*/))
+    .map((skill) => cleanBullet(skill).replace(/[.]+$/g, '').trim())
+    .filter((skill) => skill && skill.length <= 80),
+)];
+
+export const parseCvStructure = (text) => {
+  const sections = splitCvSections(text);
+  return {
+    contact: parseContact(sections.header),
+    summary: sections.summary,
+    skills: parseSkillList(sections.skills),
+    experience: parseExperience(sections.experience),
+    education: parseEducationLines(sections.education),
+    certifications: parseSkillList(sections.certifications),
+    projects: sections.projects,
+    coverLetter: sections.coverLetter,
+  };
+};
+
+export const analyzeJobRequirements = (text) => {
+  const lines = normalizeLines(text);
+  let section = '';
+  const mustHaves = [];
+  const niceToHaves = [];
+  for (const rawLine of lines) {
+    const heading = rawLine.replace(/[:\s]+$/, '').toLowerCase();
+    if (/^(?:requirements|qualifications|must[- ]haves?|what you(?:'|’)ll need|minimum qualifications)$/.test(heading)) {
+      section = 'must';
+      continue;
+    }
+    if (/^(?:preferred|nice[- ]to[- ]haves?|bonus|desired|what we(?:'|’)d love)$/.test(heading)) {
+      section = 'nice';
+      continue;
+    }
+    if (SECTION_HEADING_PATTERN.test(rawLine)) section = '';
+    const requirement = cleanBullet(rawLine);
+    if (requirement.length < 10 || NON_SKILL_REQUIREMENT_TERMS.test(requirement)) continue;
+    const isNice = section === 'nice' || /\b(?:preferred|nice to have|bonus|desirable)\b/i.test(requirement);
+    const isMust = section === 'must' || /\b(?:must|required|essential|minimum|at least)\b/i.test(requirement);
+    if (isNice) niceToHaves.push(requirement);
+    else if (isMust) mustHaves.push(requirement);
+  }
+  const logistics = extractLogistics('', text);
+  return {
+    must_haves: [...new Set(mustHaves)].slice(0, 20),
+    nice_to_haves: [...new Set(niceToHaves)].slice(0, 20),
+    logistics: logistics.requirements,
+  };
+};
+
+export const mergeGroundedJobRequirements = (fallback, generated, sourceText) => {
+  const source = normalizeComparableText(sourceText);
+  const groundedEntries = (values) => (Array.isArray(values) ? values : [])
+    .filter((value) => typeof value === 'string')
+    .map((value) => value.trim())
+    .filter((value) => value.length >= 10 && source.includes(normalizeComparableText(value)));
+  return {
+    must_haves: [...new Set([
+      ...(fallback?.must_haves || []),
+      ...groundedEntries(generated?.must_haves),
+    ])].slice(0, 20),
+    nice_to_haves: [...new Set([
+      ...(fallback?.nice_to_haves || []),
+      ...groundedEntries(generated?.nice_to_haves),
+    ])].slice(0, 20),
+    logistics: fallback?.logistics || extractLogistics('', sourceText).requirements,
+  };
+};
 
 export const splitCvSections = (text) => {
   const lines = normalizeLines(text);
@@ -113,19 +297,15 @@ export const splitCvSections = (text) => {
       }
       continue;
     }
-    const isBullet = /^(?:[-*•▪◦‣]|\d+[.)])\s+/.test(rawLine);
-    const line = rawLine.replace(/^(?:[-*•▪◦‣]|\d+[.)])\s+/, '').trim();
+    const isBullet = isBulletLine(rawLine);
+    const line = isBullet ? `${rawLine.match(/^(?:[-*•▪◦‣]|\d+[.)])\s+/)[0]}${cleanBullet(rawLine)}` : rawLine.trim();
     if (!line) continue;
     sections[current].push(line);
-    if (current === 'experience' && isBullet) bulletLines.push(line);
-  }
-
-  if (!sections.summary.length) {
-    sections.summary = sections.other.filter((line) => line.length > 40).slice(0, 3);
+    if (current === 'experience' && isBullet) bulletLines.push(cleanBullet(line));
   }
   const experienceBullets = bulletLines.length
     ? bulletLines
-    : sections.experience.filter((line) => line.length > 20);
+    : sections.experience.filter((line) => !DATE_RANGE.test(line) && line.length > 20).map(cleanBullet);
   return {
     ...sections,
     header: sections.header.join('\n'),
@@ -141,6 +321,15 @@ export const splitCvSections = (text) => {
     coverLetterStarted,
     resumeText: coverLetterIndex >= 0 ? lines.slice(0, coverLetterIndex).join('\n') : lines.join('\n'),
     sourceLines: lines,
+    structured: {
+      contact: parseContact(sections.header.join('\n')),
+      summary: sections.summary.join('\n'),
+      skills: parseSkillList(sections.skills),
+      experience: parseExperience(sections.experience),
+      education: parseEducationLines(sections.education),
+      certifications: parseSkillList(sections.certifications),
+      projects: sections.projects,
+    },
   };
 };
 
@@ -391,6 +580,138 @@ export const normalizeAiRewrites = (payload, sourceText) => {
       add_only_if_true: Boolean(summaryProposed && !summaryGrounded),
       unverified_addition: summaryProposed && !summaryGrounded ? summaryProposed : '',
     },
+  };
+};
+
+const normalizeComparableText = (value) => String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+export const normalizeTailoredCv = ({ generated, cv, sourceText, jobRequirements }) => {
+  const summaryRewrite = normalizeAiRewrites(
+    { summary_rewrite: generated?.summary?.summary },
+    sourceText,
+  ).summary_rewrite;
+  const untraceableSuggestions = [];
+  const experience = (cv.experience || []).map((role, roleIndex) => {
+    const suggestions = [...(generated?.experience?.experience?.find(
+      (entry) => Number(entry?.roleIndex) === roleIndex,
+    )?.bullets || [])];
+    const bullets = role.bullets.map((sourceBullet) => {
+      const suggestionIndex = suggestions.findIndex((entry) =>
+        normalizeComparableText(entry?.sourceBullet) === normalizeComparableText(sourceBullet));
+      const suggestion = suggestionIndex >= 0 ? suggestions.splice(suggestionIndex, 1)[0] : null;
+      const tailoredBullet = typeof suggestion?.tailoredBullet === 'string'
+        ? suggestion.tailoredBullet.trim().slice(0, 1000)
+        : '';
+      const traceable = Boolean(
+        suggestion
+        && tailoredBullet
+        && hasGroundedFacts(sourceBullet, tailoredBullet, sourceBullet),
+      );
+      return {
+        sourceBullet,
+        tailoredBullet: traceable ? tailoredBullet : '',
+        reason: typeof suggestion?.reason === 'string' ? suggestion.reason.slice(0, 300) : '',
+        traceable,
+        accepted: false,
+        untraceableSuggestion: tailoredBullet && !traceable ? tailoredBullet : '',
+      };
+    });
+    for (const suggestion of suggestions) {
+      if (typeof suggestion?.tailoredBullet === 'string' && suggestion.tailoredBullet.trim()) {
+        untraceableSuggestions.push(suggestion.tailoredBullet.trim().slice(0, 1000));
+      }
+    }
+    return { ...role, bullets };
+  });
+
+  const sourceSkills = new Set((cv.skills || []).map(normalizeComparableText));
+  const generatedSkills = (generated?.skills?.skills || [])
+    .filter((skill) => typeof skill === 'string')
+    .map((skill) => skill.trim());
+  const skills = [...new Set(generatedSkills
+    .filter((skill) => sourceSkills.has(normalizeComparableText(skill))))];
+  const requirements = [
+    ...(jobRequirements?.must_haves || []).map((requirement) => ({ requirement, kind: 'must_have' })),
+    ...(jobRequirements?.nice_to_haves || []).map((requirement) => ({ requirement, kind: 'nice_to_have' })),
+  ];
+  const sourceTextNormalized = normalizeComparableText(sourceText);
+  const sourceSkillFamilies = new Set(extractSkillPhrases(sourceText));
+  const gaps = requirements
+    .filter(({ requirement }) => {
+      if (sourceTextNormalized.includes(normalizeComparableText(requirement))) return false;
+      const requirementSkills = extractSkillPhrases(requirement);
+      return !requirementSkills.some((skill) => sourceSkillFamilies.has(skill));
+    })
+    .slice(0, 15)
+    .map(({ requirement, kind }) => ({
+      requirement,
+      kind,
+      guidance: 'Add a specific example only if this requirement reflects your real experience; otherwise treat it as a skill gap.',
+      add_only_if_true: true,
+    }));
+  for (const skill of generatedSkills.filter((entry) => !sourceSkills.has(normalizeComparableText(entry)))) {
+    gaps.push({
+      requirement: skill,
+      kind: 'unsupported_skill',
+      guidance: 'This skill was not present in the source CV. Add it only if you can verify it from your actual experience.',
+      add_only_if_true: true,
+    });
+  }
+  for (const suggestion of untraceableSuggestions) {
+    gaps.push({
+      requirement: suggestion,
+      kind: 'untraceable_rewrite',
+      guidance: 'This AI suggestion could not be tied to a source bullet. Do not use it unless you can independently verify it.',
+      add_only_if_true: true,
+    });
+  }
+  if (summaryRewrite.unverified_addition) {
+    gaps.push({
+      requirement: summaryRewrite.unverified_addition,
+      kind: 'untraceable_summary',
+      guidance: 'The proposed summary could not be grounded in the source CV. Use only if every statement is independently verified.',
+      add_only_if_true: true,
+    });
+  }
+
+  for (const role of experience) {
+    for (const bullet of role.bullets) {
+      if (bullet.untraceableSuggestion) {
+        gaps.push({
+          requirement: bullet.untraceableSuggestion,
+          kind: 'untraceable_rewrite',
+          guidance: 'This AI suggestion could not be tied to a source bullet. Do not use it unless you can independently verify it.',
+          add_only_if_true: true,
+        });
+      }
+    }
+  }
+
+  const summary = summaryRewrite.suggested
+    ? {
+      original: summaryRewrite.original,
+      tailored: summaryRewrite.suggested,
+      reason: summaryRewrite.reason,
+      traceable: true,
+      accepted: false,
+    }
+    : {
+      original: cv.summary || '',
+      tailored: '',
+      reason: summaryRewrite.unverified_addition
+        ? 'AI summary was not grounded in the source CV.'
+        : '',
+      traceable: false,
+      accepted: false,
+      untraceableSuggestion: summaryRewrite.unverified_addition || '',
+    };
+
+  return {
+    summary,
+    skills,
+    experience,
+    gaps: gaps.slice(0, 20),
+    job_requirements: jobRequirements,
   };
 };
 

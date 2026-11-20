@@ -64,7 +64,21 @@ export const sendEmployerApplicationNotification = async ({ recipient, job, appl
     ].filter(Boolean).map(escapeHtml).join(' · ')).join('\n\n')
     : 'Not provided';
   const coverLetter = escapeHtml(application.coverLetter || 'No cover letter provided.');
-  const resumeUrl = escapeHtml(application.resumeUrl);
+  const resumeUrl = application.resumeUrl ? escapeHtml(application.resumeUrl) : '';
+  const tailoredSections = application.tailoredCv?.sections;
+  const tailoredSummary = tailoredSections?.summary
+    ? escapeHtml(tailoredSections.summary)
+    : '';
+  const tailoredExperience = Array.isArray(tailoredSections?.experience)
+    ? tailoredSections.experience.map((role) => {
+      const heading = [role.title, role.company, role.dates, role.location].filter(Boolean).map(escapeHtml).join(' · ');
+      const bullets = (role.bullets || []).map((bullet) => bullet.editedText || (bullet.accepted ? bullet.tailoredBullet : bullet.sourceBullet))
+        .filter(Boolean)
+        .map((bullet) => `<li>${escapeHtml(bullet)}</li>`)
+        .join('');
+      return `<p><strong>${heading}</strong></p><ul>${bullets}</ul>`;
+    }).join('')
+    : '';
 
   return transporter.sendMail({
     from: emailFrom,
@@ -79,7 +93,14 @@ export const sendEmployerApplicationNotification = async ({ recipient, job, appl
       `Skills: ${applicant.skills?.join(', ') || 'Not provided'}`,
       `Education:\n${applicant.education?.map((item) => [item.degree, item.field, item.school, item.endYear].filter(Boolean).join(' · ')).join('\n') || 'Not provided'}`,
       `Experience:\n${applicant.experience?.map((item) => [item.position, item.company, item.description].filter(Boolean).join(' · ')).join('\n') || 'Not provided'}`,
-      `Resume: ${application.resumeUrl}`,
+      `Resume: ${application.resumeUrl || (tailoredSections ? 'Job-specific tailored CV is available in the employer dashboard.' : 'Not provided')}`,
+      ...(tailoredSections ? [
+        `Tailored CV summary: ${tailoredSections.summary || 'Not provided'}`,
+        `Tailored CV experience:\n${tailoredSections.experience?.map((role) => [
+          [role.title, role.company, role.dates].filter(Boolean).join(' · '),
+          ...(role.bullets || []).map((bullet) => bullet.editedText || (bullet.accepted ? bullet.tailoredBullet : bullet.sourceBullet)),
+        ].filter(Boolean).join('\n')).join('\n\n') || 'Not provided'}`,
+      ] : []),
       `Cover letter: ${application.coverLetter || 'No cover letter provided.'}`,
     ].join('\n'),
     html: `<h2>New application for ${escapeHtml(job.title)}</h2>
@@ -89,7 +110,9 @@ export const sendEmployerApplicationNotification = async ({ recipient, job, appl
       <p><strong>Skills:</strong> ${skills}</p>
       <h3>Education</h3><p>${education.replace(/\n/g, '<br>')}</p>
       <h3>Experience</h3><p>${experience.replace(/\n/g, '<br>')}</p>
-      <p><strong>Resume:</strong> <a href="${resumeUrl}">View candidate resume</a></p>
+      <p><strong>Resume:</strong> ${resumeUrl ? `<a href="${resumeUrl}">View candidate resume</a>` : tailoredSections ? 'A job-specific tailored CV is available in the employer dashboard.' : 'Not provided'}</p>
+      ${tailoredSummary ? `<h3>Tailored CV summary</h3><p>${tailoredSummary}</p>` : ''}
+      ${tailoredExperience ? `<h3>Tailored CV experience</h3>${tailoredExperience}` : ''}
       <h3>Cover letter</h3><p>${coverLetter.replace(/\n/g, '<br>')}</p>`,
   });
 };

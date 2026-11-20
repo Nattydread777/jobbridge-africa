@@ -2,10 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   analyzeCvMatch,
+  analyzeJobRequirements,
   createAiReviewPrompt,
   extractLogistics,
   extractSkillPhrases,
   filterSkillNoise,
+  mergeGroundedJobRequirements,
+  normalizeCvText,
+  normalizeTailoredCv,
+  parseCvStructure,
   normalizeAiRewrites,
   redactCvPii,
   splitCvSections,
@@ -113,4 +118,86 @@ test('AI rewrites require a source-backed original and facts already present in 
   assert.equal(result.rewrites[1].add_only_if_true, true);
   assert.equal(result.rewrites[2].suggested, '');
   assert.equal(result.rewrites[2].add_only_if_true, true);
+});
+
+test('CV normalization rejoins split phrases and parsing keeps skills out of summary', () => {
+  const text = normalizeCvText([
+    'Summary',
+    'Built an end - to - end platform with multi - stakeholder teams',
+    'and improved weekly reporting.',
+    'Skills',
+    'JavaScript, React, SQL',
+    'Experience',
+    'Senior Engineer | Acme | Lagos | Jan 2020 - Present',
+    '- Built customer dashboards that improved',
+    'weekly reporting for product teams.',
+  ].join('\n'));
+
+  assert.match(text, /end-to-end platform with multi-stakeholder teams and improved weekly reporting/);
+  const cv = parseCvStructure(text);
+  assert.match(cv.summary, /end-to-end/);
+  assert.deepEqual(cv.skills, ['JavaScript', 'React', 'SQL']);
+  assert.doesNotMatch(cv.summary, /JavaScript|React|SQL/);
+  assert.deepEqual(cv.experience[0], {
+    title: 'Senior Engineer',
+    company: 'Acme',
+    dates: 'Jan 2020 - Present',
+    location: 'Lagos',
+    bullets: ['Built customer dashboards that improved weekly reporting for product teams.'],
+  });
+});
+
+test('job requirements are categorized and AI rewrites remain source-bullet traceable', () => {
+  const jobDescription = [
+    'Requirements',
+    '- Must have experience with React and customer onboarding.',
+    'Nice to have',
+    '- Preferred: familiarity with Kubernetes.',
+    'Fully remote, aligned to Eastern Time.',
+  ].join('\n');
+  const requirements = analyzeJobRequirements(jobDescription);
+  assert.ok(requirements.must_haves.some((item) => /React/));
+  assert.ok(requirements.nice_to_haves.some((item) => /Kubernetes/));
+  assert.match(requirements.logistics.timezone, /Eastern Time/);
+
+  const cv = parseCvStructure([
+    'Summary',
+    'Frontend developer with React experience.',
+    'Skills',
+    'React, JavaScript',
+    'Experience',
+    'Senior Engineer | Acme | 2020-2023',
+    '- Built React dashboards.',
+  ].join('\n'));
+  const tailored = normalizeTailoredCv({
+    cv,
+    sourceText: 'React frontend developer. Built React dashboards.',
+    jobRequirements: requirements,
+    generated: {
+      summary: { summary: { original: cv.summary, suggested: cv.summary, reason: 'Clear and grounded.' } },
+      skills: { skills: ['React', 'JavaScript', 'Kubernetes'] },
+      experience: {
+        experience: [{
+          roleIndex: 0,
+          bullets: [
+            { sourceBullet: 'Built React dashboards.', tailoredBullet: 'Built React dashboards.', reason: 'Clearer.' },
+            { sourceBullet: 'Built React dashboards.', tailoredBullet: 'Led 10 engineers.', reason: 'Impact.' },
+          ],
+        }],
+      },
+    },
+  });
+  assert.equal(tailored.experience[0].bullets[0].sourceBullet, 'Built React dashboards.');
+  assert.equal(tailored.experience[0].bullets[0].traceable, true);
+  assert.ok(tailored.gaps.some((gap) => /Led 10 engineers/.test(gap.requirement) && gap.add_only_if_true));
+  assert.ok(tailored.gaps.some((gap) => /Kubernetes/.test(gap.requirement) && gap.add_only_if_true));
+  assert.deepEqual(tailored.skills, ['React', 'JavaScript']);
+
+  const groundedRequirements = mergeGroundedJobRequirements(
+    { must_haves: [], nice_to_haves: [], logistics: requirements.logistics },
+    { must_haves: ['Must have experience with React and customer onboarding.', 'Invented requirement'] },
+    jobDescription,
+  );
+  assert.ok(groundedRequirements.must_haves.includes('Must have experience with React and customer onboarding.'));
+  assert.ok(!groundedRequirements.must_haves.includes('Invented requirement'));
 });

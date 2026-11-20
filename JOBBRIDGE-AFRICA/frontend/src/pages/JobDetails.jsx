@@ -29,6 +29,7 @@ const JobDetails = () => {
   const [fitContext, setFitContext] = useState(null);
   const [fitLoading, setFitLoading] = useState(false);
   const [fitError, setFitError] = useState("");
+  const tailoredCvId = new URLSearchParams(location.search).get("tailoredCvId") || "";
   const jobId = job?._id;
   const salaryLabel = [job?.salary, job?.salaryRange]
     .map((value) => String(value || "").trim())
@@ -149,7 +150,7 @@ const JobDetails = () => {
   const handleSubmitApplication = async (e) => {
     e.preventDefault();
 
-    if (!applicationData.resume && !user?.resumeUrl) {
+    if (!applicationData.resume && !user?.resumeUrl && !tailoredCvId) {
       alert("Please upload your resume/CV");
       return;
     }
@@ -160,11 +161,13 @@ const JobDetails = () => {
       const body = applicationData.resume ? new FormData() : {
         jobId: id,
         coverLetter: applicationData.coverLetter,
+        tailoredCvId,
       };
       if (applicationData.resume) {
         body.append("jobId", id);
         body.append("coverLetter", applicationData.coverLetter);
         body.append("resume", applicationData.resume);
+        if (tailoredCvId) body.append("tailoredCvId", tailoredCvId);
       }
       const { data } = await api.post("/applications", body);
 
@@ -426,8 +429,13 @@ const JobDetails = () => {
               <form onSubmit={handleSubmitApplication} className="space-y-6">
                 {/* Resume Upload */}
                 <div>
+                  {tailoredCvId && (
+                    <p className="mb-3 rounded-lg border border-violet-200 bg-violet-50 p-3 text-sm text-violet-950">
+                      Your saved, job-specific tailored CV will be included with this application. You can still attach a different resume below.
+                    </p>
+                  )}
                   <label className="block text-sm font-medium mb-2">
-                    Resume/CV <span className="text-red-500">*</span>
+                    Resume/CV {!tailoredCvId && <span className="text-red-500">*</span>}
                   </label>
                   {user?.resumeUrl && !applicationData.resume && (
                     <div className="mb-3 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 p-3">
@@ -451,10 +459,10 @@ const JobDetails = () => {
                       <p className="text-sm font-medium mb-1">
                         {applicationData.resume
                           ? `Selected: ${applicationData.resume.name}`
-                          : user?.resumeUrl ? "Choose a different resume (optional)" : "Click to upload your resume/CV"}
+                          : user?.resumeUrl || tailoredCvId ? "Choose a different resume (optional)" : "Click to upload your resume/CV"}
                       </p>
                       <p className="text-xs text-gray-500">
-                        Supported formats: PDF, DOC, DOCX (Max 10MB). Your saved profile resume is used by default.
+                        Supported formats: PDF, DOC, DOCX (Max 10MB). The tailored CV or saved profile resume is used by default.
                       </p>
                     </label>
                   </div>
@@ -514,7 +522,7 @@ const JobDetails = () => {
                         : "bg-accent text-white hover:bg-red-700"
                     }`}
                   >
-                    {submitting ? "Submitting..." : "Submit Application"}
+                    {submitting ? "Submitting..." : tailoredCvId ? "Apply with this CV" : "Submit Application"}
                   </button>
                   <button
                     type="button"

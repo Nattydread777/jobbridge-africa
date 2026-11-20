@@ -251,6 +251,33 @@ const EmployerDashboard = () => {
                       </div>
                     )}
 
+                    {application.tailoredCv?.sections && (
+                      <div className="mb-3 rounded-lg border border-violet-200 bg-violet-50 p-4">
+                        <p className="mb-2 text-sm font-semibold text-violet-950">Job-specific tailored CV</p>
+                        {application.tailoredCv.sections.summary && (
+                          <p className="mb-2 text-sm text-violet-950">{application.tailoredCv.sections.summary}</p>
+                        )}
+                        {application.tailoredCv.sections.skills?.length > 0 && (
+                          <p className="mb-2 text-sm text-violet-950"><strong>Skills:</strong> {application.tailoredCv.sections.skills.join(", ")}</p>
+                        )}
+                        {application.tailoredCv.sections.experience?.map((role, roleIndex) => (
+                          <div key={`${role.title}-${roleIndex}`} className="mb-2 text-sm text-violet-950">
+                            <p className="font-semibold">{[role.title, role.company, role.dates, role.location].filter(Boolean).join(" · ")}</p>
+                            <ul className="list-disc space-y-1 pl-5">
+                              {role.bullets?.map((bullet, bulletIndex) => (
+                                <li key={`${bullet.sourceBullet}-${bulletIndex}`}>
+                                  {bullet.editedText || (bullet.accepted ? bullet.tailoredBullet : bullet.sourceBullet)}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                        {application.tailoredCv.sections.education?.length > 0 && (
+                          <p className="text-sm text-violet-950"><strong>Education:</strong> {application.tailoredCv.sections.education.join(" · ")}</p>
+                        )}
+                      </div>
+                    )}
+
                     {application.resumeUrl && (
                       <a href={application.resumeUrl} target="_blank" rel="noopener noreferrer" className="mb-3 inline-flex font-semibold text-primary hover:underline">
                         View applicant resume ↗

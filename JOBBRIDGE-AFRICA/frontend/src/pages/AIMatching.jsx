@@ -219,7 +219,7 @@ const AIMatching = () => {
                             <Link to={getJobPath(job)} className="text-primary hover:underline">View Details →</Link>
                           </div>
                           <div>
-                            <Link to={`/ai-cv-tool?jobId=${encodeURIComponent(job._id)}`} className="text-sm text-primary hover:underline">Compare my CV</Link>
+                            <Link to={`/ai-cv-tool?jobId=${encodeURIComponent(job._id)}`} className="text-sm font-semibold text-primary hover:underline">Tailor CV &amp; apply →</Link>
                           </div>
                         </div>
                       </div>

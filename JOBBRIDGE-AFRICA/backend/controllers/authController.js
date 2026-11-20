@@ -10,6 +10,7 @@ import {
   sendPasswordResetEmail,
 } from '../services/emailService.js';
 import Application from '../models/Application.js';
+import TailoredCv from '../models/TailoredCv.js';
 
 export const registerUser = asyncHandler(async (req, res) => {
   const {
@@ -457,9 +458,14 @@ export const deleteMyCvData = asyncHandler(async (req, res) => {
         $unset: { resumePublicId: '' },
       },
     ),
+    TailoredCv.deleteMany({ applicant: user._id }),
+    Application.updateMany(
+      { applicant: user._id, tailoredCv: { $exists: true } },
+      { $set: { tailoredCvDeletedAt: deletedAt }, $unset: { tailoredCv: '' } },
+    ),
   ]);
   res.status(200).json({
-    message: 'Your saved profile CV and application CV files were removed from JobBridge-managed storage.',
+    message: 'Your saved profile CV, application CV files, and tailored CV versions were removed from JobBridge-managed storage.',
   });
 });
 

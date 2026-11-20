@@ -6,64 +6,88 @@ import CvUsage from '../models/CvUsage.js';
 import { buildActiveJobFilter } from '../utils/jobFilters.js';
 import {
   analyzeCvMatch,
-  createAiReviewPrompt,
+  analyzeJobRequirements,
   extractSkillPhrases,
-  normalizeAiRewrites,
+  mergeGroundedJobRequirements,
+  normalizeTailoredCv,
+  parseCvStructure,
   redactCvPii,
   splitCvSections,
 } from '../services/cvAnalysisService.js';
+import { getAiApiKey, tailorCvInParallel } from '../services/aiCvService.js';
 
 const CV_TEXT_LIMIT = 30000;
 const JOB_TEXT_LIMIT = 15000;
 const COVER_LETTER_LIMIT = 10000;
 const REQUEST_BYTE_LIMIT = 250000;
 
-const getAiApiKey = () => process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY;
-const getAiBaseUrl = () => (
-  process.env.AI_BASE_URL
-  || (process.env.GEMINI_API_KEY
-    ? 'https://generativelanguage.googleapis.com/v1beta/openai/'
-    : 'https://api.openai.com/v1')
-).replace(/\/+$/, '');
-const getAiModel = () => (
-  process.env.AI_MODEL
-  || (process.env.GEMINI_API_KEY ? 'gemini-2.5-flash' : 'gpt-4o-mini')
-);
-
 const getDailyLimit = () => {
   const parsed = Number.parseInt(process.env.CV_DAILY_FREE_LIMIT || '5', 10);
   return Number.isInteger(parsed) ? Math.min(20, Math.max(1, parsed)) : 5;
 };
 
-const consumeDailyAllowance = async (req) => {
+const getDailyAiLimit = () => {
+  const parsed = Number.parseInt(process.env.CV_DAILY_AI_LIMIT || '2', 10);
+  return Number.isInteger(parsed) ? Math.min(10, Math.max(1, parsed)) : 2;
+};
+
+const consumeDailyAllowance = async (req, aiReview) => {
   const dayKey = new Date().toISOString().slice(0, 10);
   const identity = req.user?._id
     ? `user:${req.user._id}`
     : `ip:${req.ip || req.socket?.remoteAddress || 'unknown'}`;
   const identityHash = createHash('sha256').update(identity).digest('hex');
   const dailyLimit = getDailyLimit();
+  const aiDailyLimit = getDailyAiLimit();
+  const countField = aiReview ? 'aiCount' : 'count';
+  const limit = aiReview ? aiDailyLimit : dailyLimit;
   const expiresAt = new Date(Date.now() + 35 * 24 * 60 * 60 * 1000);
-  const filter = { identityHash, dayKey, count: { $lt: dailyLimit } };
+  const filter = {
+    identityHash,
+    dayKey,
+    ...(aiReview
+      ? { $or: [{ aiCount: { $lt: limit } }, { aiCount: { $exists: false } }] }
+      : { count: { $lt: limit } }),
+  };
   try {
-    let usage = await CvUsage.findOneAndUpdate(filter, { $inc: { count: 1 } }, { new: true });
+    let usage = await CvUsage.findOneAndUpdate(filter, { $inc: { [countField]: 1 } }, { new: true });
     if (!usage) {
       try {
-        usage = await CvUsage.create({ identityHash, dayKey, count: 1, expiresAt });
+        usage = await CvUsage.create({
+          identityHash,
+          dayKey,
+          count: aiReview ? 0 : 1,
+          aiCount: aiReview ? 1 : 0,
+          expiresAt,
+        });
       } catch (error) {
         if (error.code !== 11000) throw error;
-        usage = await CvUsage.findOneAndUpdate(filter, { $inc: { count: 1 } }, { new: true });
+        usage = await CvUsage.findOneAndUpdate(filter, { $inc: { [countField]: 1 } }, { new: true });
       }
     }
     if (!usage) {
-      const exhausted = new Error('You have reached today’s free CV review allowance. Please try again tomorrow.');
+      const exhausted = new Error(
+        aiReview
+          ? 'You have reached today’s free AI tailoring allowance. Please try again tomorrow.'
+          : 'You have reached today’s free diagnostic allowance. Please try again tomorrow.',
+      );
       exhausted.status = 429;
       throw exhausted;
     }
-    return { dailyLimit, remaining: Math.max(0, dailyLimit - usage.count) };
+    return {
+      diagnosticLimit: dailyLimit,
+      diagnosticsRemaining: Math.max(0, dailyLimit - usage.count),
+      aiTailoringLimit: aiDailyLimit,
+      aiTailoringsRemaining: Math.max(0, aiDailyLimit - usage.aiCount),
+    };
   } catch (error) {
     if (error.status) throw error;
     if (error.code === 11000) {
-      const exhausted = new Error('You have reached today’s free CV review allowance. Please try again tomorrow.');
+      const exhausted = new Error(
+        aiReview
+          ? 'You have reached today’s free AI tailoring allowance. Please try again tomorrow.'
+          : 'You have reached today’s free diagnostic allowance. Please try again tomorrow.',
+      );
       exhausted.status = 429;
       throw exhausted;
     }
@@ -83,55 +107,6 @@ const getRequestedJob = async (jobId, res) => {
     throw new Error('That job listing is no longer active. Choose another listing or paste a description.');
   }
   return job;
-};
-
-const requestAiReview = async (cvText, jobDescription) => {
-  const prompt = createAiReviewPrompt(cvText, jobDescription);
-  const apiKey = getAiApiKey();
-  if (!apiKey) {
-    const configurationError = new Error('Optional AI review is not configured. You can still use the free diagnostic review.');
-    configurationError.status = 503;
-    throw configurationError;
-  }
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
-  try {
-    const response = await fetch(`${getAiBaseUrl()}/chat/completions`, {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: getAiModel(),
-        temperature: 0.1,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: prompt.system },
-          { role: 'user', content: prompt.user },
-        ],
-      }),
-    });
-    if (!response.ok) {
-      throw new Error(`AI provider returned HTTP ${response.status}`);
-    }
-    const responseBody = await response.json();
-    const content = responseBody.choices?.[0]?.message?.content;
-    if (typeof content !== 'string') throw new Error('AI provider returned no structured response.');
-    return JSON.parse(content);
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      const timeoutError = new Error('AI review timed out. Please try again.');
-      timeoutError.status = 504;
-      throw timeoutError;
-    }
-    const providerError = new Error('AI review is temporarily unavailable. Your diagnostic results are still available.');
-    providerError.status = 502;
-    throw providerError;
-  } finally {
-    clearTimeout(timeout);
-  }
 };
 
 export const optimizeCv = asyncHandler(async (req, res) => {
@@ -186,7 +161,7 @@ export const optimizeCv = asyncHandler(async (req, res) => {
 
   let allowance;
   try {
-    allowance = await consumeDailyAllowance(req);
+    allowance = await consumeDailyAllowance(req, aiReview);
   } catch (error) {
     if (error.status) res.status(error.status);
     throw error;
@@ -195,49 +170,62 @@ export const optimizeCv = asyncHandler(async (req, res) => {
   const redactedJobDescription = redactCvPii(jobDescription);
   const diagnostic = analyzeCvMatch(redactedCvText, redactedJobDescription);
   const sections = splitCvSections(cvText);
-  const experienceBullets = sections.experienceBullets.slice(0, 8);
-  const summary = sections.summary;
-  let aiReviewResult = {
-    rewrites: [],
-    summary_rewrite: {
-      original: summary,
-      suggested: '',
-      reason: '',
-      accepted: false,
-      requires_review: true,
-      add_only_if_true: false,
-      unverified_addition: '',
-    },
-  };
+  const structuredCv = parseCvStructure(redactedCvText);
+  const jobRequirements = analyzeJobRequirements(redactedJobDescription);
+  let aiReviewResult = null;
+  let aiJobAnalysisFallback = false;
   if (aiReview) {
-    let providerResult;
     try {
-      providerResult = await requestAiReview(
-        [redactedCvText, coverLetterText ? `\nCover letter:\n${redactCvPii(coverLetterText)}` : ''].join(''),
+      const generated = await tailorCvInParallel({
+        cv: {
+          summary: structuredCv.summary,
+          skills: structuredCv.skills,
+          experience: structuredCv.experience,
+          education: structuredCv.education,
+          certifications: structuredCv.certifications,
+        },
+        job: redactedJobDescription,
+        jobRequirements,
+      });
+      const tailoredJobRequirements = mergeGroundedJobRequirements(
+        jobRequirements,
+        generated.jobAnalysis,
         redactedJobDescription,
       );
+      aiJobAnalysisFallback = generated.jobAnalysisUnavailable;
+      aiReviewResult = normalizeTailoredCv({
+        generated,
+        cv: structuredCv,
+        sourceText: redactedCvText,
+        jobRequirements: tailoredJobRequirements,
+      });
+      jobRequirements.must_haves = tailoredJobRequirements.must_haves;
+      jobRequirements.nice_to_haves = tailoredJobRequirements.nice_to_haves;
     } catch (error) {
       if (error.status) res.status(error.status);
       throw error;
     }
-    aiReviewResult = normalizeAiRewrites(providerResult, redactedCvText);
-    aiReviewResult.rewrites = aiReviewResult.rewrites.slice(0, 5);
   }
 
   res.status(200).json({
     ...diagnostic,
-    rewrites: aiReviewResult.rewrites,
-    summary_rewrite: aiReviewResult.summary_rewrite,
-    cv_sections: {
-      summary: sections.summary,
-      skills: sections.skills,
-      experience: sections.experience,
-      education: sections.education,
-      certifications: sections.certifications,
-      projects: sections.projects,
-      experience_bullets: experienceBullets,
-      cover_letter_detected: Boolean(sections.coverLetter),
-    },
+    job_requirements: jobRequirements,
+    ai_job_analysis_fallback: aiJobAnalysisFallback,
+    cv_sections: aiReview
+      ? {
+        ...structuredCv,
+        contact: undefined,
+      }
+      : {
+        ...structuredCv,
+        contact: undefined,
+        experience: structuredCv.experience.slice(0, 8),
+        experience_bullets: sections.experienceBullets.slice(0, 8),
+        cover_letter_detected: Boolean(sections.coverLetter),
+      },
+    tailored_cv: aiReviewResult,
+    rewrites: [],
+    summary_rewrite: null,
     ai_review_used: aiReview,
     ai_review_available: Boolean(getAiApiKey()),
     ai_provider: aiReview
@@ -246,7 +234,7 @@ export const optimizeCv = asyncHandler(async (req, res) => {
     job: job ? { _id: job._id, title: job.title, companyName: job.companyName } : null,
     daily_allowance: allowance,
     note: aiReview
-      ? 'AI-assisted suggestions are guidance only. Review every edit for accuracy; no suggestion is a hiring decision or guarantee.'
+      ? 'AI-assisted tailored text is guidance only. Review every edit and source link before use; no suggestion is a hiring decision or guarantee.'
       : 'This free diagnostic uses rule-based phrase matching. It is guidance only, not a hiring decision or guarantee.',
   });
 });

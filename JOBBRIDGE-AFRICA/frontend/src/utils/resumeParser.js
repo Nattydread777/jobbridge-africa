@@ -118,13 +118,94 @@ const RESUME_HEADINGS = [
   ["coverLetter", /^(?:cover letter|letter of motivation)$/i],
 ];
 
+const RESUME_DATE_RANGE = /\b(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:19|20)\d{2}\s*(?:-|–|to|through)\s*(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:(?:19|20)\d{2}|present|current)\b/i;
+const isBullet = (line) => /^(?:[-*•▪◦‣]|\d+[.)])\s+/.test(line);
+const cleanBullet = (line) => line.replace(/^(?:[-*•▪◦‣]|\d+[.)])\s+/, "").trim();
+
+export const normalizeResumeText = (sourceText) => String(sourceText || "")
+  .replace(/\u00ad/g, "")
+  .replaceAll(String.fromCharCode(0), " ")
+  .replace(/\r\n?/g, "\n")
+  .replace(/([a-z0-9])\s+-\s+([a-z0-9])/g, "$1-$2")
+  .split("\n")
+  .map((line) => line.replace(/[ \t]+$/g, "").trim())
+  .filter(Boolean)
+  .reduce((state, line) => {
+    const { normalized } = state;
+    const heading = RESUME_HEADINGS.find(([, pattern]) => pattern.test(line.replace(/[:\s]+$/, "")));
+    if (heading) {
+      state.section = heading[0];
+      normalized.push(line);
+      return state;
+    }
+    const previous = normalized.at(-1);
+    if (!previous || isBullet(line)) {
+      normalized.push(line);
+      return state;
+    }
+    const roleHeader = RESUME_DATE_RANGE.test(line) || /\s(?:\|| at )\s/i.test(line);
+    const continuation = (isBullet(previous) && !roleHeader)
+      || (previous.length > 18
+        && !/[.!?]$/.test(previous)
+        && !RESUME_DATE_RANGE.test(previous)
+        && !RESUME_DATE_RANGE.test(line)
+        && state.section !== "skills"
+        && !(state.section === "experience" && !isBullet(previous))
+        && (/^[a-z]/.test(line) || /[,;:]$/.test(previous)));
+    if (continuation) normalized[normalized.length - 1] = `${previous} ${line}`.replace(/\s+/g, " ").trim();
+    else normalized.push(line);
+    return state;
+  }, { normalized: [], section: "" }).normalized
+  .join("\n");
+
+const parseExperienceItems = (lines) => {
+  const items = [];
+  let current = null;
+  const startRole = (header = "") => {
+    const dates = header.match(RESUME_DATE_RANGE)?.[0] || "";
+    const withoutDates = header.replace(RESUME_DATE_RANGE, "").replace(/[|,;–—-]+$/g, "").trim();
+    const parts = withoutDates.split(/\s*(?:\||•|·| at )\s*/i).map((part) => part.trim()).filter(Boolean);
+    current = {
+      title: parts[0] || "",
+      company: parts[1] || "",
+      dates,
+      location: parts[2] || "",
+      bullets: [],
+    };
+    items.push(current);
+  };
+  for (const line of lines) {
+    if (isBullet(line)) {
+      if (!current) startRole();
+      current.bullets.push(cleanBullet(line));
+    } else if (RESUME_DATE_RANGE.test(line) && current && !current.dates && !current.bullets.length) {
+      current.dates = line.match(RESUME_DATE_RANGE)?.[0] || "";
+    } else if (!current || current.bullets.length || RESUME_DATE_RANGE.test(line)) {
+      startRole(line);
+    } else if (!current.title) {
+      startRole(line);
+    } else if (!current.company) {
+      current.company = line;
+    } else if (!current.location) {
+      current.location = line;
+    } else {
+      current.bullets.push(line);
+    }
+  }
+  return items.filter((item) => item.title || item.company || item.dates || item.bullets.length);
+};
+
+const splitSkillLines = (lines) => [...new Set(
+  lines.flatMap((line) => line.split(/[,;|•·]\s*/))
+    .map((line) => cleanBullet(line).replace(/[.]+$/g, "").trim())
+    .filter((line) => line && line.length <= 80),
+)];
+
 export const splitResumeSections = (sourceText) => {
-  const lines = String(sourceText || "")
-    .replaceAll(String.fromCharCode(0), " ")
-    .replace(/\r\n?/g, "\n")
+  const normalizedText = normalizeResumeText(sourceText);
+  const lines = normalizedText
     .split("\n")
-    .map((line) => line.replace(/[ \t]+$/g, "").trim())
-    .filter(Boolean);
+    .map((line) => line.trim());
   const sections = {
     header: [],
     summary: [],
@@ -137,17 +218,16 @@ export const splitResumeSections = (sourceText) => {
     coverLetter: [],
   };
   let current = "header";
-  let coverLetterIndex = -1;
-  for (const [index, line] of lines.entries()) {
+  for (const line of lines) {
     const heading = line.replace(/[:\s]+$/, "");
     const matched = RESUME_HEADINGS.find(([, pattern]) => pattern.test(heading));
     if (matched) {
       current = matched[0];
-      if (current === "coverLetter") coverLetterIndex = index;
       continue;
     }
     sections[current].push(line);
   }
+  const coverLetterStart = lines.findIndex((line) => /^(?:cover letter|letter of motivation)[:\s]*$/i.test(line));
   return {
     ...sections,
     header: sections.header.join("\n"),
@@ -159,9 +239,31 @@ export const splitResumeSections = (sourceText) => {
     projects: sections.projects,
     other: sections.other,
     coverLetter: sections.coverLetter.join("\n"),
-    resumeText: coverLetterIndex >= 0
-      ? lines.slice(0, coverLetterIndex).join("\n")
-      : lines.join("\n"),
+    resumeText: coverLetterStart >= 0 ? lines.slice(0, coverLetterStart).join("\n") : normalizedText,
+    structured: {
+      contact: parseContactHeader(sections.header),
+      summary: sections.summary.join("\n"),
+      skills: splitSkillLines(sections.skills),
+      experience: parseExperienceItems(sections.experience),
+      education: sections.education,
+      certifications: splitSkillLines(sections.certifications),
+    },
+  };
+};
+
+const parseContactHeader = (headerLines) => {
+  const header = headerLines.join("\n");
+  const lines = headerLines.map((line) => line.trim()).filter(Boolean);
+  const email = header.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
+  const phone = header.match(/(?:\+?\d{1,3}[\s().-]?)?(?:\d[\s().-]?){7,14}\d/)?.[0] || "";
+  const name = lines.find((line) => !line.includes("@") && !/\d/.test(line)
+    && !/^(?:curriculum vitae|resume|résumé|cv|contact)$/i.test(line)) || "";
+  const locationLine = lines.find((line) => /\b(?:address|location|based in)\b/i.test(line)) || "";
+  return {
+    name,
+    email,
+    phone,
+    location: locationLine.replace(/^(?:address|location|based in)\s*[:-]?\s*/i, ""),
   };
 };
 
@@ -178,11 +280,7 @@ const sectionText = (text, headingPattern) => {
 };
 
 export const parseResumeText = (sourceText) => {
-  const text = sourceText
-    .replaceAll(String.fromCharCode(0), " ")
-    .replace(/\r\n?/g, "\n")
-    .replace(/[ \t]+$/gm, "")
-    .trim();
+  const text = normalizeResumeText(sourceText).trim();
   if (!text) throw new Error("No readable text was found. Try another file or paste your CV content.");
 
   const sections = splitResumeSections(text);
@@ -219,14 +317,7 @@ export const parseResumeText = (sourceText) => {
   const experienceText = sections.experience.join("\n")
     || sectionText(text, /^(experience|work experience|employment history|work history)\s*:?\s*$/i);
   const experience = experienceText
-    ? experienceText.split(/\r?\n/).slice(0, 12).map((line) => ({
-      company: "",
-      position: line.slice(0, 120),
-      location: "",
-      startDate: "",
-      endDate: "",
-      description: "",
-    })).filter((item) => item.position)
+    ? parseExperienceItems(experienceText.split(/\r?\n/).slice(0, 40))
     : [];
   const summaryText = sections.summary
     || sectionText(text, /^(summary|professional summary|profile|about me|objective)\s*:?\s*$/i);
@@ -240,6 +331,7 @@ export const parseResumeText = (sourceText) => {
     education,
     experience,
     sections,
+    structured: sections.structured,
     resumeText: sections.resumeText,
     coverLetter: sections.coverLetter,
   };
