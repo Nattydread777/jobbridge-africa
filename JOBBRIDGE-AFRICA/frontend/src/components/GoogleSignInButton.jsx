@@ -32,7 +32,8 @@ const GoogleSignInButton = ({
         await refreshUser();
         onComplete();
       } catch (error) {
-        setMessage(error.response?.data?.message || "Google sign-in failed. Please try again.");
+        const backendMessage = error.response?.data?.message;
+        setMessage(backendMessage || "Google sign-in could not be completed. Check the Google Client ID configuration or continue with email and password.");
       }
     };
   }, [role, companyName, termsAccepted, privacyAccepted, onComplete, refreshUser]);

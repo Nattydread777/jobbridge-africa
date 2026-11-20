@@ -1,10 +1,15 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 
 const Header = () => {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const { user, isAuthenticated, logout } = useAuth();
   const [elevated, setElevated] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     const onScroll = () => {
@@ -24,6 +29,24 @@ const Header = () => {
     "fixed top-0 inset-x-0 z-50 transition-all duration-300 backdrop-blur-md";
   const transparent = "bg-charcoal/80";
   const elevatedStyles = elevated ? "shadow-md bg-charcoal/95" : transparent;
+  const accountPath = user?.role === "employer"
+    ? "/employer-dashboard"
+    : user?.role === "job_seeker"
+      ? "/profile-view"
+      : "/dashboard";
+  const handleLogout = async () => {
+    setLogoutError("");
+    setLoggingOut(true);
+    try {
+      await logout();
+      navigate("/");
+    } catch (error) {
+      console.error("Logout failed:", error);
+      setLogoutError("We couldn't sign you out. Please try again.");
+    } finally {
+      setLoggingOut(false);
+    }
+  };
 
   return (
     <header className={`${base} ${elevatedStyles}`}>
@@ -129,18 +152,21 @@ const Header = () => {
             >
               Upgrade to Pro
             </NavLink>
-            <NavLink
-              to="/login"
-              className="whitespace-nowrap rounded-lg bg-white/90 px-3 py-2 text-sm font-semibold text-primary transition hover:bg-white"
-            >
-              Login
-            </NavLink>
-            <NavLink
-              to="/register"
-              className="whitespace-nowrap rounded-lg bg-terracotta px-3 py-2 text-sm font-semibold text-white transition hover:bg-terracotta-dark"
-            >
-              Sign Up
-            </NavLink>
+            {isAuthenticated ? (
+              <>
+                <NavLink to={accountPath} className="whitespace-nowrap rounded-lg bg-white/90 px-3 py-2 text-sm font-semibold text-primary transition hover:bg-white">
+                  My account
+                </NavLink>
+                <button type="button" onClick={handleLogout} disabled={loggingOut} className="whitespace-nowrap rounded-lg bg-white/10 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:opacity-60">
+                  {loggingOut ? "Signing out…" : "Sign out"}
+                </button>
+              </>
+            ) : (
+              <>
+                <NavLink to="/login" className="whitespace-nowrap rounded-lg bg-white/90 px-3 py-2 text-sm font-semibold text-primary transition hover:bg-white">Login</NavLink>
+                <NavLink to="/register" className="whitespace-nowrap rounded-lg bg-terracotta px-3 py-2 text-sm font-semibold text-white transition hover:bg-terracotta-dark">Sign Up</NavLink>
+              </>
+            )}
           </div>
 
           {/* Mobile Hamburger Button */}
@@ -283,25 +309,23 @@ const Header = () => {
               >
                 Upgrade to Pro
               </NavLink>
-              <NavLink
-                to="/login"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-4 py-2 bg-white/90 text-primary rounded-md hover:bg-white transition font-semibold text-center cursor-pointer"
-              >
-                Login
-              </NavLink>
-              <NavLink
-                to="/register"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-4 py-2 bg-terracotta text-white rounded-md hover:bg-terracotta-dark transition font-semibold text-center cursor-pointer"
-              >
-                Sign Up
-              </NavLink>
+              {isAuthenticated ? (
+                <>
+                  <NavLink to={accountPath} onClick={() => setMobileMenuOpen(false)} className="rounded-md bg-white/90 px-4 py-2 text-center font-semibold text-primary transition hover:bg-white">My account</NavLink>
+                  <button type="button" onClick={handleLogout} disabled={loggingOut} className="rounded-md bg-white/10 px-4 py-2 text-center font-semibold text-white transition hover:bg-white/20 disabled:opacity-60">{loggingOut ? "Signing out…" : "Sign out"}</button>
+                </>
+              ) : (
+                <>
+                  <NavLink to="/login" onClick={() => setMobileMenuOpen(false)} className="cursor-pointer rounded-md bg-white/90 px-4 py-2 text-center font-semibold text-primary transition hover:bg-white">Login</NavLink>
+                  <NavLink to="/register" onClick={() => setMobileMenuOpen(false)} className="cursor-pointer rounded-md bg-terracotta px-4 py-2 text-center font-semibold text-white transition hover:bg-terracotta-dark">Sign Up</NavLink>
+                </>
+              )}
             </div>
               </div>
             </div>
         </nav>
       </div>
+      {logoutError && <p role="alert" className="absolute right-4 top-full mt-2 rounded-lg bg-red-100 px-4 py-2 text-sm text-red-900 shadow">{logoutError}</p>}
     </header>
   );
 };

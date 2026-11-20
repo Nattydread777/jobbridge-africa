@@ -49,6 +49,28 @@ const userSchema = new mongoose.Schema({
     description: String,
   }],
   skills: [String],
+  skillGroups: {
+    core: { type: [String], default: [] },
+    tools: { type: [String], default: [] },
+    technical: { type: [String], default: [] },
+  },
+  certifications: [{
+    name: String,
+    issuer: String,
+    issueDate: String,
+    credentialUrl: String,
+  }],
+  projects: [{
+    name: String,
+    description: String,
+    url: String,
+  }],
+  workPreferences: {
+    workModes: { type: [String], default: [] },
+    targetRoles: { type: [String], default: [] },
+    preferredLocations: { type: [String], default: [] },
+    willingToRelocate: { type: Boolean, default: false },
+  },
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {

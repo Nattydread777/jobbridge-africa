@@ -1,20 +1,25 @@
 const SKILL_FAMILIES = [
   { canonical: 'accessibility testing', variants: ['accessibility testing', 'wcag', 'web accessibility'] },
   { canonical: 'agile delivery', variants: ['agile', 'scrum', 'sprint planning'] },
+  { canonical: 'angular', variants: ['angular', 'angular.js', 'angularjs'] },
   { canonical: 'api development', variants: ['api development', 'rest api', 'restful api', 'graphql api'] },
   { canonical: 'aws', variants: ['aws', 'amazon web services'] },
+  { canonical: 'backend development', variants: ['backend development', 'back-end development', 'server-side development'] },
   { canonical: 'business analysis', variants: ['business analysis', 'requirements gathering', 'process analysis'] },
   { canonical: 'client coordination', variants: ['client coordination', 'stakeholder liaison', 'stakeholder engagement', 'client liaison', 'partner coordination'] },
   { canonical: 'cloud infrastructure', variants: ['cloud infrastructure', 'cloud computing', 'infrastructure as code'] },
   { canonical: 'communication', variants: ['communication', 'written communication', 'verbal communication', 'communication skills'] },
+  { canonical: 'content marketing', variants: ['content marketing', 'content strategy', 'content creation'] },
   { canonical: 'css', variants: ['css', 'css3'] },
   { canonical: 'customer relationship management', variants: ['customer relationship management', 'crm', 'client relationship management'] },
+  { canonical: 'customer service', variants: ['customer service', 'customer support', 'customer success'] },
   { canonical: 'cybersecurity', variants: ['cybersecurity', 'information security', 'application security'] },
   { canonical: 'data analysis', variants: ['data analysis', 'data analytics', 'exploratory data analysis'] },
   { canonical: 'data visualization', variants: ['data visualization', 'data visualisation', 'dashboard development'] },
   { canonical: 'database management', variants: ['database management', 'database administration', 'database design'] },
   { canonical: 'docker', variants: ['docker', 'containerization', 'containerisation'] },
   { canonical: 'excel', variants: ['excel', 'microsoft excel', 'spreadsheet analysis'] },
+  { canonical: 'express.js', variants: ['express.js', 'expressjs', 'express js'] },
   { canonical: 'figma', variants: ['figma', 'figma prototyping'] },
   { canonical: 'financial analysis', variants: ['financial analysis', 'financial modelling', 'financial modeling'] },
   { canonical: 'git', variants: ['git', 'github', 'gitlab', 'version control'] },
@@ -28,28 +33,34 @@ const SKILL_FAMILIES = [
   { canonical: 'mongodb', variants: ['mongodb', 'mongo db'] },
   { canonical: 'mysql', variants: ['mysql'] },
   { canonical: 'node.js', variants: ['node.js', 'nodejs', 'node js'] },
+  { canonical: 'next.js', variants: ['next.js', 'nextjs', 'next js'] },
   { canonical: 'people management', variants: ['people management', 'team leadership', 'staff supervision'] },
   { canonical: 'postgresql', variants: ['postgresql', 'postgres'] },
   { canonical: 'problem solving', variants: ['problem solving', 'troubleshooting', 'root cause analysis'] },
   { canonical: 'project management', variants: ['project management', 'project coordination', 'program management'] },
   { canonical: 'python', variants: ['python'] },
+  { canonical: 'power bi', variants: ['power bi', 'powerbi'] },
   { canonical: 'react', variants: ['react', 'react.js', 'reactjs'] },
   { canonical: 'redis', variants: ['redis'] },
   { canonical: 'salesforce', variants: ['salesforce', 'salesforce crm'] },
+  { canonical: 'search engine optimization', variants: ['search engine optimization', 'search engine optimisation', 'seo'] },
   { canonical: 'sql', variants: ['sql', 'structured query language'] },
   { canonical: 'stakeholder management', variants: ['stakeholder management', 'stakeholder communication'] },
   { canonical: 'technical writing', variants: ['technical writing', 'technical documentation', 'documentation'] },
   { canonical: 'typescript', variants: ['typescript'] },
+  { canonical: 'tableau', variants: ['tableau'] },
   { canonical: 'user experience design', variants: ['user experience design', 'ux design', 'user research', 'usability testing'] },
   { canonical: 'user interface design', variants: ['user interface design', 'ui design', 'interface design'] },
+  { canonical: 'vue.js', variants: ['vue.js', 'vuejs', 'vue js'] },
+  { canonical: 'wordpress', variants: ['wordpress', 'word press'] },
 ];
 
 const SECTION_HEADINGS = [
   { key: 'summary', pattern: /^(?:professional\s+)?(?:summary|profile|objective|about me)$/i },
-  { key: 'skills', pattern: /^(?:core\s+|technical\s+|key\s+)?skills(?:\s+and\s+competencies)?$/i },
-  { key: 'experience', pattern: /^(?:(?:professional|work)\s+)?(?:experience|employment history|work history)$/i },
+  { key: 'skills', pattern: /^(?:(?:core|technical|key|domain)\s+)?(?:skills|competencies|areas of expertise|technical proficiencies|tools and technologies)(?:\s+and\s+competencies)?$/i },
+  { key: 'experience', pattern: /^(?:(?:professional|work|career)\s+)?(?:experience|employment history|work history|professional background)$/i },
   { key: 'education', pattern: /^(?:education|academic background|qualifications)$/i },
-  { key: 'certifications', pattern: /^(?:certifications?|licenses?|professional development)$/i },
+  { key: 'certifications', pattern: /^(?:certifications?|licenses?|professional development|training|courses|coursework|programs|programmes)$/i },
   { key: 'projects', pattern: /^(?:selected\s+)?projects?$/i },
   { key: 'coverLetter', pattern: /^(?:cover letter|letter of motivation)$/i },
 ];
@@ -87,6 +98,9 @@ export const normalizeCvText = (text) => String(text || '')
   .replace(/\u00ad/g, '')
   .replace(/\u0000/g, ' ')
   .replace(/\r\n?/g, '\n')
+  .replace(/\bMERN\s*-\s*stack\b/gi, 'MERN stack')
+  .replace(/\ba\s*nd\b/gi, 'and')
+  .replace(/\bauto\s+mation\b/gi, 'automation')
   .replace(/([a-z0-9])\s+-\s+([a-z0-9])/g, '$1-$2')
   .split('\n')
   .map((line) => line.replace(/[ \t]+$/g, '').trim())
@@ -118,6 +132,8 @@ export const normalizeCvText = (text) => String(text || '')
     const continuedBullet = previousIsBullet
       && !/[.!?]$/.test(previous)
       && !NON_SKILL_REQUIREMENT_TERMS.test(line)
+      && !isCredentialRecord(line)
+      && !isEducationRecord(line)
       && !looksLikeRoleHeader;
     if (continuedBullet || unfinishedParagraph) {
       normalized[normalized.length - 1] = `${previous} ${line}`.replace(/\s+/g, ' ').trim();
@@ -133,6 +149,18 @@ const normalizeLines = (text) => normalizeCvText(text).split('\n');
 const DATE_RANGE = /\b(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:19|20)\d{2}\s*(?:-|–|to|through)\s*(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:(?:19|20)\d{2}|present|current)\b/i;
 const isBulletLine = (line) => /^(?:[-*•▪◦‣]|\d+[.)])\s+/.test(line);
 const cleanBullet = (line) => line.replace(/^(?:[-*•▪◦‣]|\d+[.)])\s+/, '').trim();
+const EXPERIENCE_ACTION_PATTERN = /^(?:built|created|designed|developed|delivered|implemented|launched|led|managed|owned|improved|increased|reduced|supported|coordinated|analyzed|analysed|maintained|automated|trained|taught)\b/i;
+const isCredentialRecord = (line) => {
+  const content = cleanBullet(line);
+  if (EXPERIENCE_ACTION_PATTERN.test(content)) return false;
+  return /\b(?:PLP|HQFM|Packt|Scenario Academy)\b/i.test(content)
+    || /\b(?:certification|certificate|certified|coursework|course completion|training program|training programme|professional development|bootcamp)\b/i.test(content);
+};
+const isEducationRecord = (line) => {
+  const content = cleanBullet(line);
+  return !EXPERIENCE_ACTION_PATTERN.test(content)
+    && /\b(?:bachelor|master|ph\.?d|b\.?sc|m\.?sc|mba|diploma|degree|university|polytechnic|college)\b/i.test(content);
+};
 
 const parseExperience = (lines) => {
   const items = [];
@@ -156,12 +184,23 @@ const parseExperience = (lines) => {
     if (isBulletLine(line)) {
       if (!current) startRole();
       current.bullets.push(cleanBullet(line));
-    } else if (DATE_RANGE.test(line) && current && !current.dates && !current.bullets.length) {
-      current.dates = line.match(DATE_RANGE)?.[0] || '';
-    } else if (!current || current.bullets.length || DATE_RANGE.test(line)) {
+    } else if (!current) {
+      startRole(line);
+    } else if (DATE_RANGE.test(line) && !line.replace(DATE_RANGE, '').trim()) {
+      if (!current.dates && !current.bullets.length) current.dates = line.match(DATE_RANGE)?.[0] || '';
+      else startRole(line);
+    } else if (current.dates && !current.title && !current.bullets.length) {
+      const dates = current.dates;
+      const header = line.match(DATE_RANGE) ? line : `${line} | ${dates}`;
+      const parsed = header.replace(DATE_RANGE, '').split(/\s*(?:\||•|·| at )\s*/i).map((part) => part.trim()).filter(Boolean);
+      current.title = parsed[0] || '';
+      current.company = parsed[1] || '';
+      current.location = parsed[2] || '';
+      current.dates = line.match(DATE_RANGE)?.[0] || dates;
+    } else if (current.bullets.length || DATE_RANGE.test(line)) {
       startRole(line);
     } else if (!current.title) {
-      startRole(line);
+      current.title = line;
     } else if (!current.company) {
       current.company = line;
     } else if (!current.location) {
@@ -209,10 +248,10 @@ export const parseCvStructure = (text) => {
   return {
     contact: parseContact(sections.header),
     summary: sections.summary,
-    skills: parseSkillList(sections.skills),
-    experience: parseExperience(sections.experience),
-    education: parseEducationLines(sections.education),
-    certifications: parseSkillList(sections.certifications),
+    skills: sections.structured.skills,
+    experience: sections.structured.experience,
+    education: sections.structured.education,
+    certifications: sections.structured.certifications,
     projects: sections.projects,
     coverLetter: sections.coverLetter,
   };
@@ -223,6 +262,7 @@ export const analyzeJobRequirements = (text) => {
   let section = '';
   const mustHaves = [];
   const niceToHaves = [];
+  const inlineNiceSkills = new Set();
   for (const rawLine of lines) {
     const heading = rawLine.replace(/[:\s]+$/, '').toLowerCase();
     if (/^(?:requirements|qualifications|must[- ]haves?|what you(?:'|’)ll need|minimum qualifications)$/.test(heading)) {
@@ -233,18 +273,41 @@ export const analyzeJobRequirements = (text) => {
       section = 'nice';
       continue;
     }
-    if (SECTION_HEADING_PATTERN.test(rawLine)) section = '';
+    if (SECTION_HEADING_PATTERN.test(rawLine) && !REQUIREMENT_SECTION_HEADING_PATTERN.test(rawLine)) section = '';
     const requirement = cleanBullet(rawLine);
     if (requirement.length < 10 || NON_SKILL_REQUIREMENT_TERMS.test(requirement)) continue;
-    const isNice = section === 'nice' || /\b(?:preferred|nice to have|bonus|desirable)\b/i.test(requirement);
+    const niceMarker = /\b(?:preferred|nice[- ]to[- ]have|bonus|desirable)\b\s*:?\s*/i.exec(requirement);
+    if (niceMarker) {
+      const niceText = requirement.slice(niceMarker.index + niceMarker[0].length).trim();
+      if (niceText.length >= 3) {
+        niceToHaves.push(niceText);
+        matchingSkillFamilies(niceText).forEach((skill) => inlineNiceSkills.add(skill));
+      }
+      const precedingText = requirement.slice(0, niceMarker.index).trim();
+      if (/\b(?:must|required|essential|minimum|at least)\b/i.test(precedingText)) {
+        mustHaves.push(precedingText);
+      }
+      continue;
+    }
+    const isNice = section === 'nice';
     const isMust = section === 'must' || /\b(?:must|required|essential|minimum|at least)\b/i.test(requirement);
-    if (isNice) niceToHaves.push(requirement);
+    if (isNice) {
+      niceToHaves.push(requirement);
+      matchingSkillFamilies(requirement).forEach((skill) => inlineNiceSkills.add(skill));
+    }
     else if (isMust) mustHaves.push(requirement);
   }
+  const skillPhrases = matchingSkillFamilies(text);
+  const inferredMustHaves = skillPhrases
+    .filter((skill) => !inlineNiceSkills.has(skill))
+    .map((skill) => skill.replace(/\b\w/g, (letter) => letter.toUpperCase()));
+  const uniqueMustHaves = [...new Set([...mustHaves, ...inferredMustHaves])];
+  const uniqueNiceToHaves = [...new Set(niceToHaves)];
   const logistics = extractLogistics('', text);
   return {
-    must_haves: [...new Set(mustHaves)].slice(0, 20),
-    nice_to_haves: [...new Set(niceToHaves)].slice(0, 20),
+    must_haves: uniqueMustHaves.slice(0, 20),
+    nice_to_haves: uniqueNiceToHaves.slice(0, 20),
+    skill_phrases: skillPhrases,
     logistics: logistics.requirements,
   };
 };
@@ -303,8 +366,20 @@ export const splitCvSections = (text) => {
     sections[current].push(line);
     if (current === 'experience' && isBullet) bulletLines.push(cleanBullet(line));
   }
+  const routedCertifications = sections.experience.filter(isCredentialRecord).map(cleanBullet);
+  const routedEducation = sections.experience
+    .filter((line) => !isCredentialRecord(line) && isEducationRecord(line))
+    .map(cleanBullet);
+  sections.experience = sections.experience
+    .filter((line) => !isCredentialRecord(line) && !isEducationRecord(line));
+  sections.education.push(...routedEducation);
+  sections.certifications.push(...routedCertifications);
+  const parsedSkills = parseSkillList(sections.skills);
+  const skills = parsedSkills.length
+    ? parsedSkills
+    : matchingSkillFamilies([...sections.summary, ...sections.experience, ...sections.projects].join('\n'));
   const experienceBullets = bulletLines.length
-    ? bulletLines
+    ? bulletLines.filter((line) => !isCredentialRecord(line) && !isEducationRecord(line))
     : sections.experience.filter((line) => !DATE_RANGE.test(line) && line.length > 20).map(cleanBullet);
   return {
     ...sections,
@@ -324,7 +399,7 @@ export const splitCvSections = (text) => {
     structured: {
       contact: parseContact(sections.header.join('\n')),
       summary: sections.summary.join('\n'),
-      skills: parseSkillList(sections.skills),
+      skills,
       experience: parseExperience(sections.experience),
       education: parseEducationLines(sections.education),
       certifications: parseSkillList(sections.certifications),
@@ -334,12 +409,16 @@ export const splitCvSections = (text) => {
 };
 
 const matchingSkillFamilies = (text) => {
-  const source = String(text || '').toLowerCase();
+  const source = normalizeCvText(String(text || '')).toLowerCase();
+  const withoutLocations = [...LOCATION_TERMS].reduce(
+    (value, term) => value.replace(new RegExp(`\\b${escapeRegex(term)}\\b`, 'gi'), ' '),
+    source,
+  );
   const matched = SKILL_FAMILIES
-    .filter(({ variants }) => variants.some((variant) => containsPhrase(source, variant)))
+    .filter(({ variants }) => variants.some((variant) => containsPhrase(withoutLocations, variant)))
     .map(({ canonical }) => canonical);
-  if (/\bstakeholder communication\b/i.test(source)
-    && !/\b(?:written|verbal)?\s*communication skills\b|\bwritten communication\b|\bverbal communication\b/i.test(source)) {
+  if (/\bstakeholder communication\b/i.test(withoutLocations)
+    && !/\b(?:written|verbal)?\s*communication skills\b|\bwritten communication\b|\bverbal communication\b/i.test(withoutLocations)) {
     return matched.filter((skill) => skill !== 'communication');
   }
   return matched;

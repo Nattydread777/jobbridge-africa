@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
@@ -8,26 +8,31 @@ const PROFILE_TABS = [
   { id: "experience", label: "Experience" },
   { id: "education", label: "Education" },
   { id: "skills", label: "Skills" },
+  { id: "credentials", label: "Certifications & Projects" },
+  { id: "preferences", label: "Work Preferences" },
   { id: "resume", label: "Resume Management" },
 ];
+
+const countEntries = (value) => (
+  Array.isArray(value)
+    ? value.length
+    : value && typeof value === "object"
+      ? Object.keys(value).length
+      : 0
+);
+const countUniqueSkills = (user) => new Set([
+  ...(Array.isArray(user.skills) ? user.skills : []),
+  ...Object.values(user.skillGroups || {}).flatMap((skills) => Array.isArray(skills) ? skills : []),
+].filter((skill) => typeof skill === "string" && skill.trim()).map((skill) => skill.trim().toLowerCase())).size;
 
 const ProfileView = () => {
   const { user, logout, refreshUser } = useAuth();
   const navigate = useNavigate();
   const resumeInput = useRef(null);
   const [activeTab, setActiveTab] = useState("overview");
-  const [resumeOpen, setResumeOpen] = useState(false);
+  const [resumePreviewOpen, setResumePreviewOpen] = useState(false);
   const [uploadingResume, setUploadingResume] = useState(false);
   const [resumeError, setResumeError] = useState("");
-
-  useEffect(() => {
-    if (!resumeOpen) return undefined;
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") setResumeOpen(false);
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [resumeOpen]);
 
   if (!user) {
     return (
@@ -84,6 +89,8 @@ const ProfileView = () => {
       const refreshedUser = await refreshUser();
       if (!refreshedUser) {
         setResumeError("Your resume was uploaded, but your profile could not refresh. Reload the page to view it.");
+      } else {
+        setResumePreviewOpen(false);
       }
     } catch (error) {
       console.error("Resume upload failed:", error);
@@ -120,7 +127,9 @@ const ProfileView = () => {
                 </p>
               )}
               {experience.description && (
-                <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">{experience.description}</p>
+                <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-600">
+                  {experience.description.split(/\r?\n/).map((bullet) => bullet.trim()).filter(Boolean).map((bullet, bulletIndex) => <li key={`${bullet}-${bulletIndex}`}>{bullet.replace(/^(?:[-*•]|\d+[.)])\s*/, "")}</li>)}
+                </ul>
               )}
             </article>
           ))}
@@ -173,17 +182,79 @@ const ProfileView = () => {
           Edit skills
         </Link>
       </div>
-      {user.skills?.length ? (
-        <div className="flex flex-wrap gap-2">
-          {user.skills.map((skill, index) => (
-            <span key={`${skill}-${index}`} className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-900">
-              {skill}
-            </span>
+      {(user.skillGroups && Object.values(user.skillGroups).some((skills) => skills?.length)) ? (
+        <div className="space-y-4">
+          {[["core", "Core / domain skills"], ["tools", "Tools / platforms"], ["technical", "Technical / analytics"]].map(([key, title]) => (
+            <div key={key}>
+              <h3 className="mb-2 text-sm font-semibold text-slate-700">{title}</h3>
+              <div className="flex flex-wrap gap-2">
+                {(user.skillGroups[key] || []).map((skill, index) => <span key={`${skill}-${index}`} className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-900">{skill}</span>)}
+              </div>
+            </div>
           ))}
+        </div>
+      ) : user.skills?.length ? (
+        <div className="flex flex-wrap gap-2">
+          {user.skills.map((skill, index) => <span key={`${skill}-${index}`} className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-900">{skill}</span>)}
         </div>
       ) : (
         <EmptyState text="Add relevant skills to improve your visibility in candidate searches." />
       )}
+    </section>
+  );
+
+  const renderCredentials = () => (
+    <div className="grid gap-5 lg:grid-cols-2">
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Certifications &amp; training</h2>
+            <p className="mt-1 text-sm text-slate-500">Programs and credentials, separate from employment.</p>
+          </div>
+          <Link to="/profile" className="text-sm font-semibold text-amber-800 hover:underline">Edit</Link>
+        </div>
+        {user.certifications?.length ? user.certifications.map((certification, index) => (
+          <article key={`${certification.name}-${index}`} className="mb-3 rounded-xl border border-slate-200 p-4">
+            <h3 className="font-semibold text-slate-900">{certification.name || "Certification"}</h3>
+            <p className="mt-1 text-sm text-slate-600">{[certification.issuer, certification.issueDate].filter(Boolean).join(" · ")}</p>
+            {certification.credentialUrl && <a href={certification.credentialUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm font-semibold text-amber-800 underline">View credential</a>}
+          </article>
+        )) : <EmptyState text="Add courses, programs, and certifications to show your ongoing learning." />}
+      </section>
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Portfolio &amp; projects</h2>
+            <p className="mt-1 text-sm text-slate-500">Showcase relevant work and outcomes.</p>
+          </div>
+          <Link to="/profile" className="text-sm font-semibold text-amber-800 hover:underline">Edit</Link>
+        </div>
+        {user.projects?.length ? user.projects.map((project, index) => (
+          <article key={`${project.name}-${index}`} className="mb-3 rounded-xl border border-slate-200 p-4">
+            <h3 className="font-semibold text-slate-900">{project.name || "Project"}</h3>
+            {project.description && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{project.description}</p>}
+            {project.url && <a href={project.url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-sm font-semibold text-amber-800 underline">View project</a>}
+          </article>
+        )) : <EmptyState text="Add portfolio links or projects related to your target roles." />}
+      </section>
+    </div>
+  );
+
+  const renderPreferences = () => (
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">Work preferences</h2>
+          <p className="mt-1 text-sm text-slate-500">Your preferred roles, locations, and work arrangements.</p>
+        </div>
+        <Link to="/profile" className="text-sm font-semibold text-amber-800 hover:underline">Edit preferences</Link>
+      </div>
+      <dl className="grid gap-4 sm:grid-cols-2">
+        <div><dt className="text-sm text-slate-500">Work arrangement</dt><dd className="mt-1 font-medium text-slate-900">{user.workPreferences?.workModes?.join(", ") || "Not specified"}</dd></div>
+        <div><dt className="text-sm text-slate-500">Target roles</dt><dd className="mt-1 font-medium text-slate-900">{user.workPreferences?.targetRoles?.join(", ") || "Not specified"}</dd></div>
+        <div><dt className="text-sm text-slate-500">Preferred locations</dt><dd className="mt-1 font-medium text-slate-900">{user.workPreferences?.preferredLocations?.join(", ") || "Not specified"}</dd></div>
+        <div><dt className="text-sm text-slate-500">Relocation</dt><dd className="mt-1 font-medium text-slate-900">{user.workPreferences?.willingToRelocate ? "Open to relocation" : "Not specified"}</dd></div>
+      </dl>
     </section>
   );
 
@@ -199,8 +270,8 @@ const ProfileView = () => {
             <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-lg bg-white text-xl shadow-sm">📄</span>
             <div>
               <p className="font-semibold text-slate-900">Resume / CV uploaded</p>
-              <button type="button" onClick={() => setResumeOpen(true)} className="mt-1 text-sm font-medium text-amber-800 underline underline-offset-2">
-                Preview document
+              <button type="button" onClick={() => setResumePreviewOpen((open) => !open)} aria-expanded={resumePreviewOpen} className="mt-1 text-sm font-medium text-amber-800 underline underline-offset-2">
+                {resumePreviewOpen ? "Hide preview" : "Preview document"}
               </button>
             </div>
           </div>
@@ -225,6 +296,17 @@ const ProfileView = () => {
         onChange={handleResumeUpload}
         className="hidden"
       />
+      {resumePreviewOpen && user.resumeUrl && (
+        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-slate-800">Resume preview</p>
+            <a href={user.resumeUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-amber-800 underline">Open in new tab</a>
+          </div>
+          {resumeIsPdf
+            ? <iframe title="Uploaded resume preview" src={user.resumeUrl} loading="lazy" className="h-[70vh] min-h-96 w-full rounded-lg border border-slate-300 bg-white" />
+            : <p className="rounded-lg bg-white p-4 text-sm text-slate-700">This Word document opens in a new tab; in-page preview is available for PDF files.</p>}
+        </div>
+      )}
     </section>
   );
 
@@ -309,18 +391,18 @@ const ProfileView = () => {
                     {user.bio || "Add a concise introduction about your experience, strengths, and career goals."}
                   </p>
                   {user.resumeUrl && (
-                    <button type="button" onClick={() => setResumeOpen(true)} className="mt-5 inline-flex items-center gap-2 font-semibold text-amber-800 hover:underline">
-                      📄 View Resume/CV
+                    <button type="button" onClick={() => { setActiveTab("resume"); setResumePreviewOpen(true); }} className="mt-5 inline-flex items-center gap-2 font-semibold text-amber-800 hover:underline">
+                    📄 Preview Resume/CV
                     </button>
                   )}
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                   <h2 className="text-lg font-bold text-slate-900">Profile at a glance</h2>
                   <dl className="mt-4 space-y-3 text-sm">
-                    <div><dt className="text-slate-500">Experience</dt><dd className="font-semibold text-slate-800">{user.experience?.length || 0} roles</dd></div>
-                    <div><dt className="text-slate-500">Education</dt><dd className="font-semibold text-slate-800">{user.education?.length || 0} entries</dd></div>
-                    <div><dt className="text-slate-500">Skills</dt><dd className="font-semibold text-slate-800">{user.skills?.length || 0} skills</dd></div>
-                    <div><dt className="text-slate-500">Resume</dt><dd className="font-semibold text-slate-800">{user.resumeUrl ? "Uploaded" : "Not uploaded"}</dd></div>
+                    <div><dt className="text-slate-500">Experience</dt><dd className="font-semibold text-slate-800">{countEntries(user.experience)} {countEntries(user.experience) === 1 ? "role" : "roles"}</dd></div>
+                    <div><dt className="text-slate-500">Education</dt><dd className="font-semibold text-slate-800">{countEntries(user.education)} {countEntries(user.education) === 1 ? "entry" : "entries"}</dd></div>
+                    <div><dt className="text-slate-500">Skills</dt><dd className="font-semibold text-slate-800">{countUniqueSkills(user)} {countUniqueSkills(user) === 1 ? "skill" : "skills"}</dd></div>
+                    <div><dt className="text-slate-500">Resume</dt><dd className="font-semibold text-slate-800">{user.resumeUrl ? "1 document uploaded" : "0 documents uploaded"}</dd></div>
                   </dl>
                 </div>
               </section>
@@ -328,6 +410,8 @@ const ProfileView = () => {
             {activeTab === "experience" && renderExperience()}
             {activeTab === "education" && renderEducation()}
             {activeTab === "skills" && renderSkills()}
+            {activeTab === "credentials" && renderCredentials()}
+            {activeTab === "preferences" && renderPreferences()}
             {activeTab === "resume" && renderResume()}
           </div>
           <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -350,42 +434,6 @@ const ProfileView = () => {
         </section>
       )}
 
-      {resumeOpen && user.resumeUrl && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setResumeOpen(false);
-          }}
-        >
-          <section role="dialog" aria-modal="true" aria-labelledby="resume-dialog-title" tabIndex={-1} className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
-              <div>
-                <h2 id="resume-dialog-title" className="font-bold text-slate-900">Resume / CV</h2>
-                <p className="text-sm text-slate-500">Preview or replace the document attached to your profile.</p>
-              </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => resumeInput.current?.click()} disabled={uploadingResume} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400 disabled:opacity-60">
-                  {uploadingResume ? "Uploading…" : "Replace CV"}
-                </button>
-                <button type="button" onClick={() => setResumeOpen(false)} aria-label="Close resume preview" className="rounded-lg border border-slate-300 px-3 py-2 text-slate-700 hover:bg-slate-50">✕</button>
-              </div>
-            </header>
-            {resumeError && <p role="alert" className="mx-5 mt-3 text-sm text-red-700">{resumeError}</p>}
-            <div className="min-h-0 flex-1 bg-slate-100 p-3 sm:p-5">
-              {resumeIsPdf ? (
-                <iframe title="Uploaded resume preview" src={user.resumeUrl} className="h-[65vh] w-full rounded-lg border border-slate-300 bg-white" />
-              ) : (
-                <div className="flex h-full min-h-64 flex-col items-center justify-center rounded-lg border border-slate-200 bg-white p-8 text-center">
-                  <span aria-hidden="true" className="text-4xl">📄</span>
-                  <p className="mt-3 font-semibold text-slate-900">Word documents open in your document viewer</p>
-                  <p className="mt-1 max-w-md text-sm text-slate-600">Preview is available for PDF files. Open this DOC/DOCX in a new tab or replace it with a PDF for an in-page preview.</p>
-                  <a href={user.resumeUrl} target="_blank" rel="noopener noreferrer" className="mt-4 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">Open document</a>
-                </div>
-              )}
-            </div>
-          </section>
-        </div>
-      )}
     </main>
   );
 };

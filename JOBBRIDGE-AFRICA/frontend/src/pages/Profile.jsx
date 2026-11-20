@@ -162,6 +162,35 @@ const COMMON_SKILLS = [
   "AR/VR",
 ];
 
+const SKILL_GROUPS = [
+  ["core", "Core / domain skills"],
+  ["tools", "Tools / platforms"],
+  ["technical", "Technical / analytics"],
+];
+const uniqueValues = (values) => [...new Set((values || [])
+  .filter((value) => typeof value === "string" && value.trim())
+  .map((value) => value.trim()))];
+const normalizeSkillGroups = (groups = {}, skills = []) => {
+  const normalized = {
+    core: uniqueValues(groups.core),
+    tools: uniqueValues(groups.tools),
+    technical: uniqueValues(groups.technical),
+  };
+  const known = new Set(Object.values(normalized).flat().map((skill) => skill.toLowerCase()));
+  normalized.core = uniqueValues([
+    ...normalized.core,
+    ...skills.filter((skill) => !known.has(String(skill).toLowerCase())),
+  ]);
+  return normalized;
+};
+const emptyWorkPreferences = () => ({
+  workModes: [],
+  targetRoles: [],
+  preferredLocations: [],
+  willingToRelocate: false,
+});
+const commaSeparatedValues = (value) => uniqueValues(value.split(","));
+
 const Profile = () => {
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
@@ -180,15 +209,25 @@ const Profile = () => {
     country: user?.country || "",
     bio: user?.bio || "",
     skills: [],
+    skillGroups: normalizeSkillGroups(),
     education: [],
     experience: [],
+    certifications: [],
+    projects: [],
+    workPreferences: emptyWorkPreferences(),
     languages: [],
   });
 
   const [newSkill, setNewSkill] = useState("");
+  const [newSkillGroup, setNewSkillGroup] = useState("core");
   const [skillSuggestions, setSkillSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [emailNotifications, setEmailNotifications] = useState(false);
+  const [jobAlertStatus, setJobAlertStatus] = useState(null);
+  const [jobAlertSubmitting, setJobAlertSubmitting] = useState(false);
+  const [profileSaveStatus, setProfileSaveStatus] = useState(null);
+  const [targetRolesText, setTargetRolesText] = useState("");
+  const [preferredLocationsText, setPreferredLocationsText] = useState("");
   const [parsing, setParsing] = useState(false);
 
   // Load user data into profile state when user changes
@@ -201,10 +240,16 @@ const Profile = () => {
         country: user.country || "",
         bio: user.bio || "",
         skills: user.skills || [],
+        skillGroups: normalizeSkillGroups(user.skillGroups, user.skills),
         education: user.education || [],
         experience: user.experience || [],
+        certifications: user.certifications || [],
+        projects: user.projects || [],
+        workPreferences: { ...emptyWorkPreferences(), ...(user.workPreferences || {}) },
         languages: user.languages || [],
       });
+      setTargetRolesText((user.workPreferences?.targetRoles || []).join(", "));
+      setPreferredLocationsText((user.workPreferences?.preferredLocations || []).join(", "));
     }
   }, [user]);
 
@@ -223,8 +268,13 @@ const Profile = () => {
           phone: parsedData.phone || profile.phone,
           bio: parsedData.bio || profile.bio,
           skills: [...new Set([...profile.skills, ...parsedData.skills])],
+          skillGroups: normalizeSkillGroups(profile.skillGroups, [
+            ...profile.skills,
+            ...parsedData.skills,
+          ]),
           education: parsedData.education.length ? parsedData.education : profile.education,
           experience: parsedData.experience.length ? parsedData.experience : profile.experience,
+          certifications: parsedData.certifications?.length ? parsedData.certifications : profile.certifications,
         };
         setProfile(nextProfile);
         const formData = new FormData();
@@ -237,8 +287,12 @@ const Profile = () => {
           country: nextProfile.country,
           bio: nextProfile.bio,
           skills: nextProfile.skills,
+          skillGroups: nextProfile.skillGroups,
           education: nextProfile.education,
           experience: nextProfile.experience,
+          certifications: nextProfile.certifications,
+          projects: nextProfile.projects,
+          workPreferences: nextProfile.workPreferences,
         });
         await refreshUser();
         setActiveTab("basic");
@@ -342,20 +396,38 @@ const Profile = () => {
 
   const handleAddSkill = (skillToAdd = null) => {
     const skill = (skillToAdd || newSkill).trim();
-    const alreadyAdded = profile.skills.some(
-      (existingSkill) => existingSkill.toLowerCase() === skill.toLowerCase()
-    );
-    if (skill && !alreadyAdded) {
-      setProfile({ ...profile, skills: [...profile.skills, skill] });
+    if (skill) {
+      const currentGroup = profile.skillGroups[newSkillGroup] || [];
+      const alreadyAdded = currentGroup.some(
+        (existingSkill) => existingSkill.toLowerCase() === skill.toLowerCase()
+      );
+      if (!alreadyAdded) {
+        const skillGroups = {
+          ...profile.skillGroups,
+          [newSkillGroup]: [...currentGroup, skill],
+        };
+        setProfile({
+          ...profile,
+          skillGroups,
+          skills: uniqueValues(Object.values(skillGroups).flat()),
+        });
+      }
       setNewSkill("");
       setShowSuggestions(false);
       setSkillSuggestions([]);
     }
   };
 
-  const handleRemoveSkill = (index) => {
-    const updated = profile.skills.filter((_, i) => i !== index);
-    setProfile({ ...profile, skills: updated });
+  const handleRemoveSkill = (group, index) => {
+    const skillGroups = {
+      ...profile.skillGroups,
+      [group]: profile.skillGroups[group].filter((_, itemIndex) => itemIndex !== index),
+    };
+    setProfile({
+      ...profile,
+      skillGroups,
+      skills: uniqueValues(Object.values(skillGroups).flat()),
+    });
   };
 
   const handleAddEducation = () => {
@@ -391,7 +463,27 @@ const Profile = () => {
     });
   };
 
+  const handleAddCertification = () => {
+    setProfile({
+      ...profile,
+      certifications: [...profile.certifications, {
+        name: "",
+        issuer: "",
+        issueDate: "",
+        credentialUrl: "",
+      }],
+    });
+  };
+
+  const handleAddProject = () => {
+    setProfile({
+      ...profile,
+      projects: [...profile.projects, { name: "", description: "", url: "" }],
+    });
+  };
+
   const handleSaveProfile = async () => {
+    setProfileSaveStatus(null);
     try {
       await api.put("/auth/profile", {
         name: profile.name,
@@ -402,20 +494,47 @@ const Profile = () => {
         education: profile.education,
         experience: profile.experience,
         skills: profile.skills,
+        skillGroups: profile.skillGroups,
+        certifications: profile.certifications,
+        projects: profile.projects,
+        workPreferences: profile.workPreferences,
       });
 
       // Refresh user data from server
       await refreshUser();
-      alert("Profile saved successfully!");
+      setProfileSaveStatus({ type: "success", message: "Profile saved successfully." });
     } catch (error) {
       console.error("Error saving profile:", error);
-      alert(error.response?.data?.message || "Failed to save profile");
+      setProfileSaveStatus({ type: "error", message: error.response?.data?.message || "Failed to save profile." });
     }
   };
 
-  const handleSubscribeAlerts = () => {
-    // TODO: Send to backend
-    alert("You've been subscribed to job alerts!");
+  const handleSubscribeAlerts = async () => {
+    setJobAlertStatus(null);
+    if (!profile.email) {
+      setJobAlertStatus({ type: "error", message: "Add an email address to your profile before subscribing." });
+      return;
+    }
+    if (!emailNotifications) {
+      setJobAlertStatus({ type: "error", message: "Choose to receive job alert emails before subscribing." });
+      return;
+    }
+    setJobAlertSubmitting(true);
+    try {
+      const { data } = await api.post("/job-alerts", {
+        email: profile.email,
+        location: profile.country,
+        consent: true,
+      });
+      setJobAlertStatus({ type: "success", message: data.message || "Your job alert subscription is saved." });
+    } catch (error) {
+      setJobAlertStatus({
+        type: "error",
+        message: error.response?.data?.message || "We couldn't save your job alerts. Please try again.",
+      });
+    } finally {
+      setJobAlertSubmitting(false);
+    }
   };
 
   if (!user) {
@@ -546,6 +665,8 @@ const Profile = () => {
               ["experience", "Experience"],
               ["education", "Education"],
               ["skills", "Skills"],
+              ["credentials", "Certifications & Projects"],
+              ["preferences", "Work Preferences"],
               ["resume", "Resume Management"],
               ["photo", "Profile Photo"],
               ["alerts", "Job Alerts"],
@@ -567,6 +688,11 @@ const Profile = () => {
             ))}
           </div>
         </nav>
+        {profileSaveStatus && (
+          <p role={profileSaveStatus.type === "error" ? "alert" : "status"} className={`mb-5 rounded-lg border p-3 text-sm ${profileSaveStatus.type === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+            {profileSaveStatus.message}
+          </p>
+        )}
 
         {/* Profile Photo Tab */}
         {activeTab === "photo" && (
@@ -1072,7 +1198,7 @@ const Profile = () => {
                         />
                       </div>
                       <textarea
-                        placeholder="Job description and responsibilities..."
+                        placeholder="Impact bullets, one per line (include results and measurable outcomes where available)..."
                         rows="3"
                         value={exp.description}
                         onChange={(e) => {
@@ -1119,6 +1245,14 @@ const Profile = () => {
                 Type to search for skills or add your own
               </label>
               <div className="flex gap-3">
+                <select
+                  aria-label="Skill category"
+                  value={newSkillGroup}
+                  onChange={(event) => setNewSkillGroup(event.target.value)}
+                  className="rounded border px-3 py-2"
+                >
+                  {SKILL_GROUPS.map(([group, label]) => <option key={group} value={group}>{label}</option>)}
+                </select>
                 <div className="flex-1 relative">
                   <input
                     id="skill-picker"
@@ -1177,27 +1311,22 @@ const Profile = () => {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              {profile.skills.length === 0 ? (
-                <p className="text-gray-500">No skills added yet.</p>
-              ) : (
-                profile.skills.map((skill, index) => (
-                  <span
-                    key={index}
-                    className="bg-gray-100 px-4 py-2 rounded-full flex items-center gap-2"
-                  >
-                    {skill}
-                    <button
-                      type="button"
-                      aria-label={`Remove ${skill}`}
-                      onClick={() => handleRemoveSkill(index)}
-                      className="text-red-500 hover:text-red-700 font-bold"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))
-              )}
+            <div className="space-y-5">
+              {SKILL_GROUPS.map(([group, label]) => (
+                <section key={group}>
+                  <h3 className="mb-2 font-semibold text-slate-800">{label}</h3>
+                  {profile.skillGroups[group].length ? (
+                    <div className="flex flex-wrap gap-2">
+                      {profile.skillGroups[group].map((skill, index) => (
+                        <span key={`${skill}-${index}`} className="flex items-center gap-2 rounded-full bg-gray-100 px-4 py-2">
+                          {skill}
+                          <button type="button" aria-label={`Remove ${skill} from ${label}`} onClick={() => handleRemoveSkill(group, index)} className="font-bold text-red-500 hover:text-red-700">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : <p className="text-sm text-gray-500">No {label.toLowerCase()} added yet.</p>}
+                </section>
+              ))}
             </div>
             <div className="flex gap-3 mt-6">
               <button
@@ -1210,6 +1339,90 @@ const Profile = () => {
           </div>
         )}
 
+        {activeTab === "credentials" && (
+          <div className="space-y-6 rounded-lg bg-white p-8 shadow">
+            <section>
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-2xl font-bold">Certifications &amp; training</h2>
+                  <p className="mt-1 text-sm text-gray-600">Keep courses, certificates, and credentials separate from work history.</p>
+                </div>
+                <button type="button" onClick={handleAddCertification} className="rounded bg-primary px-4 py-2 font-semibold text-white hover:bg-yellow-600">Add certification</button>
+              </div>
+              {profile.certifications.length === 0 && <p className="text-sm text-gray-500">No certifications added yet.</p>}
+              <div className="space-y-4">
+                {profile.certifications.map((certification, index) => (
+                  <fieldset key={`certification-${index}`} className="grid gap-3 rounded-xl border p-4 md:grid-cols-2">
+                    <legend className="px-1 text-sm font-semibold">Certification {index + 1}</legend>
+                    {[
+                      ["name", "Certification or program"],
+                      ["issuer", "Issuing organization"],
+                      ["issueDate", "Issue date"],
+                      ["credentialUrl", "Credential URL"],
+                    ].map(([key, label]) => (
+                      <label key={key} className="grid gap-1 text-sm font-medium">
+                        {label}
+                        <input type={key === "credentialUrl" ? "url" : "text"} value={certification[key] || ""} onChange={(event) => setProfile((current) => ({ ...current, certifications: current.certifications.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: event.target.value } : item) }))} className="rounded border px-3 py-2" />
+                      </label>
+                    ))}
+                    <button type="button" onClick={() => setProfile((current) => ({ ...current, certifications: current.certifications.filter((_, itemIndex) => itemIndex !== index) }))} className="w-fit text-sm font-semibold text-red-700 hover:underline">Remove certification</button>
+                  </fieldset>
+                ))}
+              </div>
+            </section>
+            <section className="border-t pt-6">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-bold">Portfolio &amp; projects</h2>
+                  <p className="mt-1 text-sm text-gray-600">Add portfolio links or projects relevant to your target roles.</p>
+                </div>
+                <button type="button" onClick={handleAddProject} className="rounded bg-slate-800 px-4 py-2 font-semibold text-white hover:bg-slate-700">Add project</button>
+              </div>
+              {profile.projects.length === 0 && <p className="text-sm text-gray-500">No projects added yet.</p>}
+              <div className="space-y-4">
+                {profile.projects.map((project, index) => (
+                  <fieldset key={`project-${index}`} className="grid gap-3 rounded-xl border p-4 md:grid-cols-2">
+                    <legend className="px-1 text-sm font-semibold">Project {index + 1}</legend>
+                    <label className="grid gap-1 text-sm font-medium">Project name<input value={project.name || ""} onChange={(event) => setProfile((current) => ({ ...current, projects: current.projects.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item) }))} className="rounded border px-3 py-2" /></label>
+                    <label className="grid gap-1 text-sm font-medium">Portfolio / project URL<input type="url" value={project.url || ""} onChange={(event) => setProfile((current) => ({ ...current, projects: current.projects.map((item, itemIndex) => itemIndex === index ? { ...item, url: event.target.value } : item) }))} className="rounded border px-3 py-2" /></label>
+                    <label className="grid gap-1 text-sm font-medium md:col-span-2">Project details<textarea rows={3} value={project.description || ""} onChange={(event) => setProfile((current) => ({ ...current, projects: current.projects.map((item, itemIndex) => itemIndex === index ? { ...item, description: event.target.value } : item) }))} className="rounded border px-3 py-2" /></label>
+                    <button type="button" onClick={() => setProfile((current) => ({ ...current, projects: current.projects.filter((_, itemIndex) => itemIndex !== index) }))} className="w-fit text-sm font-semibold text-red-700 hover:underline">Remove project</button>
+                  </fieldset>
+                ))}
+              </div>
+            </section>
+            <div className="flex justify-end border-t pt-5">
+              <button type="button" onClick={handleSaveProfile} className="rounded bg-primary px-6 py-2 font-semibold text-white hover:bg-yellow-600">Save Changes</button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "preferences" && (
+          <section className="space-y-6 rounded-lg bg-white p-8 shadow">
+            <div>
+              <h2 className="text-2xl font-bold">Work preferences</h2>
+              <p className="mt-1 text-sm text-gray-600">Tell employers which roles and work arrangements you are considering.</p>
+            </div>
+            <fieldset>
+              <legend className="mb-2 text-sm font-semibold">Work arrangement</legend>
+              <div className="flex flex-wrap gap-4">
+                {["Remote", "Hybrid", "On-site"].map((mode) => (
+                  <label key={mode} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
+                    <input type="checkbox" checked={profile.workPreferences.workModes.includes(mode)} onChange={(event) => setProfile((current) => ({ ...current, workPreferences: { ...current.workPreferences, workModes: event.target.checked ? uniqueValues([...current.workPreferences.workModes, mode]) : current.workPreferences.workModes.filter((item) => item !== mode) } }))} />
+                    {mode}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+            <label className="grid gap-1 text-sm font-semibold">Target roles <span className="font-normal text-gray-500">Separate multiple titles with commas.</span><input value={targetRolesText} onChange={(event) => { setTargetRolesText(event.target.value); setProfile((current) => ({ ...current, workPreferences: { ...current.workPreferences, targetRoles: commaSeparatedValues(event.target.value) } })); }} className="rounded border px-3 py-2 font-normal" placeholder="Product Designer, UX Researcher" /></label>
+            <label className="grid gap-1 text-sm font-semibold">Preferred locations <span className="font-normal text-gray-500">Separate cities or countries with commas.</span><input value={preferredLocationsText} onChange={(event) => { setPreferredLocationsText(event.target.value); setProfile((current) => ({ ...current, workPreferences: { ...current.workPreferences, preferredLocations: commaSeparatedValues(event.target.value) } })); }} className="rounded border px-3 py-2 font-normal" placeholder="Lagos, Nigeria" /></label>
+            <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={profile.workPreferences.willingToRelocate} onChange={(event) => setProfile((current) => ({ ...current, workPreferences: { ...current.workPreferences, willingToRelocate: event.target.checked } }))} /><span>Open to relocation</span></label>
+            <div className="flex justify-end border-t pt-5">
+              <button type="button" onClick={handleSaveProfile} className="rounded bg-primary px-6 py-2 font-semibold text-white hover:bg-yellow-600">Save Changes</button>
+            </div>
+          </section>
+        )}
+
         {/* Job Alerts Tab */}
         {activeTab === "alerts" && (
           <div className="bg-white p-8 rounded-lg shadow">
@@ -1218,36 +1431,28 @@ const Profile = () => {
             </h2>
 
             <div className="space-y-6">
-              <div className="flex items-center justify-between p-4 border rounded">
-                <div>
-                  <h3 className="font-semibold">Email Notifications</h3>
-                  <p className="text-sm text-gray-600">
-                    Receive daily job recommendations based on your profile
-                  </p>
-                </div>
-                <label className="relative inline-block w-12 h-6">
-                  <input
-                    type="checkbox"
-                    checked={emailNotifications}
-                    onChange={(e) => setEmailNotifications(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <span className="absolute inset-0 bg-gray-300 rounded-full peer-checked:bg-primary transition cursor-pointer"></span>
-                  <span className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-6"></span>
-                </label>
-              </div>
+              <label className="flex items-start gap-3 rounded-lg border p-4 text-sm">
+                <input type="checkbox" checked={emailNotifications} onChange={(event) => setEmailNotifications(event.target.checked)} className="mt-1 h-4 w-4 accent-amber-600" />
+                <span><strong className="block">Email Notifications</strong> I agree to receive job alert emails at {profile.email || "the email address on my profile"}. Your choice is saved with the subscription; contact JobBridge Africa to withdraw it.</span>
+              </label>
 
               <div className="border-t pt-6">
                 <h3 className="font-semibold mb-4">Subscribe to Latest Jobs</h3>
                 <p className="text-gray-600 mb-4">
                   Get weekly emails with the latest job opportunities matching
-                  your interests.
+                  your interests at <strong>{profile.email || "your profile email"}</strong>.
                 </p>
+                {jobAlertStatus && (
+                  <p role={jobAlertStatus.type === "error" ? "alert" : "status"} className={`mb-4 rounded-lg border p-3 text-sm ${jobAlertStatus.type === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+                    {jobAlertStatus.message}
+                  </p>
+                )}
                 <button
                   onClick={handleSubscribeAlerts}
-                  className="bg-secondary text-white px-6 py-2 rounded hover:bg-green-700 transition"
+                  disabled={jobAlertSubmitting}
+                  className="rounded bg-secondary px-6 py-2 text-white transition hover:bg-green-700 disabled:cursor-wait disabled:opacity-60"
                 >
-                  Subscribe Now
+                  {jobAlertSubmitting ? "Saving…" : jobAlertStatus?.type === "success" ? "Update subscription" : "Subscribe Now"}
                 </button>
               </div>
             </div>

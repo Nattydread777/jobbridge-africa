@@ -9,7 +9,8 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (character)
 }[character]));
 
 export const isEmailConfigured = () =>
-  Boolean(process.env.EMAIL_USER?.trim() && process.env.EMAIL_PASS?.trim());
+  Boolean(process.env.RESEND_API_KEY?.trim()
+    || (process.env.EMAIL_USER?.trim() && process.env.EMAIL_PASS?.trim()));
 
 const createTransporter = () => {
   const emailFrom = process.env.EMAIL_FROM || process.env.EMAIL_USER;
@@ -33,6 +34,27 @@ const createTransporter = () => {
     greetingTimeout: 10000,
     socketTimeout: 15000,
   });
+};
+
+const sendTransactionalEmail = async (message) => {
+  const from = process.env.RESEND_FROM || process.env.EMAIL_FROM || process.env.EMAIL_USER;
+  if (!from) throw new Error('Email delivery is not configured (RESEND_FROM or EMAIL_FROM is required).');
+  if (process.env.RESEND_API_KEY?.trim()) {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ...message, from }),
+    });
+    if (!response.ok) {
+      throw new Error(`Email delivery provider returned HTTP ${response.status}.`);
+    }
+    return response.json();
+  }
+  const transporter = createTransporter();
+  return transporter.sendMail({ ...message, from });
 };
 
 export const sendEmployerApplicationNotification = async ({ recipient, job, applicant, application }) => {
@@ -121,12 +143,10 @@ export const sendPasswordResetEmail = async ({ recipient, name, resetUrl }) => {
   if (!recipient || !resetUrl) {
     throw new Error('Password reset email requires a recipient and reset URL.');
   }
-  const transporter = createTransporter();
   const safeName = escapeHtml(name || 'there');
   const safeUrl = escapeHtml(resetUrl);
 
-  return transporter.sendMail({
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+  return sendTransactionalEmail({
     to: recipient,
     subject: 'Reset your JobBridge Africa password',
     text: [
@@ -148,12 +168,10 @@ export const sendEmailVerification = async ({ recipient, name, verificationUrl }
   if (!recipient || !verificationUrl) {
     throw new Error('Email verification requires a recipient and verification URL.');
   }
-  const transporter = createTransporter();
   const safeName = escapeHtml(name || 'there');
   const safeUrl = escapeHtml(verificationUrl);
 
-  return transporter.sendMail({
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+  return sendTransactionalEmail({
     to: recipient,
     subject: 'Verify your JobBridge Africa email',
     text: [

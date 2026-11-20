@@ -89,6 +89,34 @@ test("normalization repairs hyphen spacing and joins continuation lines without 
   assert.equal(sections.structured.experience[1].title, "Product Manager");
 });
 
+test("core competencies, separated dates, and training records map to the right CV sections", () => {
+  const parsed = parseResumeText([
+    "Ada Example",
+    "Core Competencies",
+    "React, Stakeholder Management, SQL",
+    "Experience",
+    "2020 - 2022",
+    "Product Designer",
+    "Acme",
+    "Lagos",
+    "- Built MERN - stack tools for a nd auto mation workflows.",
+    "PLP Digital Skills Program",
+    "Packt JavaScript Certificate",
+    "Education",
+    "BSc Computer Science",
+  ].join("\n"));
+
+  assert.deepEqual(parsed.structured.skills, ["React", "Stakeholder Management", "SQL"]);
+  assert.equal(parsed.structured.summary, "");
+  assert.equal(parsed.structured.experience.length, 1);
+  assert.equal(parsed.structured.experience[0].title, "Product Designer");
+  assert.equal(parsed.structured.experience[0].company, "Acme");
+  assert.match(parsed.structured.experience[0].dates, /2020/);
+  assert.match(parsed.structured.experience[0].bullets[0], /MERN stack tools for and automation workflows/);
+  assert.deepEqual(parsed.certifications, ["PLP Digital Skills Program", "Packt JavaScript Certificate"]);
+  assert.ok(parsed.education.some((entry) => /BSc Computer Science/.test(entry.degree)));
+});
+
 test("DOCX export uses candidate name first and leaves role headers outside bullet lists", async () => {
   const blob = await createCvDocxBlob({
     contact: { name: "Ada Example", email: "ada@example.com", phone: "", location: "" },

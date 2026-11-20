@@ -5,6 +5,67 @@ import api from "../services/api";
 import PageBreadcrumb from "../components/PageBreadcrumb";
 import { updatePageMetadata } from "../utils/pageMetadata";
 
+const normalizeJobText = (value) => String(value || "")
+  .replace(/<br\s*\/?>/gi, "\n")
+  .replace(/<\/(?:p|li|h[1-6])\s*>/gi, "\n")
+  .replace(/<li(?:\s[^>]*)?>/gi, "• ")
+  .replace(/<[^>]*>/g, "")
+  .replace(/&nbsp;/gi, " ")
+  .replace(/&amp;/gi, "&")
+  .replace(/&lt;/gi, "<")
+  .replace(/&gt;/gi, ">")
+  .replace(/&quot;/gi, '"')
+  .replace(/&#39;/gi, "'")
+  .replace(/\r\n?/g, "\n")
+  .replace(/[ \t]+\n/g, "\n")
+  .trim();
+
+const safeExternalUrl = (value) => {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+  } catch {
+    return "";
+  }
+};
+
+const isJobSectionHeading = (line) => (
+  line.length <= 90
+  && (
+    /^(?:about (?:the|this) (?:role|job)|what you(?:'|’)ll do|what you(?:'|’)ll need|responsibilities|requirements|qualifications|benefits|nice to have|preferred qualifications|how to apply)[:\s]*$/i.test(line)
+    || /:$/.test(line)
+  )
+);
+
+const FormattedJobText = ({ text }) => {
+  const lines = normalizeJobText(text)
+    .replace(/[•▪◦‣]\s*/g, "\n• ")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const blocks = [];
+  for (const line of lines) {
+    if (isJobSectionHeading(line)) {
+      blocks.push({ type: "heading", text: line.replace(/:$/, "") });
+    } else if (/^(?:[-*•▪◦‣]|\d+[.)])\s+/.test(line)) {
+      const current = blocks.at(-1);
+      if (current?.type === "list") current.items.push(line.replace(/^(?:[-*•▪◦‣]|\d+[.)])\s+/, ""));
+      else blocks.push({ type: "list", items: [line.replace(/^(?:[-*•▪◦‣]|\d+[.)])\s+/, "")] });
+    } else {
+      blocks.push({ type: "paragraph", text: line });
+    }
+  }
+  return (
+    <div className="space-y-3 text-gray-700">
+      {blocks.map((block, index) => {
+        if (block.type === "heading") return <h3 key={`${block.text}-${index}`} className="pt-2 font-semibold text-slate-900">{block.text}</h3>;
+        if (block.type === "list") return <ul key={`list-${index}`} className="list-disc space-y-1 pl-6">{block.items.map((item, itemIndex) => <li key={`${item}-${itemIndex}`}>{item}</li>)}</ul>;
+        return <p key={`paragraph-${index}`}>{block.text}</p>;
+      })}
+    </div>
+  );
+};
+
 const JobDetails = () => {
   const { id } = useParams();
   const location = useLocation();
@@ -33,7 +94,7 @@ const JobDetails = () => {
   const jobId = job?._id;
   const salaryLabel = [job?.salary, job?.salaryRange]
     .map((value) => String(value || "").trim())
-    .find((value) => value && !/^competitive$/i.test(value)) || "";
+    .find(Boolean) || "Not specified";
   const workMode = {
     remote: "Remote",
     hybrid: "Hybrid",
@@ -55,6 +116,14 @@ const JobDetails = () => {
   const remoteEligibility = job?.isRemote || job?.workplaceType === "remote" || job?.jobType === "Remote"
     ? `Remote – ${remoteEligibilityLabel}`
     : "";
+  const descriptionParts = [job?.fullDescription, job?.description]
+    .map(normalizeJobText)
+    .filter((text, index, parts) => text
+      && parts.indexOf(text) === index
+      && !parts.some((other) => other.length > text.length && other.includes(text)));
+  const externalApplicationLink = safeExternalUrl(job?.applicationLink);
+  const sourceUrl = safeExternalUrl(job?.sourceUrl);
+  const fullJobDescription = descriptionParts.join("\n\n") || job?.excerpt || "";
 
   useEffect(() => {
     setLoading(true);
@@ -226,7 +295,9 @@ const JobDetails = () => {
           <span>📍 {job.location}</span>
           <span>💼 {job.jobType}{workMode && job.jobType !== workMode ? ` · ${workMode}` : ""}</span>
           {remoteEligibility && <span>{remoteEligibility}</span>}
-          {salaryLabel && <span>💰 {salaryLabel}</span>}
+          <span>💰 Compensation: {salaryLabel}</span>
+          {job.seniority && <span>Seniority: {job.seniority}</span>}
+          {job.categories?.length > 0 && <span>Category: {job.categories.join(", ")}</span>}
           {postedDays !== null && <span>Posted {postedDays} {postedDays === 1 ? "day" : "days"} ago</span>}
           <span>Source: {sourceLabel}</span>
           {job.expiryDate && (
@@ -268,46 +339,42 @@ const JobDetails = () => {
         )}
 
         <div className="mb-6">
-          <h2 className="text-2xl font-bold mb-3">Job Description</h2>
-          <p className="text-gray-700 whitespace-pre-line">{job.fullDescription || job.description}</p>
+          <h2 className="text-2xl font-bold mb-3">Full Job Description</h2>
+          <FormattedJobText text={fullJobDescription} />
         </div>
 
         {job.requirements && (
           <div className="mb-6">
             <h2 className="text-2xl font-bold mb-3">Requirements</h2>
-            <p className="text-gray-700 whitespace-pre-line">
-              {job.requirements}
-            </p>
+            <FormattedJobText text={job.requirements} />
           </div>
         )}
 
         {job.qualifications && (
           <div className="mb-6">
             <h2 className="text-2xl font-bold mb-3">Qualifications</h2>
-            <p className="text-gray-700 whitespace-pre-line">{job.qualifications}</p>
+            <FormattedJobText text={job.qualifications} />
           </div>
         )}
 
         {job.responsibilities && (
           <div className="mb-6">
             <h2 className="text-2xl font-bold mb-3">Responsibilities</h2>
-            <p className="text-gray-700 whitespace-pre-line">
-              {job.responsibilities}
-            </p>
+            <FormattedJobText text={job.responsibilities} />
           </div>
         )}
 
         {job.benefits && (
           <div className="mb-6">
             <h2 className="text-2xl font-bold mb-3">Benefits</h2>
-            <p className="text-gray-700 whitespace-pre-line">{job.benefits}</p>
+            <FormattedJobText text={job.benefits} />
           </div>
         )}
 
         {(job.applicationInstructions || job.applicationEmail) && (
           <div className="mb-6">
             <h2 className="mb-2 text-2xl font-bold">How to Apply</h2>
-            {job.applicationInstructions && <p className="mb-2 whitespace-pre-line text-gray-700">{job.applicationInstructions}</p>}
+            {job.applicationInstructions && <FormattedJobText text={job.applicationInstructions} />}
             {job.applicationEmail && (
               <p className="text-gray-600">
                 Send your application to{" "}
@@ -318,9 +385,14 @@ const JobDetails = () => {
             )}
           </div>
         )}
-        {job.applicationLink && (
+        {externalApplicationLink && (
           <p className="mb-6 break-all text-sm text-gray-600">
-            Application link: <a href={job.applicationLink} target="_blank" rel="noopener noreferrer" className="text-primary underline">{job.applicationLink}</a>
+            Application link: <a href={externalApplicationLink} target="_blank" rel="noopener noreferrer" className="text-primary underline">{externalApplicationLink}</a>
+          </p>
+        )}
+        {sourceUrl && (
+          <p className="mb-6 text-sm text-gray-600">
+            Source listing: <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">{sourceLabel}</a>
           </p>
         )}
 
@@ -332,9 +404,9 @@ const JobDetails = () => {
             Check my CV fit
           </Link>
           {job.source !== "employer" && job.isDirectPosting !== true ? (
-            job.applicationLink ? (
+            externalApplicationLink ? (
               <a
-                href={job.applicationLink}
+                href={externalApplicationLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="rounded bg-accent px-8 py-3 font-semibold text-white transition hover:bg-red-700"

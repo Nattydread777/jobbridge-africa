@@ -5,7 +5,9 @@ const SKILL_TERMS = [
   "PostgreSQL", "Redis", "AWS", "Azure", "Google Cloud", "Docker",
   "Kubernetes", "Git", "Linux", "Machine Learning", "Data Analysis",
   "SQL", "HTML", "CSS", "Figma", "UI/UX Design", "Project Management",
-  "Agile", "Scrum", "Communication", "Cybersecurity", "Excel",
+  "Agile", "Scrum", "Communication", "Cybersecurity", "Excel", "Power BI",
+  "Tableau", "Salesforce", "SEO", "Express.js", "Next.js", "Angular",
+  "Vue.js", "WordPress", "Customer Service",
 ];
 
 export const extractResumeText = async (file) => {
@@ -110,10 +112,10 @@ export const extractResumeText = async (file) => {
 
 const RESUME_HEADINGS = [
   ["summary", /^(?:professional\s+)?(?:summary|profile|objective|about me)$/i],
-  ["skills", /^(?:core\s+|technical\s+|key\s+)?skills(?:\s+and\s+competencies)?$/i],
-  ["experience", /^(?:(?:professional|work)\s+)?(?:experience|employment history|work history)$/i],
+  ["skills", /^(?:(?:core|technical|key|domain)\s+)?(?:skills|competencies|areas of expertise|technical proficiencies|tools and technologies)(?:\s+and\s+competencies)?$/i],
+  ["experience", /^(?:(?:professional|work|career)\s+)?(?:experience|employment history|work history|professional background)$/i],
   ["education", /^(?:education|academic background|qualifications)$/i],
-  ["certifications", /^(?:certifications?|licenses?|professional development)$/i],
+  ["certifications", /^(?:certifications?|licenses?|professional development|training|courses|coursework|programs|programmes)$/i],
   ["projects", /^(?:selected\s+)?projects?$/i],
   ["coverLetter", /^(?:cover letter|letter of motivation)$/i],
 ];
@@ -121,11 +123,26 @@ const RESUME_HEADINGS = [
 const RESUME_DATE_RANGE = /\b(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:19|20)\d{2}\s*(?:-|–|to|through)\s*(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:(?:19|20)\d{2}|present|current)\b/i;
 const isBullet = (line) => /^(?:[-*•▪◦‣]|\d+[.)])\s+/.test(line);
 const cleanBullet = (line) => line.replace(/^(?:[-*•▪◦‣]|\d+[.)])\s+/, "").trim();
+const EXPERIENCE_ACTION_PATTERN = /^(?:built|created|designed|developed|delivered|implemented|launched|led|managed|owned|improved|increased|reduced|supported|coordinated|analyzed|analysed|maintained|automated|trained|taught)\b/i;
+const isCredentialRecord = (line) => {
+  const content = cleanBullet(line);
+  if (EXPERIENCE_ACTION_PATTERN.test(content)) return false;
+  return /\b(?:PLP|HQFM|Packt|Scenario Academy)\b/i.test(content)
+    || /\b(?:certification|certificate|certified|coursework|course completion|training program|training programme|professional development|bootcamp)\b/i.test(content);
+};
+const isEducationRecord = (line) => {
+  const content = cleanBullet(line);
+  return !EXPERIENCE_ACTION_PATTERN.test(content)
+    && /\b(?:bachelor|master|ph\.?d|b\.?sc|m\.?sc|mba|diploma|degree|university|polytechnic|college)\b/i.test(content);
+};
 
 export const normalizeResumeText = (sourceText) => String(sourceText || "")
   .replace(/\u00ad/g, "")
   .replaceAll(String.fromCharCode(0), " ")
   .replace(/\r\n?/g, "\n")
+  .replace(/\bMERN\s*-\s*stack\b/gi, "MERN stack")
+  .replace(/\ba\s*nd\b/gi, "and")
+  .replace(/\bauto\s+mation\b/gi, "automation")
   .replace(/([a-z0-9])\s+-\s+([a-z0-9])/g, "$1-$2")
   .split("\n")
   .map((line) => line.replace(/[ \t]+$/g, "").trim())
@@ -144,7 +161,10 @@ export const normalizeResumeText = (sourceText) => String(sourceText || "")
       return state;
     }
     const roleHeader = RESUME_DATE_RANGE.test(line) || /\s(?:\|| at )\s/i.test(line);
-    const continuation = (isBullet(previous) && !roleHeader)
+    const continuation = (isBullet(previous)
+      && !roleHeader
+      && !isCredentialRecord(line)
+      && !isEducationRecord(line))
       || (previous.length > 18
         && !/[.!?]$/.test(previous)
         && !RESUME_DATE_RANGE.test(previous)
@@ -178,12 +198,23 @@ const parseExperienceItems = (lines) => {
     if (isBullet(line)) {
       if (!current) startRole();
       current.bullets.push(cleanBullet(line));
-    } else if (RESUME_DATE_RANGE.test(line) && current && !current.dates && !current.bullets.length) {
-      current.dates = line.match(RESUME_DATE_RANGE)?.[0] || "";
-    } else if (!current || current.bullets.length || RESUME_DATE_RANGE.test(line)) {
+    } else if (!current) {
+      startRole(line);
+    } else if (RESUME_DATE_RANGE.test(line) && !line.replace(RESUME_DATE_RANGE, "").trim()) {
+      if (!current.dates && !current.bullets.length) current.dates = line.match(RESUME_DATE_RANGE)?.[0] || "";
+      else startRole(line);
+    } else if (current.dates && !current.title && !current.bullets.length) {
+      const dates = current.dates;
+      const header = line.match(RESUME_DATE_RANGE) ? line : `${line} | ${dates}`;
+      const parsed = header.replace(RESUME_DATE_RANGE, "").split(/\s*(?:\||•|·| at )\s*/i).map((part) => part.trim()).filter(Boolean);
+      current.title = parsed[0] || "";
+      current.company = parsed[1] || "";
+      current.location = parsed[2] || "";
+      current.dates = line.match(RESUME_DATE_RANGE)?.[0] || dates;
+    } else if (current.bullets.length || RESUME_DATE_RANGE.test(line)) {
       startRole(line);
     } else if (!current.title) {
-      startRole(line);
+      current.title = line;
     } else if (!current.company) {
       current.company = line;
     } else if (!current.location) {
@@ -227,15 +258,27 @@ export const splitResumeSections = (sourceText) => {
     }
     sections[current].push(line);
   }
+  const routedCertifications = sections.experience.filter(isCredentialRecord).map(cleanBullet);
+  const routedEducation = sections.experience
+    .filter((line) => !isCredentialRecord(line) && isEducationRecord(line))
+    .map(cleanBullet);
+  const experienceLines = sections.experience
+    .filter((line) => !isCredentialRecord(line) && !isEducationRecord(line));
+  const educationLines = [...sections.education, ...routedEducation];
+  const certificationLines = [...sections.certifications, ...routedCertifications];
+  const structuredSkills = splitSkillLines(sections.skills);
+  const detectedSkills = SKILL_TERMS.filter((skill) =>
+    new RegExp(`(^|[^a-z0-9+#])${skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9+#]|$)`, "i").test(normalizedText),
+  );
   const coverLetterStart = lines.findIndex((line) => /^(?:cover letter|letter of motivation)[:\s]*$/i.test(line));
   return {
     ...sections,
     header: sections.header.join("\n"),
     summary: sections.summary.join("\n"),
-    skills: sections.skills,
-    experience: sections.experience,
-    education: sections.education,
-    certifications: sections.certifications,
+    skills: structuredSkills.length ? sections.skills : detectedSkills,
+    experience: experienceLines,
+    education: educationLines,
+    certifications: certificationLines,
     projects: sections.projects,
     other: sections.other,
     coverLetter: sections.coverLetter.join("\n"),
@@ -243,10 +286,10 @@ export const splitResumeSections = (sourceText) => {
     structured: {
       contact: parseContactHeader(sections.header),
       summary: sections.summary.join("\n"),
-      skills: splitSkillLines(sections.skills),
-      experience: parseExperienceItems(sections.experience),
-      education: sections.education,
-      certifications: splitSkillLines(sections.certifications),
+      skills: structuredSkills.length ? structuredSkills : detectedSkills,
+      experience: parseExperienceItems(experienceLines),
+      education: educationLines,
+      certifications: splitSkillLines(certificationLines),
     },
   };
 };
@@ -329,6 +372,7 @@ export const parseResumeText = (sourceText) => {
     bio: summaryText.slice(0, 1200),
     skills: foundSkills,
     education,
+    certifications: sections.structured.certifications,
     experience,
     sections,
     structured: sections.structured,

@@ -1,6 +1,7 @@
 // backend/routes/authRoutes.js
 import express from 'express';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 import { 
     registerUser, 
     loginUser, 
@@ -49,14 +50,28 @@ const resumeUpload = multer({
     else cb(new Error('Resume must be a PDF, DOC, DOCX, or TXT file.'));
   },
 });
+const resendVerificationLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { message: 'Too many verification requests. Please wait an hour before requesting another link.' },
+});
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 3,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { message: 'Too many password reset requests. Please wait an hour before trying again.' },
+});
 
 // Public Routes
 router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.post('/google', googleAuth);
 router.post('/verify-email/:token', verifyEmail);
-router.post('/resend-verification', resendVerificationEmail);
-router.post('/forgot-password', forgotPassword);
+router.post('/resend-verification', resendVerificationLimiter, resendVerificationEmail);
+router.post('/forgot-password', forgotPasswordLimiter, forgotPassword);
 router.post('/reset-password/:token', resetPassword);
 // One-time bootstrap (no auth): requires ADMIN_SETUP_TOKEN and no existing admin
 router.post('/bootstrap-admin', bootstrapAdmin);

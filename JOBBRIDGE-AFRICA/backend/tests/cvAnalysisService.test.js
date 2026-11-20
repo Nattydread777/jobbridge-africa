@@ -147,6 +147,33 @@ test('CV normalization rejoins split phrases and parsing keeps skills out of sum
   });
 });
 
+test('CV parsing repairs split words, populates competencies, and routes training out of experience', () => {
+  const parsed = parseCvStructure([
+    'Core Competencies',
+    'React, Stakeholder Management, SQL',
+    'Experience',
+    '2020 - 2022',
+    'Product Designer',
+    'Acme',
+    'Lagos',
+    '- Built MERN - stack tools for a nd auto mation workflows.',
+    'PLP Digital Skills Program',
+    'Packt JavaScript Certificate',
+    'Education',
+    'BSc Computer Science',
+  ].join('\n'));
+
+  assert.deepEqual(parsed.skills, ['React', 'Stakeholder Management', 'SQL']);
+  assert.equal(parsed.experience.length, 1);
+  assert.equal(parsed.experience[0].title, 'Product Designer');
+  assert.equal(parsed.experience[0].company, 'Acme');
+  assert.match(parsed.experience[0].dates, /2020/);
+  assert.match(parsed.experience[0].bullets[0], /MERN stack tools for and automation workflows/);
+  assert.ok(parsed.certifications.some((item) => /PLP/.test(item)));
+  assert.ok(parsed.certifications.some((item) => /Packt/.test(item)));
+  assert.ok(parsed.education.some((item) => /BSc Computer Science/.test(item.degree)));
+});
+
 test('job requirements are categorized and AI rewrites remain source-bullet traceable', () => {
   const jobDescription = [
     'Requirements',
@@ -200,4 +227,18 @@ test('job requirements are categorized and AI rewrites remain source-bullet trac
   );
   assert.ok(groundedRequirements.must_haves.includes('Must have experience with React and customer onboarding.'));
   assert.ok(!groundedRequirements.must_haves.includes('Invented requirement'));
+});
+
+test('short and external-style job descriptions infer skill phrases without misclassifying nice-to-haves', () => {
+  const requirements = analyzeJobRequirements(
+    'React developer with experience in SQL and Power BI. Nice to have: Kubernetes or Docker.',
+  );
+  assert.ok(requirements.must_haves.some((item) => /React/i.test(item)));
+  assert.ok(requirements.must_haves.some((item) => /SQL/i.test(item)));
+  assert.ok(requirements.must_haves.some((item) => /Power BI/i.test(item)));
+  assert.ok(requirements.nice_to_haves.some((item) => /Kubernetes|Docker/i.test(item)));
+  assert.ok(!requirements.must_haves.some((item) => /Kubernetes|Docker/i.test(item)));
+  for (const skill of ['react', 'sql', 'power bi', 'kubernetes', 'docker']) {
+    assert.ok(requirements.skill_phrases.includes(skill));
+  }
 });

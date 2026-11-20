@@ -142,8 +142,12 @@ export const resendVerificationEmail = asyncHandler(async (req, res) => {
   }
   const genericMessage = 'If an unverified account exists for that email, a verification link will be sent.';
   const user = await User.findOne({ email }).select('+emailVerificationToken +emailVerificationExpires');
-  if (!user || user.emailVerified !== false) {
-    return res.json({ message: genericMessage });
+  if (!user) return res.json({ message: genericMessage, status: 'accepted' });
+  if (user.emailVerified !== false) {
+    return res.json({
+      message: 'This email is already verified. You can sign in to your account.',
+      status: 'already_verified',
+    });
   }
   if (!isEmailConfigured()) {
     res.status(503);
@@ -155,8 +159,20 @@ export const resendVerificationEmail = asyncHandler(async (req, res) => {
   await user.save();
   const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
   const verificationUrl = new URL(`/verify-email/${token}`, frontendUrl).toString();
-  await sendEmailVerification({ recipient: user.email, name: user.name, verificationUrl });
-  res.json({ message: genericMessage });
+  try {
+    await sendEmailVerification({ recipient: user.email, name: user.name, verificationUrl });
+  } catch (error) {
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save();
+    console.error('Email verification resend failed:', error.message);
+    res.status(503);
+    throw new Error('We could not deliver the verification email. Check the email service configuration or try again later.');
+  }
+  res.json({
+    message: 'Verification email sent. Check your inbox and spam folder for the link.',
+    status: 'sent',
+  });
 });
 
 export const googleAuth = asyncHandler(async (req, res) => {
@@ -324,6 +340,10 @@ export const getUserProfile = asyncHandler(async (req, res) => {
       education: req.user.education,
       experience: req.user.experience,
       skills: req.user.skills,
+      skillGroups: req.user.skillGroups,
+      certifications: req.user.certifications,
+      projects: req.user.projects,
+      workPreferences: req.user.workPreferences,
     });
   } else {
     res.status(404);
@@ -347,6 +367,10 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
     if (req.body.education !== undefined) user.education = req.body.education;
     if (req.body.experience !== undefined) user.experience = req.body.experience;
     if (req.body.skills !== undefined) user.skills = req.body.skills;
+    if (req.body.skillGroups !== undefined) user.skillGroups = req.body.skillGroups;
+    if (req.body.certifications !== undefined) user.certifications = req.body.certifications;
+    if (req.body.projects !== undefined) user.projects = req.body.projects;
+    if (req.body.workPreferences !== undefined) user.workPreferences = req.body.workPreferences;
     
     if (user.role === 'employer') {
       user.companyName = req.body.companyName || user.companyName;
@@ -374,6 +398,10 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
       education: updatedUser.education,
       experience: updatedUser.experience,
       skills: updatedUser.skills,
+      skillGroups: updatedUser.skillGroups,
+      certifications: updatedUser.certifications,
+      projects: updatedUser.projects,
+      workPreferences: updatedUser.workPreferences,
     });
 
   } else {
