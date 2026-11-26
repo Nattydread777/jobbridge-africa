@@ -12,6 +12,21 @@ export const isEmailConfigured = () =>
   Boolean(process.env.RESEND_API_KEY?.trim()
     || (process.env.EMAIL_USER?.trim() && process.env.EMAIL_PASS?.trim()));
 
+export const createPasswordResetUrl = (resetToken) => {
+  const configuredFrontendUrl = [
+    process.env.FRONTEND_URL,
+    process.env.CLIENT_URL,
+    process.env.APP_URL,
+  ].map((url) => url?.trim()).find(Boolean);
+  const isProduction = process.env.NODE_ENV === 'production'
+    || process.env.RENDER === 'true'
+    || Boolean(process.env.RENDER_SERVICE_ID);
+  const frontendUrl = configuredFrontendUrl
+    || (isProduction ? 'https://jobbridgeafrica.com' : 'http://localhost:5173');
+
+  return new URL(`/reset-password/${encodeURIComponent(resetToken)}`, frontendUrl).toString();
+};
+
 const createTransporter = () => {
   const emailFrom = process.env.EMAIL_FROM || process.env.EMAIL_USER;
   const emailHost = process.env.EMAIL_HOST || 'smtp.zoho.com';

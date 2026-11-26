@@ -5,6 +5,7 @@ import User from '../models/userModel.js';
 import generateToken from '../utils/generateToken.js';
 import cloudinary from '../config/cloudinary.js';
 import {
+  createPasswordResetUrl,
   isEmailConfigured,
   sendEmailVerification,
   sendPasswordResetEmail,
@@ -260,17 +261,10 @@ export const forgotPassword = asyncHandler(async (req, res) => {
     await user.save();
 
     try {
-      const frontendUrl = process.env.FRONTEND_URL
-        || (process.env.CORS_ORIGIN || process.env.ALLOWED_ORIGINS)
-          ?.split(',')
-          .map((origin) => origin.trim())
-          .find(Boolean)
-        || 'http://localhost:5173';
-      const resetUrl = new URL(`/reset-password/${resetToken}`, frontendUrl).toString();
       await sendPasswordResetEmail({
         recipient: user.email,
         name: user.name,
-        resetUrl,
+        resetUrl: createPasswordResetUrl(resetToken),
       });
     } catch (error) {
       user.passwordResetToken = undefined;

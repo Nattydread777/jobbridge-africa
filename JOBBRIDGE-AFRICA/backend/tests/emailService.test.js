@@ -1,10 +1,58 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  createPasswordResetUrl,
   isEmailConfigured,
   sendEmailVerification,
   sendPasswordResetEmail,
 } from '../services/emailService.js';
+
+test('password reset URLs use configured frontend domains and the production default', () => {
+  const environmentKeys = ['FRONTEND_URL', 'CLIENT_URL', 'APP_URL', 'NODE_ENV', 'RENDER', 'RENDER_SERVICE_ID'];
+  const previous = Object.fromEntries(environmentKeys.map((key) => [key, process.env[key]]));
+
+  try {
+    environmentKeys.forEach((key) => delete process.env[key]);
+    process.env.NODE_ENV = 'production';
+    assert.equal(
+      createPasswordResetUrl('reset-token'),
+      'https://jobbridgeafrica.com/reset-password/reset-token',
+    );
+    delete process.env.NODE_ENV;
+    process.env.RENDER = 'true';
+    assert.equal(
+      createPasswordResetUrl('reset-token'),
+      'https://jobbridgeafrica.com/reset-password/reset-token',
+    );
+    delete process.env.RENDER;
+    assert.equal(
+      createPasswordResetUrl('reset-token'),
+      'http://localhost:5173/reset-password/reset-token',
+    );
+    process.env.NODE_ENV = 'production';
+
+    process.env.APP_URL = 'https://app.example.com/';
+    assert.equal(
+      createPasswordResetUrl('reset-token'),
+      'https://app.example.com/reset-password/reset-token',
+    );
+    process.env.CLIENT_URL = 'https://client.example.com';
+    assert.equal(
+      createPasswordResetUrl('reset-token'),
+      'https://client.example.com/reset-password/reset-token',
+    );
+    process.env.FRONTEND_URL = 'https://frontend.example.com/';
+    assert.equal(
+      createPasswordResetUrl('reset-token'),
+      'https://frontend.example.com/reset-password/reset-token',
+    );
+  } finally {
+    environmentKeys.forEach((key) => {
+      if (previous[key] === undefined) delete process.env[key];
+      else process.env[key] = previous[key];
+    });
+  }
+});
 
 test('password reset and verification emails use Resend when it is the configured provider', async () => {
   const previous = {
