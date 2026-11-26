@@ -53,68 +53,70 @@ const Login = () => {
       </section>
 
       <section className="flex items-center justify-center rounded-3xl border border-slate-200 bg-white p-6 shadow-lg md:p-10">
-        <form onSubmit={handleLogin} className="w-full max-w-md space-y-5">
-          <div>
-            <h2 className="text-3xl font-bold text-slate-900">Welcome back</h2>
-            <p className="mt-2 text-slate-600">Sign in to continue to your JobBridge account.</p>
-          </div>
-          {error && (
-            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-              {error}
+        <div className="w-full max-w-md">
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div>
+              <h2 className="text-3xl font-bold text-slate-900">Welcome back</h2>
+              <p className="mt-2 text-slate-600">Sign in to continue to your JobBridge account.</p>
             </div>
-          )}
-          <div>
-            <label htmlFor="login-email" className="mb-1.5 block text-sm font-semibold text-slate-700">Email address</label>
-            <input
-              id="login-email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
-              required
-            />
-          </div>
-          <div>
-            <label htmlFor="login-password" className="mb-1.5 block text-sm font-semibold text-slate-700">Password</label>
-            <input
-              id="login-password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
-              required
-            />
+            {error && (
+              <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                {error}
+              </div>
+            )}
+            <div>
+              <label htmlFor="login-email" className="mb-1.5 block text-sm font-semibold text-slate-700">Email address</label>
+              <input
+                id="login-email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="login-password" className="mb-1.5 block text-sm font-semibold text-slate-700">Password</label>
+              <input
+                id="login-password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setForgotPasswordOpen(true)}
+                className="mt-2 block text-sm font-semibold text-amber-700 hover:underline"
+              >
+                Forgot password?
+              </button>
+              <div className="border-t border-slate-200 pt-5">
+                <p className="mb-3 text-center text-sm font-semibold text-slate-600">Or sign in with Google</p>
+                <GoogleSignInButton onComplete={() => navigate("/profile-view", { replace: true })} />
+              </div>
+            </div>
             <button
-              type="button"
-              onClick={() => setForgotPasswordOpen(true)}
-              className="mt-2 block text-sm font-semibold text-amber-700 hover:underline"
+              type="submit"
+              disabled={submitting}
+              aria-busy={submitting}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-5 py-3 font-bold text-slate-950 transition hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60"
             >
-              Forgot password?
+              {submitting && <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" aria-hidden="true" />}
+              {submitting ? "Signing you in..." : "Sign in"}
             </button>
-            <div className="border-t border-slate-200 pt-5">
-              <p className="mb-3 text-center text-sm font-semibold text-slate-600">Or sign in with Google</p>
-              <GoogleSignInButton onComplete={() => navigate("/profile-view", { replace: true })} />
-            </div>
-            <ResendVerification initialEmail={email} />
-          </div>
-          <button
-            type="submit"
-            disabled={submitting}
-            aria-busy={submitting}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-5 py-3 font-bold text-slate-950 transition hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60"
-          >
-            {submitting && <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" aria-hidden="true" />}
-            {submitting ? "Signing you in..." : "Sign in"}
-          </button>
-          <p aria-live="polite" className="sr-only">
-            {submitting ? "Signing in to your account." : ""}
-          </p>
-          <p className="text-center text-sm text-slate-600">
-            New to JobBridge Africa? <Link to="/register" className="font-bold text-amber-700 hover:underline">Create an account</Link>
-          </p>
-        </form>
+            <p aria-live="polite" className="sr-only">
+              {submitting ? "Signing in to your account." : ""}
+            </p>
+            <p className="text-center text-sm text-slate-600">
+              New to JobBridge Africa? <Link to="/register" className="font-bold text-amber-700 hover:underline">Create an account</Link>
+            </p>
+          </form>
+          <ResendVerification initialEmail={email} />
+        </div>
       </section>
       {forgotPasswordOpen && (
         <ForgotPasswordModal
