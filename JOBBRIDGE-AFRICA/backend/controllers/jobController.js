@@ -14,17 +14,11 @@ const normalizeDeduplicationField = (field) => ({
   $toLower: {
     $trim: {
       input: {
-        $regexReplace: {
-          input: {
-            $convert: {
-              input: `$${field}`,
-              to: 'string',
-              onError: '',
-              onNull: '',
-            },
-          },
-          regex: '\\s+',
-          replacement: ' ',
+        $convert: {
+          input: `$${field}`,
+          to: 'string',
+          onError: '',
+          onNull: '',
         },
       },
     },
