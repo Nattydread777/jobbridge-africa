@@ -216,8 +216,10 @@ const PrivacyPolicy = () => {
                 time via your dashboard
               </li>
               <li>
-                <strong>Delete:</strong> Request deletion of your account and
-                associated data
+                <strong>Delete:</strong> Delete your job seeker account from
+                your profile. Submitted applications are retained in anonymized
+                form for employer records; attached CV files and cover letters
+                are removed.
               </li>
               <li>
                 <strong>Opt-Out:</strong> Unsubscribe from job alert emails by contacting us at the address below

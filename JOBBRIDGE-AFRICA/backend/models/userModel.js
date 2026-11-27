@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema({
   emailVerified: { type: Boolean, default: true },
   emailVerificationToken: { type: String, select: false },
   emailVerificationExpires: { type: Date, select: false },
+  accountDeletedAt: { type: Date, select: false },
   termsAcceptedAt: { type: Date },
   privacyAcceptedAt: { type: Date },
   role: {

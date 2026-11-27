@@ -1,5 +1,6 @@
 import asyncHandler from 'express-async-handler';
 import { createHash, randomBytes } from 'node:crypto';
+import mongoose from 'mongoose';
 import { OAuth2Client } from 'google-auth-library';
 import User from '../models/userModel.js';
 import generateToken from '../utils/generateToken.js';
@@ -11,7 +12,39 @@ import {
   sendPasswordResetEmail,
 } from '../services/emailService.js';
 import Application from '../models/Application.js';
+import CvUsage from '../models/CvUsage.js';
+import ExternalApplication from '../models/ExternalApplication.js';
+import JobAlert from '../models/JobAlert.js';
+import JobOutboundClick from '../models/JobOutboundClick.js';
+import JobReport from '../models/JobReport.js';
 import TailoredCv from '../models/TailoredCv.js';
+
+const clearAuthCookie = (res) => {
+  const isProd = process.env.NODE_ENV === 'production';
+  res.clearCookie('jwt', {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
+    path: '/',
+  });
+};
+
+const deleteCloudinaryAssets = async (assets) => {
+  const uniqueAssets = [...new Map(
+    assets
+      .filter(({ publicId }) => publicId)
+      .map((asset) => [`${asset.resourceType}:${asset.publicId}`, asset]),
+  ).values()];
+  const deletions = await Promise.allSettled(uniqueAssets.map(async ({ publicId, resourceType }) => {
+    const result = await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+    if (!['ok', 'not found'].includes(result.result)) {
+      throw new Error('Cloudinary did not confirm asset deletion.');
+    }
+  }));
+  if (deletions.some((deletion) => deletion.status === 'rejected')) {
+    throw new Error('Some account files could not be removed from storage.');
+  }
+};
 
 export const registerUser = asyncHandler(async (req, res) => {
   const {
@@ -312,7 +345,7 @@ export const resetPassword = asyncHandler(async (req, res) => {
 });
 
 export const logoutUser = asyncHandler(async (req, res) => {
-  res.cookie('jwt', '', { httpOnly: true, expires: new Date(0) });
+  clearAuthCookie(res);
   res.status(200).json({ message: 'Logged out successfully' });
 });
 
@@ -451,18 +484,14 @@ export const deleteMyCvData = asyncHandler(async (req, res) => {
   }
 
   const applications = await Application.find({ applicant: user._id }).select('resumePublicId');
-  const publicIds = [...new Set([
-    user.resumePublicId,
-    ...applications.map((application) => application.resumePublicId),
-  ].filter(Boolean))];
-  const deletions = await Promise.allSettled(publicIds.map(async (publicId) => {
-    const result = await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
-    return { publicId, result: result.result };
-  }));
-  const failedDeletion = deletions.find((deletion) =>
-    deletion.status === 'rejected'
-    || !['ok', 'not found'].includes(deletion.value?.result));
-  if (failedDeletion) {
+  try {
+    await deleteCloudinaryAssets([
+      user.resumePublicId && { publicId: user.resumePublicId, resourceType: 'raw' },
+      ...applications.map((application) => (
+        application.resumePublicId && { publicId: application.resumePublicId, resourceType: 'raw' }
+      )),
+    ].filter(Boolean));
+  } catch {
     res.status(502);
     throw new Error('Some CV files could not be removed from storage. Please retry or contact support.');
   }
@@ -488,6 +517,97 @@ export const deleteMyCvData = asyncHandler(async (req, res) => {
   ]);
   res.status(200).json({
     message: 'Your saved profile CV, application CV files, and tailored CV versions were removed from JobBridge-managed storage.',
+  });
+});
+
+export const deleteMyAccount = asyncHandler(async (req, res) => {
+  if (req.user.role !== 'job_seeker') {
+    res.status(403);
+    throw new Error('Only job seeker accounts can be deleted here.');
+  }
+
+  const user = await User.findById(req.user._id);
+  if (!user || user.accountDeletedAt) {
+    res.status(404);
+    throw new Error('User not found.');
+  }
+
+  const applications = await Application.find({ applicant: user._id }).select('resumePublicId');
+  try {
+    await deleteCloudinaryAssets([
+      user.profileImagePublicId && { publicId: user.profileImagePublicId, resourceType: 'image' },
+      user.resumePublicId && { publicId: user.resumePublicId, resourceType: 'raw' },
+      ...applications.map((application) => (
+        application.resumePublicId && { publicId: application.resumePublicId, resourceType: 'raw' }
+      )),
+    ].filter(Boolean));
+  } catch {
+    res.status(502);
+    throw new Error('Some account files could not be removed from storage. Please retry or contact support.');
+  }
+
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      const currentUser = await User.findById(user._id).session(session);
+      if (!currentUser || currentUser.accountDeletedAt) {
+        res.status(404);
+        throw new Error('User not found.');
+      }
+
+      const deletedAt = new Date();
+      const [anonymizedApplicant] = await User.create([{
+        name: 'Deleted account',
+        email: `deleted-${currentUser._id}-${randomBytes(8).toString('hex')}@deleted.invalid`,
+        password: randomBytes(32).toString('hex'),
+        emailVerified: false,
+        role: 'job_seeker',
+        accountDeletedAt: deletedAt,
+      }], { session });
+
+      await Application.updateMany(
+        { applicant: currentUser._id },
+        {
+          $set: {
+            applicant: anonymizedApplicant._id,
+            coverLetter: '',
+            resumeUrl: '',
+            resumeDeletedAt: deletedAt,
+            tailoredCvDeletedAt: deletedAt,
+          },
+          $unset: { resumePublicId: '', tailoredCv: '' },
+        },
+        { session },
+      );
+      await TailoredCv.deleteMany({ applicant: currentUser._id }, { session });
+      await ExternalApplication.deleteMany({ applicant: currentUser._id }, { session });
+      await JobOutboundClick.updateMany(
+        { userId: currentUser._id },
+        { $set: { userId: null } },
+        { session },
+      );
+      await JobAlert.deleteMany({ email: currentUser.email.toLowerCase() }, { session });
+      await JobReport.updateMany(
+        { email: currentUser.email.toLowerCase() },
+        { $set: { email: '' } },
+        { session },
+      );
+      const identityHash = createHash('sha256').update(`user:${currentUser._id}`).digest('hex');
+      await CvUsage.deleteMany({ identityHash }, { session });
+
+      const deletion = await User.deleteOne({ _id: currentUser._id }, { session });
+      if (deletion.deletedCount !== 1) {
+        res.status(409);
+        throw new Error('Your account could not be deleted. Please try again.');
+      }
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  clearAuthCookie(res);
+  res.status(200).json({
+    message: 'Your account has been deleted. Submitted application history was retained in anonymized form.',
   });
 });
 

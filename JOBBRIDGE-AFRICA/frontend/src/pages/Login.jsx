@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ForgotPasswordModal from "../components/ForgotPasswordModal";
 import GoogleSignInButton from "../components/GoogleSignInButton";
@@ -12,6 +12,7 @@ const Login = () => {
   const [submitting, setSubmitting] = useState(false);
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const { login, isAuthenticated } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -55,6 +56,11 @@ const Login = () => {
       <section className="flex items-center justify-center rounded-3xl border border-slate-200 bg-white p-6 shadow-lg md:p-10">
         <div className="w-full max-w-md">
           <form onSubmit={handleLogin} className="space-y-5">
+            {location.state?.accountDeleted && (
+              <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                {location.state.message || "Your account has been deleted."}
+              </div>
+            )}
             <div>
               <h2 className="text-3xl font-bold text-slate-900">Welcome back</h2>
               <p className="mt-2 text-slate-600">Sign in to continue to your JobBridge account.</p>

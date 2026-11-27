@@ -5,19 +5,25 @@ import User from '../models/userModel.js';
 export const protect = asyncHandler(async (req, res, next) => {
   const token = req.cookies.jwt;
 
-  if (token) {
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = await User.findById(decoded.userId).select('-password');
-      next();
-    } catch (error) {
-      res.status(401);
-      throw new Error('Not authorized, token failed');
-    }
-  } else {
+  if (!token) {
     res.status(401);
     throw new Error('Not authorized, no token');
   }
+
+  let decoded;
+  try {
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch {
+    res.status(401);
+    throw new Error('Not authorized, token failed');
+  }
+  const user = await User.findById(decoded.userId).select('-password +accountDeletedAt');
+  if (!user || user.accountDeletedAt) {
+    res.status(401);
+    throw new Error('Not authorized, account unavailable');
+  }
+  req.user = user;
+  return next();
 });
 
 export const optionalProtect = asyncHandler(async (req, res, next) => {
@@ -33,7 +39,9 @@ export const optionalProtect = asyncHandler(async (req, res, next) => {
     }
     throw error;
   }
-  req.user = await User.findById(decoded.userId).select('-password');
+  const user = await User.findById(decoded.userId).select('-password +accountDeletedAt');
+  if (!user || user.accountDeletedAt) return next();
+  req.user = user;
   return next();
 });
 

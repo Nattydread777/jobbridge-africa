@@ -172,11 +172,11 @@ const EmployerDashboard = () => {
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <h3 className="font-bold text-lg">
-                          {application.applicant.name}
+                          {application.applicant.accountDeletedAt ? "Deleted account" : application.applicant.name}
                         </h3>
-                        <p className="text-gray-600 text-sm">
-                          {application.applicant.email}
-                        </p>
+                        {!application.applicant.accountDeletedAt && (
+                          <p className="text-gray-600 text-sm">{application.applicant.email}</p>
+                        )}
                         {application.applicant.phone && (
                           <p className="text-gray-600 text-sm">Phone: {application.applicant.phone}</p>
                         )}

@@ -242,7 +242,7 @@ export const getJobApplications = asyncHandler(async (req, res) => {
   }
 
   const applications = await Application.find({ job: jobId })
-    .populate('applicant', 'name email phone country bio skills education experience resumeUrl')
+    .populate('applicant', 'name email phone country bio skills education experience resumeUrl +accountDeletedAt')
     .populate('tailoredCv', 'sections source updatedAt')
     .sort('-createdAt');
 

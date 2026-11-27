@@ -26,13 +26,17 @@ const countUniqueSkills = (user) => new Set([
 ].filter((skill) => typeof skill === "string" && skill.trim()).map((skill) => skill.trim().toLowerCase())).size;
 
 const ProfileView = () => {
-  const { user, logout, refreshUser } = useAuth();
+  const { user, logout, refreshUser, deleteAccount } = useAuth();
   const navigate = useNavigate();
   const resumeInput = useRef(null);
   const [activeTab, setActiveTab] = useState("overview");
   const [resumePreviewOpen, setResumePreviewOpen] = useState(false);
   const [uploadingResume, setUploadingResume] = useState(false);
   const [resumeError, setResumeError] = useState("");
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleteAccountError, setDeleteAccountError] = useState("");
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   if (!user) {
     return (
@@ -64,6 +68,27 @@ const ProfileView = () => {
       navigate("/login");
     } catch (error) {
       console.error("Logout failed:", error);
+    }
+  };
+
+  const handleDeleteAccount = async (event) => {
+    event.preventDefault();
+    if (deleteConfirmation !== "DELETE") return;
+
+    setDeletingAccount(true);
+    setDeleteAccountError("");
+    try {
+      const { message } = await deleteAccount();
+      navigate("/login", {
+        replace: true,
+        state: { accountDeleted: true, message },
+      });
+    } catch (error) {
+      setDeleteAccountError(
+        error.response?.data?.message || "We couldn't delete your account. Please try again.",
+      );
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -422,6 +447,23 @@ const ProfileView = () => {
               <QuickAction to="/ai-matching" title="AI job matching" description="Find roles that fit your profile" />
             </div>
           </section>
+          <section className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-6">
+            <h2 className="text-lg font-bold text-red-950">Danger Zone</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-red-900">
+              Deleting your account removes your profile, CV files, tailored CVs, external application tracker entries, and job alerts. Submitted applications remain only as anonymized employer records; your cover letters and attached CVs are removed.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteConfirmation("");
+                setDeleteAccountError("");
+                setDeleteAccountOpen(true);
+              }}
+              className="mt-4 rounded-lg bg-red-700 px-4 py-2 font-semibold text-white hover:bg-red-800"
+            >
+              Delete account
+            </button>
+          </section>
         </>
       ) : (
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -434,6 +476,57 @@ const ProfileView = () => {
         </section>
       )}
 
+      {deleteAccountOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-account-title"
+            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+          >
+            <h2 id="delete-account-title" className="text-2xl font-bold text-red-900">
+              Permanently delete your account?
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-slate-700">
+              This action cannot be undone. Type <strong>DELETE</strong> to confirm. Your submitted application history will be retained only in anonymized form.
+            </p>
+            {deleteAccountError && (
+              <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-800">
+                {deleteAccountError}
+              </p>
+            )}
+            <form onSubmit={handleDeleteAccount} className="mt-5 space-y-4">
+              <label htmlFor="delete-account-confirmation" className="block text-sm font-semibold text-slate-800">
+                Confirmation
+                <input
+                  id="delete-account-confirmation"
+                  value={deleteConfirmation}
+                  onChange={(event) => setDeleteConfirmation(event.target.value)}
+                  autoComplete="off"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                />
+              </label>
+              <div className="flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDeleteAccountOpen(false)}
+                  disabled={deletingAccount}
+                  className="rounded-lg border border-slate-300 px-4 py-2 font-semibold text-slate-700 disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={deleteConfirmation !== "DELETE" || deletingAccount}
+                  className="rounded-lg bg-red-700 px-4 py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {deletingAccount ? "Deleting account…" : "Permanently delete account"}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </main>
   );
 };

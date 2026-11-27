@@ -16,6 +16,7 @@ import {
   uploadProfileImage,
     uploadResume,
     deleteMyCvData,
+    deleteMyAccount,
     bootstrapAdmin
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
@@ -83,5 +84,6 @@ router.put('/profile', protect, updateUserProfile); // Update user profile
 router.post('/upload-profile-image', protect, upload.single('profileImage'), uploadProfileImage); // Upload profile image
 router.post('/upload-resume', protect, resumeUpload.single('resume'), uploadResume);
 router.delete('/cv-data', protect, deleteMyCvData);
+router.delete('/account', protect, deleteMyAccount);
 
 export default router;

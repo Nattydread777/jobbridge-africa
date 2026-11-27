@@ -5,7 +5,7 @@ import User from '../models/userModel.js';
 // @route   GET /api/users
 // @access  Private/Admin
 export const getAllUsers = asyncHandler(async (req, res) => {
-  const users = await User.find({}, 'name email role createdAt');
+  const users = await User.find({ accountDeletedAt: { $exists: false } }, 'name email role createdAt');
   res.json(users);
 });
 

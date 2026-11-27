@@ -49,6 +49,12 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const deleteAccount = async () => {
+    const { data } = await api.delete("/auth/account");
+    setUser(null);
+    return data;
+  };
+
   const refreshUser = async () => {
     try {
       const { data } = await api.get("/auth/me");
@@ -67,6 +73,7 @@ export const AuthProvider = ({ children }) => {
     login,
     register,
     logout,
+    deleteAccount,
     refreshUser,
     isAuthenticated: !!user,
   };
