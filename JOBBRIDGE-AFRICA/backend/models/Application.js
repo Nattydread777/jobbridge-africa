@@ -32,6 +32,13 @@ const applicationSchema = new mongoose.Schema({
     enum: ['pending', 'reviewed', 'shortlisted', 'rejected', 'accepted'],
     default: 'pending'
   },
+  candidateStage: {
+    type: String,
+    enum: ['applied', 'interviewing', 'in_review', 'offer', 'rejected'],
+    default: 'applied',
+    select: false,
+  },
+  candidateNotes: { type: String, default: '', maxlength: 2000, select: false },
   appliedAt: {
     type: Date,
     default: Date.now

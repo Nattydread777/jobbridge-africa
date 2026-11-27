@@ -574,8 +574,9 @@ export const deleteMyAccount = asyncHandler(async (req, res) => {
             resumeUrl: '',
             resumeDeletedAt: deletedAt,
             tailoredCvDeletedAt: deletedAt,
+            candidateNotes: '',
           },
-          $unset: { resumePublicId: '', tailoredCv: '' },
+          $unset: { resumePublicId: '', tailoredCv: '', candidateStage: '' },
         },
         { session },
       );

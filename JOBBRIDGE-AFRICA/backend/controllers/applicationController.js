@@ -141,7 +141,8 @@ export const submitApplication = asyncHandler(async (req, res) => {
 // @access  Private
 export const getMyApplications = asyncHandler(async (req, res) => {
   const applications = await Application.find({ applicant: req.user._id })
-    .populate('job', 'title companyName location jobType salaryRange expiryDate')
+    .select('+candidateStage +candidateNotes')
+    .populate('job', 'title companyName location jobType salaryRange expiryDate isActive isApproved status source lastSeenAt pubDate createdAt')
     .sort('-createdAt');
 
   res.status(200).json(applications);
@@ -218,9 +219,70 @@ export const markExternalApplication = asyncHandler(async (req, res) => {
 
 export const getMyExternalApplications = asyncHandler(async (req, res) => {
   const applications = await ExternalApplication.find({ applicant: req.user._id })
-    .populate('job', 'title companyName location')
+    .populate('job', 'title companyName location expiryDate isActive isApproved status source lastSeenAt pubDate createdAt')
     .sort({ appliedAt: -1 });
   res.status(200).json(applications);
+});
+
+const updateCandidateTracker = async (record, body, res) => {
+  const validStages = ['applied', 'interviewing', 'in_review', 'offer', 'rejected'];
+  if (Object.prototype.hasOwnProperty.call(body, 'candidateStage')) {
+    if (!validStages.includes(body.candidateStage)) {
+      res.status(400);
+      throw new Error('Choose a valid application stage.');
+    }
+    record.candidateStage = body.candidateStage;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'candidateNotes')) {
+    if (typeof body.candidateNotes !== 'string' || body.candidateNotes.length > 2000) {
+      res.status(400);
+      throw new Error('Application notes must be 2,000 characters or fewer.');
+    }
+    record.candidateNotes = body.candidateNotes.trim();
+  }
+  if (!Object.prototype.hasOwnProperty.call(body, 'candidateStage')
+    && !Object.prototype.hasOwnProperty.call(body, 'candidateNotes')) {
+    res.status(400);
+    throw new Error('Provide an application stage or notes to update.');
+  }
+  await record.save();
+  return record;
+};
+
+export const updateMyApplicationTracker = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(400);
+    throw new Error('Invalid application ID.');
+  }
+  const application = await Application.findOne({
+    _id: req.params.id,
+    applicant: req.user._id,
+  }).select('+candidateStage +candidateNotes');
+  if (!application) {
+    res.status(404);
+    throw new Error('Application not found.');
+  }
+
+  await updateCandidateTracker(application, req.body || {}, res);
+  res.status(200).json({ message: 'Application tracker updated.', application });
+});
+
+export const updateMyExternalApplicationTracker = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(400);
+    throw new Error('Invalid application ID.');
+  }
+  const application = await ExternalApplication.findOne({
+    _id: req.params.id,
+    applicant: req.user._id,
+  });
+  if (!application) {
+    res.status(404);
+    throw new Error('Tracked application not found.');
+  }
+
+  await updateCandidateTracker(application, req.body || {}, res);
+  res.status(200).json({ message: 'Application tracker updated.', application });
 });
 
 // @desc    Get applications for a specific job (Employer only)

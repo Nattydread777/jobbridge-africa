@@ -31,37 +31,78 @@ function matchJobs(userProfile, jobs) {
 
 const demoJobs = [
   {
-    title: "Frontend Developer",
-    companyName: "Lagos Tech",
+    title: "Operations Project Manager",
+    companyName: "Coastline Logistics",
     location: "Lagos, Nigeria",
-    requirements: "JavaScript, React, CSS",
-    salaryRange: "$1200/mo",
+    requirements: "Project Management, Agile, Operations, Stakeholder Management, Excel",
+    salaryRange: "$1,600/mo",
   },
   {
-    title: "Backend Engineer",
-    companyName: "Nairobi Cloud",
+    title: "Business Operations Lead",
+    companyName: "Savannah Health",
+    location: "Accra, Ghana",
+    requirements: "Operations, Process Improvement, Project Management, Excel",
+    salaryRange: "$1,800/mo",
+  },
+  {
+    title: "Data & Business Analyst",
+    companyName: "Lakeview Finance",
+    location: "Lagos, Nigeria",
+    requirements: "SQL, Power BI, Excel, Business Analysis, Data Visualization",
+    salaryRange: "$1,700/mo",
+  },
+  {
+    title: "Product Insights Analyst",
+    companyName: "PanAfrica Retail",
     location: "Nairobi, Kenya",
-    requirements: "Node.js, MongoDB, Express",
-    salaryRange: "$1500/mo",
+    requirements: "SQL, Python, Power BI, Stakeholder Management",
+    salaryRange: "$1,900/mo",
   },
   {
-    title: "Full Stack Developer",
+    title: "Remote Full-Stack Engineer",
+    companyName: "Open Horizon Software",
+    location: "Remote — Africa",
+    requirements: "JavaScript, React, Node.js, MongoDB, CSS",
+    salaryRange: "$2,400/mo",
+  },
+  {
+    title: "Frontend Engineer",
     companyName: "Cape Town Startups",
     location: "Cape Town, South Africa",
-    requirements: "React, Node.js, TypeScript",
-    salaryRange: "$1800/mo",
+    requirements: "JavaScript, React, TypeScript, CSS, Accessibility",
+    salaryRange: "$2,100/mo",
   },
 ];
 
-const demoProfile = {
-  name: "Jane Doe",
-  location: "Lagos, Nigeria",
-  skills: ["JavaScript", "React", "Node.js", "CSS"],
-};
+const demoProfiles = [
+  {
+    id: "operations",
+    name: "Ama Mensah",
+    headline: "Operations & Project Manager",
+    location: "Accra, Ghana",
+    skills: ["Project Management", "Agile", "Operations", "Stakeholder Management", "Excel", "Process Improvement"],
+  },
+  {
+    id: "analytics",
+    name: "Nia Okafor",
+    headline: "Data & Business Analyst",
+    location: "Lagos, Nigeria",
+    skills: ["SQL", "Power BI", "Excel", "Business Analysis", "Python", "Data Visualization"],
+  },
+  {
+    id: "full-stack",
+    name: "Thabo Mokoena",
+    headline: "Full-Stack / Remote Tech",
+    location: "Cape Town, South Africa",
+    skills: ["JavaScript", "React", "Node.js", "MongoDB", "TypeScript", "CSS"],
+  },
+];
 
 const AIMatching = () => {
   const { isAuthenticated } = useAuth();
   const [showDemo, setShowDemo] = useState(false);
+  const [selectedDemoId, setSelectedDemoId] = useState(demoProfiles[0].id);
+  const demoProfile = demoProfiles.find(({ id }) => id === selectedDemoId) || demoProfiles[0];
   const matchedDemoJobs = matchJobs(demoProfile, demoJobs);
   const [loading, setLoading] = useState(false);
   const [aiMatches, setAiMatches] = useState([]);
@@ -101,9 +142,9 @@ const AIMatching = () => {
 
           <div className="prose max-w-none">
             <p className="text-lg text-gray-700 mb-6">
-              JobBridge Africa uses cutting-edge artificial intelligence to
-              connect job seekers with their perfect opportunities across the
-              African continent.{" "}
+              JobBridge Africa’s active multi-factor matching engine compares
+              skills, experience, location, work arrangement, salary, listing
+              recency, and Africa-first relevance to surface useful opportunities.{" "}
               <span className="font-bold text-primary">
                 Free AI matching included!
               </span>
@@ -124,21 +165,30 @@ const AIMatching = () => {
                 </button>
               </div>
               <span className="ml-4 text-sm text-gray-500">
-                Powered by our own engine.{" "}
-                <span className="font-bold text-accent">
-                  Kim K2 upgrade coming soon!
-                </span>
+                Personalized recommendations use the same active factors shown above.
               </span>
             </div>
             {showDemo && (
               <div className="bg-primary/10 border border-primary rounded-lg p-6 mb-8">
-                <h3 className="text-xl font-bold mb-2 text-primary">
-                  Your Profile
-                </h3>
+                <label htmlFor="demo-persona" className="mb-4 block text-sm font-semibold text-primary">
+                  Try a sample career profile
+                  <select
+                    id="demo-persona"
+                    value={selectedDemoId}
+                    onChange={(event) => setSelectedDemoId(event.target.value)}
+                    className="mt-1 block w-full rounded border border-primary/40 bg-white px-3 py-2 text-gray-800"
+                  >
+                    {demoProfiles.map((profile) => (
+                      <option key={profile.id} value={profile.id}>{profile.headline}</option>
+                    ))}
+                  </select>
+                </label>
+                <h3 className="text-xl font-bold mb-2 text-primary">Sample Profile</h3>
                 <ul className="mb-4">
                   <li>
                     <b>Name:</b> {demoProfile.name}
                   </li>
+                  <li><b>Focus:</b> {demoProfile.headline}</li>
                   <li>
                     <b>Location:</b> {demoProfile.location}
                   </li>
@@ -146,9 +196,8 @@ const AIMatching = () => {
                     <b>Skills:</b> {demoProfile.skills.join(", ")}
                   </li>
                 </ul>
-                <h3 className="text-xl font-bold mb-2 text-primary">
-                  Top Job Matches
-                </h3>
+                <h3 className="text-xl font-bold mb-2 text-primary">Sample Job Matches</h3>
+                <p className="mb-3 text-sm text-gray-600">These example profiles and listings are for demonstration only.</p>
                 <ul>
                   {matchedDemoJobs.map((job, idx) => (
                     <li
@@ -260,8 +309,7 @@ const AIMatching = () => {
                 <div>
                   <h3 className="font-semibold text-lg">AI Analysis</h3>
                   <p className="text-gray-600">
-                    Our intelligent algorithms analyze your profile and match it
-                    with thousands of job postings in real-time.
+                    The active engine scores available listings across skills, experience, location, work arrangement, salary, recency, and regional relevance.
                   </p>
                 </div>
               </div>
@@ -346,14 +394,6 @@ const AIMatching = () => {
               >
                 Create Your Profile
               </Link>
-              <div className="mt-6">
-                <button className="bg-accent text-white px-6 py-2 rounded shadow hover:bg-red-700 font-semibold">
-                  Upgrade to Premium (Coming Soon)
-                </button>
-                <span className="ml-3 text-sm text-gray-500">
-                  Unlock advanced AI (Kim K2), career guidance, and more!
-                </span>
-              </div>
             </div>
           </div>
         </div>

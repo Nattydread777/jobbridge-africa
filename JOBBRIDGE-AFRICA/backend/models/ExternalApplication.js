@@ -9,6 +9,12 @@ const externalApplicationSchema = new mongoose.Schema({
   source: { type: String, required: true, trim: true },
   applicationLink: { type: String, required: true },
   appliedAt: { type: Date, default: Date.now, required: true },
+  candidateStage: {
+    type: String,
+    enum: ['applied', 'interviewing', 'in_review', 'offer', 'rejected'],
+    default: 'applied',
+  },
+  candidateNotes: { type: String, default: '', maxlength: 2000 },
 }, { timestamps: true });
 
 externalApplicationSchema.index({ job: 1, applicant: 1 }, { unique: true });

@@ -7,6 +7,8 @@ import {
   getJobApplications,
   markExternalApplication,
   updateApplicationStatus,
+  updateMyApplicationTracker,
+  updateMyExternalApplicationTracker,
   deleteApplication
 } from '../controllers/applicationController.js';
 import { protect } from '../middleware/authMiddleware.js';
@@ -39,6 +41,8 @@ router.post('/', protect, upload.single('resume'), submitApplication);
 router.get('/my-applications', protect, getMyApplications);
 router.get('/my-external-applications', protect, getMyExternalApplications);
 router.post('/external/:jobId', protect, markExternalApplication);
+router.patch('/external/:id/tracker', protect, updateMyExternalApplicationTracker);
+router.patch('/:id/tracker', protect, updateMyApplicationTracker);
 router.get('/job/:jobId', protect, getJobApplications);
 router.put('/:id/status', protect, updateApplicationStatus);
 router.delete('/:id', protect, deleteApplication);
