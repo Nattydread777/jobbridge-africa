@@ -3,6 +3,7 @@ import PropTypes from "prop-types";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { getJobPath } from "../utils/jobUrl";
+import { formatSalaryLabel } from "../utils/salaryDisplay";
 import ExternalJobLink from "./ExternalJobLink";
 
 const getDescriptionPreview = (value, maxLength = 150) => {
@@ -58,11 +59,13 @@ const JobCard = ({ job }) => {
   const jobPath = getJobPath(job);
   const jobUrl = `${window.location.origin}${jobPath}`;
   const shareText = `${job.title} at ${job.companyName} - ${jobUrl}`;
-  const workMode = {
-    remote: "Remote",
-    hybrid: "Hybrid",
-    "on-site": "On-site",
-  }[job.workplaceType] || job.jobType;
+  const workMode = job.isRemote || job.isWorldwideRemote || job.jobType === "Remote"
+    ? "Remote"
+    : ({
+      remote: "Remote",
+      hybrid: "Hybrid",
+      "on-site": "On-site",
+    }[job.workplaceType] || job.jobType);
   const remoteScope = job.locationRestriction || job.location || "";
   const isGlobalRemote = /\b(worldwide|global(?:ly)?|anywhere|any location)\b/i.test(remoteScope);
   const remoteEligibility = isGlobalRemote
@@ -74,9 +77,18 @@ const JobCard = ({ job }) => {
     ? `Remote · ${remoteEligibility}`
     : `${workMode} · ${job.locationRestriction || job.location}`;
   const sourceLabel = job.sourceName || job.sourceProvider || (isDirectPosting ? "Direct employer" : "External source");
-  const salaryLabel = [job.salary, job.salaryRange]
-    .map((value) => String(value || "").trim())
-    .find((value) => value && !/^competitive$/i.test(value)) || "";
+  const salaryLabel = formatSalaryLabel(job);
+  const eligibilityLabel = {
+    worldwide: "Worldwide / global",
+    africa_friendly: "Africa-friendly",
+    region_restricted: "Region-restricted",
+    unspecified: "Eligibility not specified",
+  }[job.eligibilityScope] || "Eligibility not specified";
+  const timezoneLabel = {
+    africa_eu_friendly: "Africa / EU-friendly hours",
+    flexible_async: "Flexible / async",
+    specific_timezone: "Specific timezone",
+  }[job.timezonePolicy];
   const isExternalListing = !isDirectPosting && !isSampleListing;
   const descriptionPreview = getDescriptionPreview(job.description || job.excerpt);
 
@@ -112,6 +124,18 @@ const JobCard = ({ job }) => {
           <span className="rounded-full bg-violet-50 px-3 py-1 text-violet-900">
             {job.jobType}
           </span>
+        )}
+        <span className={`rounded-full px-3 py-1 ${
+          job.eligibilityScope === "region_restricted"
+            ? "bg-rose-100 text-rose-900"
+            : job.eligibilityScope === "africa_friendly"
+              ? "bg-emerald-50 text-emerald-900"
+              : "bg-cyan-50 text-cyan-900"
+        }`}>
+          {eligibilityLabel}
+        </span>
+        {timezoneLabel && (
+          <span className="rounded-full bg-indigo-50 px-3 py-1 text-indigo-900">{timezoneLabel}</span>
         )}
       </div>
       {isSampleListing ? (
@@ -197,7 +221,12 @@ JobCard.propTypes = {
     location: PropTypes.string.isRequired,
     jobType: PropTypes.string,
     workplaceType: PropTypes.string,
+    isRemote: PropTypes.bool,
     salaryRange: PropTypes.string,
+    salary: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    salaryCurrency: PropTypes.string,
+    eligibilityScope: PropTypes.string,
+    timezonePolicy: PropTypes.string,
     description: PropTypes.string.isRequired,
     source: PropTypes.string,
     sourceProvider: PropTypes.string,

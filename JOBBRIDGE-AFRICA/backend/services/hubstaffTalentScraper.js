@@ -3,6 +3,8 @@ import { createHash } from 'node:crypto';
 import { load } from 'cheerio';
 import Job from '../models/Job.js';
 import { cleanHtmlSnippet } from '../utils/sanitizer.js';
+import { deriveJobSignals } from '../utils/jobSignals.js';
+import { extractSalaryCurrency } from '../utils/salary.js';
 
 const HUBSTAFF_ORIGIN = 'https://hubstafftalent.net';
 const HUBSTAFF_SEARCH_URL = `${HUBSTAFF_ORIGIN}/search/jobs?search%5Bkeywords%5D=&page=1&search%5Btype%5D=&search%5Blast_slider%5D=&search%5Bnewer_than%5D=&search%5Bnewer_than%5D=&search%5Bpayrate_start%5D=1&search%5Bpayrate_end%5D=100&search%5Bpayrate_null%5D=0&search%5Bpayrate_null%5D=1&search%5Bbudget_start%5D=1&search%5Bbudget_end%5D=100000&search%5Bbudget_null%5D=0&search%5Bbudget_null%5D=1&search%5Bexperience_level%5D=-1&search%5Bcountries%5D%5B%5D=&search%5Blanguages%5D%5B%5D=`;
@@ -142,7 +144,7 @@ export const normalizeHubstaffTalentListing = (listing, now = new Date()) => {
 
   const pubDate = parseDate(listing.postedDate) || now;
   const sourceKey = createHash('sha256').update(sourceUrl.toLowerCase()).digest('hex');
-  return {
+  const normalized = {
     sourceKey,
     source: 'aggregated',
     sourceProvider: 'hubstafftalent',
@@ -163,6 +165,7 @@ export const normalizeHubstaffTalentListing = (listing, now = new Date()) => {
     jobType: normalizeJobType(listing.jobType),
     salary: String(listing.salary || '').trim(),
     salaryRange: String(listing.salary || '').trim() || 'Competitive',
+    salaryCurrency: extractSalaryCurrency(undefined, listing.salary),
     categories: [],
     tags: Array.isArray(listing.tags) ? [...new Set(listing.tags.map(String).map(tag => tag.trim()).filter(Boolean))] : [],
     pubDate,
@@ -170,6 +173,7 @@ export const normalizeHubstaffTalentListing = (listing, now = new Date()) => {
     isApproved: true,
     isActive: true,
   };
+  return { ...normalized, ...deriveJobSignals(normalized) };
 };
 
 const upsertHubstaffJob = async (normalized) => {

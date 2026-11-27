@@ -20,6 +20,9 @@ const Jobs = () => {
     country: searchParams.get("country") || "",
     city: searchParams.get("city") || "",
     jobType: searchParams.get("jobType") || "",
+    eligibilityScope: searchParams.get("eligibilityScope") || "",
+    timezonePolicy: searchParams.get("timezonePolicy") || "",
+    includeRestricted: searchParams.get("includeRestricted") || "",
     isRemote: searchParams.get("isRemote") || "",
     workplaceType: searchParams.get("workplaceType") || "",
     salary: searchParams.get("salary") || "",
@@ -44,6 +47,9 @@ const Jobs = () => {
       country: params.get("country") || "",
       city: params.get("city") || "",
       jobType: params.get("jobType") || "",
+      eligibilityScope: params.get("eligibilityScope") || "",
+      timezonePolicy: params.get("timezonePolicy") || "",
+      includeRestricted: params.get("includeRestricted") || "",
       isRemote: params.get("remote") || params.get("isRemote") || "",
       workplaceType: params.get("workplaceType") || "",
       salary: params.get("salary") || "",
@@ -173,6 +179,9 @@ const Jobs = () => {
       country: "",
       city: "",
       jobType: "",
+      eligibilityScope: "",
+      timezonePolicy: "",
+      includeRestricted: "",
       isRemote: "",
       workplaceType: "",
       salary: "",
@@ -345,9 +354,9 @@ const Jobs = () => {
             </select>
           </div>
 
-          {/* Job Type Filter */}
+          {/* Employment Type Filter */}
           <div className="bg-white p-4 rounded-lg shadow">
-            <h3 className="font-bold mb-3">💼 Job Type</h3>
+            <h3 className="font-bold mb-3">💼 Employment type</h3>
             <select
               value={filters.jobType}
               onChange={(e) => handleFilterChange("jobType", e.target.value)}
@@ -357,8 +366,46 @@ const Jobs = () => {
               <option value="Full-Time">Full-Time</option>
               <option value="Part-Time">Part-Time</option>
               <option value="Contract">Contract</option>
-              <option value="Remote">Remote</option>
               <option value="Internship">Internship</option>
+            </select>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow">
+            <label htmlFor="eligibility-filter" className="mb-3 block font-bold">🌍 Eligibility / region</label>
+            <select
+              id="eligibility-filter"
+              value={filters.eligibilityScope}
+              onChange={(event) => handleFilterChange("eligibilityScope", event.target.value)}
+              className="w-full rounded border p-2"
+            >
+              <option value="">All unrestricted listings (default)</option>
+              <option value="worldwide">Worldwide / global</option>
+              <option value="africa_friendly">Africa-friendly</option>
+              <option value="region_restricted">Region-restricted</option>
+            </select>
+            <label className="mt-3 flex items-start gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={filters.includeRestricted === "true"}
+                onChange={(event) => handleFilterChange("includeRestricted", event.target.checked ? "true" : "")}
+                className="mt-1"
+              />
+              <span>Also include region-restricted roles alongside other matches</span>
+            </label>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow">
+            <label htmlFor="timezone-filter" className="mb-3 block font-bold">🕒 Timezone / overlap</label>
+            <select
+              id="timezone-filter"
+              value={filters.timezonePolicy}
+              onChange={(event) => handleFilterChange("timezonePolicy", event.target.value)}
+              className="w-full rounded border p-2"
+            >
+              <option value="">Any timezone</option>
+              <option value="africa_eu_friendly">Africa / EU-friendly</option>
+              <option value="flexible_async">Flexible / async</option>
+              <option value="specific_timezone">Specific timezone stated</option>
             </select>
           </div>
 

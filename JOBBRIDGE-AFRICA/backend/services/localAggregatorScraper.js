@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { load } from 'cheerio';
 import Job from '../models/Job.js';
 import { cleanHtmlSnippet } from '../utils/sanitizer.js';
+import { deriveJobSignals } from '../utils/jobSignals.js';
 
 export const MYJOBMAG_TARGETS = [
   {
@@ -101,7 +102,7 @@ export const normalizeMyJobMagListing = (listing) => {
   if (!title || !companyName || !description || !listingUrl) return null;
 
   const sourceKey = createHash('sha256').update(listingUrl.toLowerCase()).digest('hex');
-  return {
+  const normalized = {
     sourceKey,
     source: 'aggregated',
     sourceProvider: 'myjobmag',
@@ -125,6 +126,7 @@ export const normalizeMyJobMagListing = (listing) => {
     isApproved: true,
     isActive: true,
   };
+  return { ...normalized, ...deriveJobSignals(normalized) };
 };
 
 export const ingestMyJobMagListings = async () => {

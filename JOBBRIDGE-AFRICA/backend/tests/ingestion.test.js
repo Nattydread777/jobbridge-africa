@@ -40,6 +40,7 @@ test('normalizes Greenhouse-style webhook payloads and links them to the employe
     location: { name: 'Remote - Africa' },
     departments: [{ name: 'Engineering' }],
     employment_type: 'Full-time',
+    salary: { currency: 'USD', value: { minValue: 90000, maxValue: 110000 } },
     absolute_url: 'https://jobs.example.com/jobs/456',
     datePosted: 1781200000,
     integration: 'greenhouse',
@@ -48,6 +49,9 @@ test('normalizes Greenhouse-style webhook payloads and links them to the employe
   assert.equal(job.title, 'Senior Engineer');
   assert.equal(job.description, 'Build reliable systems.');
   assert.equal(job.workplaceType, 'remote');
+  assert.equal(job.isWorldwideRemote, false);
+  assert.equal(job.eligibilityScope, 'africa_friendly');
+  assert.equal(job.salaryCurrency, 'USD');
   assert.equal(job.department, 'Engineering');
   assert.equal(job.sourceProvider, 'greenhouse');
   assert.equal(job.source, 'employer');
@@ -164,6 +168,9 @@ test('extracts JobPosting JSON-LD from arrays and graphs, then normalizes it for
   assert.equal(normalized.source, 'aggregated');
   assert.equal(normalized.isDirectPosting, false);
   assert.equal(normalized.jobType, 'Remote');
+  assert.equal(normalized.salaryCurrency, 'USD');
+  assert.equal(normalized.eligibilityScope, 'africa_friendly');
+  assert.equal(normalized.isWorldwideRemote, false);
   assert.equal(normalized.salaryRange, postings[0].salary);
   assert.equal(normalized.expiryDate.toISOString(), '2026-12-01T00:00:00.000Z');
   const modelJob = new Job(normalized);
@@ -297,19 +304,24 @@ test('normalizes remote API jobs with provider attribution and validates the Job
   assert.equal(normalized.isDirectPosting, false);
   assert.equal(normalized.isWorldwideRemote, true);
   assert.equal(normalized.jobType, 'Full-Time');
+  assert.equal(normalized.salaryCurrency, '');
+  assert.equal(normalized.eligibilityScope, 'worldwide');
 
   const modelJob = new Job(normalized);
   assert.equal(modelJob.validateSync(), undefined);
   assert.equal(modelJob.sourceName, 'Himalayas');
   assert.equal(modelJob.sourceUrl, listingUrl);
 
-  assert.equal(normalizeRemoteJob('Remotive', {
+  const restrictedRemote = normalizeRemoteJob('Remotive', {
     company_name: 'Restricted Company',
     title: 'Engineer',
     description: 'Not globally available.',
     candidate_required_location: 'United States',
     url: 'https://remotive.com/remote-jobs/restricted-role',
-  }), null);
+  });
+  assert.ok(restrictedRemote);
+  assert.equal(restrictedRemote.eligibilityScope, 'region_restricted');
+  assert.equal(restrictedRemote.isWorldwideRemote, false);
 
   assert.equal(normalizeRemoteJob('Remotive', null), null);
   assert.equal(normalizeRemoteJob('Remotive', undefined), null);
@@ -406,6 +418,7 @@ test('parses MyJobMag agency listings and normalizes attribution for the Job mod
   assert.equal(normalized.sourceUrl, listings[0].detailUrl);
   assert.equal(normalized.applicationLink, listings[0].detailUrl);
   assert.equal(normalized.location, 'Lagos, Nigeria');
+  assert.equal(normalized.eligibilityScope, 'africa_friendly');
   assert.equal(normalized.expiryDate, null);
   const modelJob = new Job(normalized);
   assert.equal(modelJob.validateSync(), undefined);
@@ -472,6 +485,8 @@ test('parses Hubstaff Talent remote jobs and normalizes them for the Job model',
   assert.equal(normalized.sourceName, 'Hubstaff Talent');
   assert.equal(normalized.location, 'Remote');
   assert.equal(normalized.workplaceType, 'remote');
+  assert.equal(normalized.salaryCurrency, '');
+  assert.equal(normalized.eligibilityScope, 'unspecified');
   assert.equal(normalized.jobType, 'Contract');
   assert.equal(normalized.salaryRange, '$25/hr');
   assert.equal(normalized.applicationLink, 'https://hubstafftalent.net/jobs/remote-product-designer/apply');

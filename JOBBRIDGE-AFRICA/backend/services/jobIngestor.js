@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import Job from '../models/Job.js';
 import { cleanHtmlDescription, cleanHtmlSnippet } from '../utils/sanitizer.js';
+import { deriveJobSignals } from '../utils/jobSignals.js';
+import { extractSalaryCurrency } from '../utils/salary.js';
 
 const HIMALAYAS_API = 'https://himalayas.app/jobs/api';
 const PAGE_SIZE = 20;
@@ -8,7 +10,7 @@ const REQUEST_DELAY_MS = 100;
 const SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const SYNC_RETRY_DELAY_MS = 15 * 60 * 1000;
 const ACTIVE_JOB_LOOKBACK_MS = 120 * 24 * 60 * 60 * 1000;
-const WORLDWIDE_PATTERN = /\b(worldwide|global(?:ly)?|anywhere|any location|africa)\b/i;
+const WORLDWIDE_PATTERN = /\b(worldwide|global(?:ly)?|anywhere|any location)\b/i;
 
 const pause = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -107,7 +109,7 @@ const normalizeJob = (job) => {
   ));
   const expiryDate = asDate(job.expiryDate);
 
-  return {
+  const normalized = {
     sourceKey,
     source: 'aggregated',
     sourceProvider: 'himalayas',
@@ -134,11 +136,13 @@ const normalizeJob = (job) => {
     seniority,
     salary,
     salaryRange: salary || 'Competitive',
+    salaryCurrency: extractSalaryCurrency(job.salaryCurrency || job.salary_currency, job.salary || job.salaryRange),
     categories,
     tags,
     expiryDate,
     isApproved: true,
   };
+  return { ...normalized, ...deriveJobSignals(normalized) };
 };
 
 const getJobsFromResponse = (payload) => {

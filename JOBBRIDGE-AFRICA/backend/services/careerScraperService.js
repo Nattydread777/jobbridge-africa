@@ -5,6 +5,8 @@ import { isIP } from 'node:net';
 import https from 'node:https';
 import { load } from 'cheerio';
 import Job from '../models/Job.js';
+import { deriveJobSignals } from '../utils/jobSignals.js';
+import { extractSalaryCurrency } from '../utils/salary.js';
 
 const USER_AGENT = 'JobBridgeAfrica-JobPostingCrawler/1.0 (+https://jobbridgeafrica.com)';
 const REQUEST_TIMEOUT_MS = 15000;
@@ -322,11 +324,12 @@ export const extractSchemaJobPostings = (html, pageUrl) => {
   return postings.map((job) => {
     const location = getJobLocation(job);
     const workplaceType = getWorkplaceType(job, location);
-    return {
+    const normalized = {
       title: htmlToText(asText(job.title)),
       description: htmlToText(asText(job.description)),
       employmentType: asText(job.employmentType),
       salary: asText(job.baseSalary),
+      salaryCurrency: extractSalaryCurrency(undefined, job.baseSalary),
       location,
       workplaceType,
       validThrough: parseDate(job.validThrough),
@@ -335,6 +338,7 @@ export const extractSchemaJobPostings = (html, pageUrl) => {
       employerName: asText(job.hiringOrganization?.name),
       department: asText(job.industry || job.occupationalCategory || job.department),
     };
+    return normalized;
   }).filter((job) => job.title && job.description);
 };
 
@@ -463,7 +467,7 @@ const discoverDomainPages = async (rootUrl, rootHtml, rootHtmlUrl = rootUrl) => 
       }
     }
   }
-  return {
+  const normalized = {
     pages: [...pages].slice(0, MAX_DISCOVERY_PAGES),
     capped: pages.size >= MAX_DISCOVERY_PAGES,
   };
@@ -480,7 +484,7 @@ export const normalizeSchemaJobPosting = (posting, rootUrlValue, crawledAt = new
     posting.title.trim().toLowerCase(),
     location.trim().toLowerCase(),
   ].join('\u0000');
-  return {
+  const normalized = {
     sourceKey: createHash('sha256').update(identity).digest('hex'),
     sourceProvider: provider,
     title: posting.title.slice(0, 300),
@@ -494,10 +498,11 @@ export const normalizeSchemaJobPosting = (posting, rootUrlValue, crawledAt = new
     workplaceType: posting.workplaceType,
     isRemote: posting.workplaceType === 'remote',
     isWorldwideRemote: posting.workplaceType === 'remote'
-      && /\b(worldwide|global(?:ly)?|anywhere|africa)\b/i.test(location),
+      && /\b(worldwide|global(?:ly)?|anywhere|any location)\b/i.test(location),
     jobType: normalizeJobType(posting.employmentType, posting.workplaceType),
     salary: posting.salary.slice(0, 500),
     salaryRange: posting.salary || 'Competitive',
+    salaryCurrency: posting.salaryCurrency || extractSalaryCurrency(undefined, posting.salary),
     expiryDate: posting.validThrough || null,
     ...(posting.datePosted ? { pubDate: posting.datePosted } : {}),
     applicationLink: posting.applicationUrl,
@@ -506,6 +511,7 @@ export const normalizeSchemaJobPosting = (posting, rootUrlValue, crawledAt = new
     isApproved: true,
     isActive: !posting.validThrough || posting.validThrough > new Date(),
   };
+  return { ...normalized, ...deriveJobSignals(normalized) };
 };
 
 const upsertPosting = async (posting, rootUrl, crawledAt, companyNameOverride) => {

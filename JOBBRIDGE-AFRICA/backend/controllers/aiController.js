@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import Job from '../models/Job.js';
 import CvUsage from '../models/CvUsage.js';
 import { buildActiveJobFilter } from '../utils/jobFilters.js';
+import { buildRegionRestrictedJobFilter, deriveJobSignals } from '../utils/jobSignals.js';
 import {
   analyzeCvMatch,
   analyzeJobRequirements,
@@ -239,15 +240,16 @@ export const optimizeCv = asyncHandler(async (req, res) => {
   });
 });
 
-// Seven-factor recommendation score; fit diagnostics remain separate from logistics.
+// Eight-factor recommendation score; fit diagnostics remain separate from logistics.
 const SCORE_WEIGHTS = {
-  skills: 0.3,
-  experience: 0.15,
-  location: 0.2,
-  workArrangement: 0.1,
-  salary: 0.08,
-  recency: 0.1,
-  africaFirst: 0.07,
+  skills: 0.27,
+  experience: 0.14,
+  location: 0.16,
+  workArrangement: 0.08,
+  salary: 0.06,
+  recency: 0.08,
+  africaFirst: 0.06,
+  eligibility: 0.15,
 };
 
 const experienceYearsFor = (user) => {
@@ -302,7 +304,12 @@ export const getAiMatches = asyncHandler(async (req, res) => {
     }
     jobs = [job];
   } else {
-    jobs = await Job.find(buildActiveJobFilter()).sort({ createdAt: -1 }).limit(200);
+    jobs = await Job.find({
+      $and: [
+        buildActiveJobFilter(),
+        { $nor: [buildRegionRestrictedJobFilter()] },
+      ],
+    }).sort({ createdAt: -1 }).limit(200);
   }
 
   const experienceText = (user.experience || []).map((entry) => [
@@ -325,6 +332,12 @@ export const getAiMatches = asyncHandler(async (req, res) => {
   const userPrefersRemote = /\bremote\b/.test(bio);
 
   const scored = jobs.map((job) => {
+    const jobSignals = deriveJobSignals(job);
+    const globalRemote = jobSignals.eligibilityScope === 'worldwide';
+    const remoteRole = job.isRemote
+      || job.isWorldwideRemote
+      || job.workplaceType === 'remote'
+      || job.jobType === 'Remote';
     const jobText = [
       job.title,
       job.description,
@@ -341,11 +354,13 @@ export const getAiMatches = asyncHandler(async (req, res) => {
       : (userSkills.length ? 0.5 : 0);
     const locationText = `${job.location || ''} ${job.locationRestriction || ''}`.toLowerCase();
     const locationScore = userCountry
-      ? (locationText.includes(userCountry) ? 1 : (job.isWorldwideRemote ? 0.85 : 0))
-      : (job.isWorldwideRemote ? 0.75 : 0.5);
+      ? (locationText.includes(userCountry)
+        ? 1
+        : (globalRemote ? 0.85 : jobSignals.eligibilityScope === 'africa_friendly' ? 0.75 : 0))
+      : (globalRemote ? 0.75 : 0.5);
     const remoteScore = userPrefersRemote
-      ? (job.isRemote || job.isWorldwideRemote || job.jobType === 'Remote' ? 1 : 0.35)
-      : (job.isRemote || job.isWorldwideRemote || job.jobType === 'Remote' ? 0.7 : 1);
+      ? (remoteRole ? 1 : 0.35)
+      : (remoteRole ? 0.7 : 1);
     const daysOld = (Date.now() - new Date(job.createdAt).getTime()) / (1000 * 60 * 60 * 24);
     const recencyScore = Math.max(0, Math.min(1, 1 - daysOld / 30));
     const isAfricanDirectPosting = job.source === 'employer'
@@ -360,13 +375,19 @@ export const getAiMatches = asyncHandler(async (req, res) => {
       salary: salaryScore(job),
       recency: recencyScore,
       africaFirst: isAfricanDirectPosting ? 1 : (job.source === 'employer' ? 0.7 : 0.4),
+      eligibility: {
+        worldwide: 1,
+        africa_friendly: 0.95,
+        region_restricted: 0,
+        unspecified: 0.5,
+      }[jobSignals.eligibilityScope],
     };
     const score = Object.entries(SCORE_WEIGHTS)
       .reduce((sum, [factor, weight]) => sum + weight * breakdown[factor], 0);
     const fitContext = analyzeCvMatch(profileText, jobText);
 
     return {
-      job,
+      job: { ...job.toObject(), ...jobSignals },
       score: Number(score.toFixed(4)),
       matchBreakdown: Object.fromEntries(
         Object.entries(breakdown).map(([factor, value]) => [factor, Number(value.toFixed(3))]),

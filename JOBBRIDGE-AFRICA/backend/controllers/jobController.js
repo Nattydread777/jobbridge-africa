@@ -5,8 +5,14 @@ import JobOutboundClick from '../models/JobOutboundClick.js';
 import User from '../models/userModel.js';
 import JobReport from '../models/JobReport.js';
 import { buildActiveJobFilter } from '../utils/jobFilters.js';
-
-const AFRICAN_LOCATION_PATTERN = '\\b(?:africa|algeria|angola|benin|botswana|burkina faso|burundi|cabo verde|cameroon|central african republic|chad|comoros|democratic republic of the congo|djibouti|egypt|equatorial guinea|eritrea|eswatini|ethiopia|gabon|gambia|ghana|guinea|guinea-bissau|ivory coast|kenya|lesotho|liberia|libya|madagascar|malawi|mali|mauritania|mauritius|morocco|mozambique|namibia|niger|nigeria|republic of the congo|rwanda|sao tome and principe|senegal|seychelles|sierra leone|somalia|south africa|south sudan|sudan|tanzania|togo|tunisia|uganda|zambia|zimbabwe)\\b';
+import {
+  africaRelevanceExpression,
+  buildEligibilityScopeFilter,
+  buildRegionRestrictedJobFilter,
+  buildTimezonePolicyFilter,
+  deriveJobSignals,
+} from '../utils/jobSignals.js';
+import { extractSalaryCurrency } from '../utils/salary.js';
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -114,6 +120,7 @@ const featuredEmployerPipeline = () => [
       $and: [
         buildActiveJobFilter(),
         { sourceProvider: { $ne: 'jobbridge-fallback' } },
+        { $nor: [buildRegionRestrictedJobFilter()] },
       ],
     },
   },
@@ -209,6 +216,9 @@ export const getJobs = asyncHandler(async (req, res) => {
     q,
     search,
     company,
+    eligibilityScope,
+    timezonePolicy,
+    includeRestricted,
     location,
     country,
     city,
@@ -235,6 +245,27 @@ export const getJobs = asyncHandler(async (req, res) => {
     throw new Error('workplaceType must be remote, hybrid, or on-site');
   }
   const filters = [buildActiveJobFilter()];
+  const parsedIncludeRestricted = parseBoolean(includeRestricted, 'includeRestricted', res) === true;
+  const validEligibilityScopes = ['worldwide', 'africa_friendly', 'region_restricted'];
+  if (eligibilityScope && !validEligibilityScopes.includes(String(eligibilityScope))) {
+    res.status(400);
+    throw new Error('eligibilityScope must be worldwide, africa_friendly, or region_restricted');
+  }
+  const validTimezonePolicies = ['africa_eu_friendly', 'flexible_async', 'specific_timezone'];
+  if (timezonePolicy && !validTimezonePolicies.includes(String(timezonePolicy))) {
+    res.status(400);
+    throw new Error('timezonePolicy must be africa_eu_friendly, flexible_async, or specific_timezone');
+  }
+  const explicitRestrictedFilter = eligibilityScope === 'region_restricted';
+  if (!parsedIncludeRestricted && !explicitRestrictedFilter) {
+    filters.push({ $nor: [buildRegionRestrictedJobFilter()] });
+  }
+  if (eligibilityScope) {
+    filters.push(buildEligibilityScopeFilter(String(eligibilityScope)));
+  }
+  if (timezonePolicy) {
+    filters.push(buildTimezonePolicyFilter(String(timezonePolicy)));
+  }
   const keyword = String(q || search || '').trim();
 
   if (keyword) {
@@ -379,7 +410,9 @@ export const getJobs = asyncHandler(async (req, res) => {
     const cursorPriority = Number(cursorValue.priority);
     if (!mongoose.isValidObjectId(cursorValue.id)
       || Number.isNaN(cursorDate.getTime())
-      || ![0, 1, 2].includes(cursorPriority)) {
+      || !Number.isInteger(cursorPriority)
+      || cursorPriority < 0
+      || cursorPriority > 16) {
       res.status(400);
       throw new Error('Invalid pagination cursor');
     }
@@ -388,74 +421,62 @@ export const getJobs = asyncHandler(async (req, res) => {
   const query = { $and: filters };
   const priorityStage = {
     $addFields: {
-        source: { $ifNull: ['$source', 'employer'] },
-        workplaceType: {
-          $ifNull: [
-            '$workplaceType',
-            {
-              $cond: [
-                {
-                  $or: [
-                    { $eq: ['$isRemote', true] },
-                    { $eq: ['$jobType', 'Remote'] },
-                    { $eq: ['$isWorldwideRemote', true] },
-                  ],
-                },
-                'remote',
-                'on-site',
-              ],
-            },
-          ],
-        },
-        isDirectPosting: {
-          $cond: [
-            { $eq: [{ $ifNull: ['$source', 'employer'] }, 'employer'] },
-            { $ifNull: ['$isDirectPosting', true] },
-            false,
-          ],
-        },
-        _searchPriority: {
-        $switch: {
-          branches: [
-            {
-              case: {
-                $and: [
-                  { $eq: [{ $ifNull: ['$source', 'employer'] }, 'employer'] },
-                  { $ne: [{ $ifNull: ['$isDirectPosting', true] }, false] },
-                  {
-                    $regexMatch: {
-                      input: {
-                        $toLower: {
-                          $concat: [
-                            { $ifNull: ['$location', ''] },
-                            ' ',
-                            { $ifNull: ['$locationRestriction', ''] },
-                          ],
-                        },
-                      },
-                      regex: AFRICAN_LOCATION_PATTERN,
-                    },
-                  },
+      source: { $ifNull: ['$source', 'employer'] },
+      workplaceType: {
+        $ifNull: [
+          '$workplaceType',
+          {
+            $cond: [
+              {
+                $or: [
+                  { $eq: ['$isRemote', true] },
+                  { $eq: ['$jobType', 'Remote'] },
+                  { $eq: ['$isWorldwideRemote', true] },
                 ],
               },
-              then: 2,
-            },
-            {
-              case: {
-                $and: [
-                  { $eq: [{ $ifNull: ['$source', 'employer'] }, 'employer'] },
-                  { $ne: [{ $ifNull: ['$isDirectPosting', true] }, false] },
-                ],
-              },
-              then: 1,
-            },
-          ],
-          default: 0,
-        },
+              'remote',
+              'on-site',
+            ],
+          },
+        ],
+      },
+      isDirectPosting: {
+        $cond: [
+          { $eq: [{ $ifNull: ['$source', 'employer'] }, 'employer'] },
+          { $ifNull: ['$isDirectPosting', true] },
+          false,
+        ],
+      },
+      _searchPriority: {
+        $cond: [
+          {
+            $and: [
+              { $eq: [{ $ifNull: ['$source', 'employer'] }, 'employer'] },
+              { $ne: [{ $ifNull: ['$isDirectPosting', true] }, false] },
+            ],
+          },
+          1,
+          0,
+        ],
       },
     },
   };
-  const pipeline = [{ $match: query }, priorityStage, ...jobDeduplicationStages()];
+  const regionalPriorityStage = {
+    $addFields: {
+      _searchPriority: {
+        $add: [
+          { $multiply: [africaRelevanceExpression(), 3] },
+          { $ifNull: ['$_searchPriority', 0] },
+        ],
+      },
+    },
+  };
+  const pipeline = [
+    { $match: query },
+    priorityStage,
+    regionalPriorityStage,
+    ...jobDeduplicationStages(),
+  ];
   if (cursorValue) {
     const cursorDate = new Date(cursorValue.createdAt);
     const cursorPriority = Number(cursorValue.priority);
@@ -527,7 +548,7 @@ export const getJobs = asyncHandler(async (req, res) => {
     : null;
 
   res.status(200).json({
-    jobs,
+    jobs: jobs.map((job) => ({ ...job, ...deriveJobSignals(job) })),
     page: pageNumber,
     limit: pageSize,
     total,
@@ -553,7 +574,8 @@ export const getJobById = asyncHandler(async (req, res) => {
   }
   const job = await Job.findById(id).populate('postedBy', 'name email');
   if (job) {
-    res.status(200).json(job);
+    const jobData = job.toObject({ virtuals: true });
+    res.status(200).json({ ...jobData, ...deriveJobSignals(jobData) });
   } else {
     res.status(404);
     throw new Error('Job not found');
@@ -648,6 +670,7 @@ export const createJob = asyncHandler(async (req, res) => {
     jobType, 
     workplaceType,
     salaryRange, 
+    salaryCurrency,
     description, 
     fullDescription,
     requirements,
@@ -672,6 +695,20 @@ export const createJob = asyncHandler(async (req, res) => {
     throw new Error('Workplace type must be remote, hybrid, or on-site');
   }
 
+  const descriptionText = fullDescription || description;
+  const jobSignals = deriveJobSignals({
+    location,
+    locationRestriction: location,
+    workplaceType: normalizedWorkplaceType,
+    isRemote: normalizedWorkplaceType === 'remote',
+    isWorldwideRemote: normalizedWorkplaceType === 'remote'
+      && /\b(worldwide|global(?:ly)?|anywhere|any location)\b/i.test(location),
+    description: descriptionText,
+    requirements,
+    qualifications,
+    responsibilities,
+    benefits,
+  });
   const job = await Job.create({
     title,
     companyName: req.user.companyName,
@@ -687,10 +724,12 @@ export const createJob = asyncHandler(async (req, res) => {
     isDirectPosting: true,
     isRemote: normalizedWorkplaceType === 'remote',
     isWorldwideRemote: normalizedWorkplaceType === 'remote'
-      && /\b(worldwide|global(?:ly)?|anywhere|africa)\b/i.test(location),
+      && /\b(worldwide|global(?:ly)?|anywhere|any location)\b/i.test(location),
     salaryRange,
-    description: fullDescription || description,
-    fullDescription: fullDescription || description,
+    salaryCurrency: extractSalaryCurrency(salaryCurrency, salaryRange),
+    ...jobSignals,
+    description: descriptionText,
+    fullDescription: descriptionText,
     requirements,
     qualifications,
     responsibilities,
@@ -732,12 +771,17 @@ export const updateJob = asyncHandler(async (req, res) => {
     job.workplaceType = normalizedWorkplaceType;
     job.isRemote = normalizedWorkplaceType === 'remote';
     job.isWorldwideRemote = normalizedWorkplaceType === 'remote'
-      && /\b(worldwide|global(?:ly)?|anywhere|africa)\b/i.test(job.location);
+      && /\b(worldwide|global(?:ly)?|anywhere|any location)\b/i.test(job.location);
   } else if (req.body.location !== undefined) {
     job.isWorldwideRemote = job.isRemote
-      && /\b(worldwide|global(?:ly)?|anywhere|africa)\b/i.test(job.location);
+      && /\b(worldwide|global(?:ly)?|anywhere|any location)\b/i.test(job.location);
   }
-  job.salaryRange = req.body.salaryRange || job.salaryRange;
+  if (req.body.salaryRange !== undefined) {
+    job.salaryRange = req.body.salaryRange || job.salaryRange;
+    job.salaryCurrency = extractSalaryCurrency(req.body.salaryCurrency, job.salaryRange);
+  } else if (req.body.salaryCurrency !== undefined) {
+    job.salaryCurrency = extractSalaryCurrency(req.body.salaryCurrency, job.salaryRange);
+  }
   job.description = req.body.fullDescription || req.body.description || job.description;
   job.fullDescription = req.body.fullDescription || req.body.description || job.fullDescription || job.description;
   job.requirements = req.body.requirements || job.requirements;
@@ -749,6 +793,13 @@ export const updateJob = asyncHandler(async (req, res) => {
     job.expiryDate = parseOptionalExpiryDate(req.body.expiryDate, res);
   }
   job.applicationEmail = req.body.applicationEmail || job.applicationEmail;
+  const jobSignals = deriveJobSignals({
+    ...job.toObject(),
+    eligibilityScope: undefined,
+    timezonePolicy: undefined,
+  });
+  job.eligibilityScope = jobSignals.eligibilityScope;
+  job.timezonePolicy = jobSignals.timezonePolicy;
 
   const updatedJob = await job.save();
   res.status(200).json(updatedJob);

@@ -5,6 +5,7 @@ import api from "../services/api";
 import PageBreadcrumb from "../components/PageBreadcrumb";
 import ExternalJobLink from "../components/ExternalJobLink";
 import { updatePageMetadata } from "../utils/pageMetadata";
+import { formatSalaryLabel } from "../utils/salaryDisplay";
 
 const normalizeJobText = (value) => String(value || "")
   .replace(/<br\s*\/?>/gi, "\n")
@@ -93,14 +94,14 @@ const JobDetails = () => {
   const [fitError, setFitError] = useState("");
   const tailoredCvId = new URLSearchParams(location.search).get("tailoredCvId") || "";
   const jobId = job?._id;
-  const salaryLabel = [job?.salary, job?.salaryRange]
-    .map((value) => String(value || "").trim())
-    .find(Boolean) || "Not specified";
-  const workMode = {
-    remote: "Remote",
-    hybrid: "Hybrid",
-    "on-site": "On-site",
-  }[job?.workplaceType] || "";
+  const salaryLabel = formatSalaryLabel(job) || "Not specified";
+  const workMode = job?.isRemote || job?.isWorldwideRemote || job?.jobType === "Remote"
+    ? "Remote"
+    : ({
+      remote: "Remote",
+      hybrid: "Hybrid",
+      "on-site": "On-site",
+    }[job?.workplaceType] || "");
   const postedDate = job?.pubDate || job?.createdAt;
   const postedTimestamp = postedDate ? new Date(postedDate).getTime() : Number.NaN;
   const postedDays = Number.isNaN(postedTimestamp)
@@ -109,7 +110,8 @@ const JobDetails = () => {
   const sourceLabel = job?.sourceName || job?.sourceProvider || (job?.source === "employer" ? "Direct employer" : "External source");
   const isExternalListing = job?.source !== "employer" && job?.isDirectPosting !== true;
   const remoteScope = job?.locationRestriction || job?.location || "";
-  const isGlobalRemote = /\b(worldwide|global(?:ly)?|anywhere|any location)\b/i.test(remoteScope);
+  const isGlobalRemote = job?.eligibilityScope === "worldwide"
+    || /\b(worldwide|global(?:ly)?|anywhere|any location)\b/i.test(remoteScope);
   const remoteEligibilityLabel = isGlobalRemote
     ? "Global"
     : remoteScope && !/\bremote\b/i.test(remoteScope)
@@ -118,6 +120,17 @@ const JobDetails = () => {
   const remoteEligibility = job?.isRemote || job?.workplaceType === "remote" || job?.jobType === "Remote"
     ? `Remote – ${remoteEligibilityLabel}`
     : "";
+  const eligibilityLabel = {
+    worldwide: "Worldwide / global",
+    africa_friendly: "Africa-friendly",
+    region_restricted: "Region-restricted",
+    unspecified: "Eligibility not specified",
+  }[job?.eligibilityScope] || "Eligibility not specified";
+  const timezoneLabel = {
+    africa_eu_friendly: "Africa / EU-friendly hours",
+    flexible_async: "Flexible / async",
+    specific_timezone: "Specific timezone stated",
+  }[job?.timezonePolicy];
   const descriptionParts = [job?.fullDescription, job?.description]
     .map(normalizeJobText)
     .filter((text, index, parts) => text
@@ -295,13 +308,22 @@ const JobDetails = () => {
         <p className="text-xl text-gray-700 mb-2">{job.companyName}</p>
         <div className="flex flex-wrap gap-4 mb-6 text-sm text-gray-600">
           <span>📍 {job.location}</span>
-          <span>💼 {job.jobType}{workMode && job.jobType !== workMode ? ` · ${workMode}` : ""}</span>
+          <span>💼 Work arrangement: {workMode || "Not specified"}</span>
           {remoteEligibility && <span>{remoteEligibility}</span>}
+          <span className={job.eligibilityScope === "region_restricted" ? "font-semibold text-rose-800" : "font-semibold text-emerald-800"}>
+            Eligibility: {eligibilityLabel}
+          </span>
+          {timezoneLabel && <span>Timezone: {timezoneLabel}</span>}
+          {job.jobType && job.jobType !== "Remote" && <span>Employment: {job.jobType}</span>}
           <span>💰 Compensation: {salaryLabel}</span>
           {job.seniority && <span>Seniority: {job.seniority}</span>}
           {job.categories?.length > 0 && <span>Category: {job.categories.join(", ")}</span>}
           {postedDays !== null && <span>Posted {postedDays} {postedDays === 1 ? "day" : "days"} ago</span>}
-          <span>Source: {sourceLabel}</span>
+          <span className={`rounded-full px-3 py-1 font-semibold ${
+            isExternalListing ? "bg-amber-100 text-amber-950" : "bg-emerald-100 text-emerald-950"
+          }`}>
+            {isExternalListing ? `Aggregated · ${sourceLabel}` : "Direct employer posting"}
+          </span>
           {job.expiryDate && (
             <span>
               ⏰ Apply by: {new Date(job.expiryDate).toLocaleDateString()}

@@ -2,6 +2,8 @@ import axios from 'axios';
 import { createHash } from 'node:crypto';
 import Job from '../models/Job.js';
 import { cleanHtmlSnippet } from '../utils/sanitizer.js';
+import { deriveJobSignals } from '../utils/jobSignals.js';
+import { extractSalaryCurrency } from '../utils/salary.js';
 
 const HIMALAYAS_API = 'https://himalayas.app/jobs/api/search';
 const REMOTIVE_API = 'https://remotive.com/api/remote-jobs';
@@ -120,8 +122,7 @@ export const normalizeRemoteJob = (sourceName, rawJob) => {
       || rawJob.sourceUrl || rawJob.source_url || rawJob.jobUrl,
   );
 
-  if (!companyName || !title || !description || !sourceUrl || !applicationLink
-    || !isWorldwideOnly(location)) return null;
+  if (!companyName || !title || !description || !sourceUrl || !applicationLink) return null;
 
   const pubDate = asDate(rawJob.pubDate || rawJob.publication_date || rawJob.date || rawJob.createdAt) || new Date();
   const expiryDate = asDate(rawJob.expiryDate || rawJob.expiry_date);
@@ -131,9 +132,10 @@ export const normalizeRemoteJob = (sourceName, rawJob) => {
     || companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   const sourceKey = sourceIdentity(sourceName, rawJob, companyName, companySlug, title, location, sourceUrl);
   const workplaceType = 'remote';
-  const salary = asText(rawJob.salary || rawJob.salaryRange || rawJob.salary_range);
+  const salarySource = rawJob.salary || rawJob.salaryRange || rawJob.salary_range;
+  const salary = asText(salarySource);
 
-  return {
+  const normalized = {
     sourceKey,
     source: 'aggregated',
     sourceProvider: sourceName.toLowerCase(),
@@ -141,7 +143,7 @@ export const normalizeRemoteJob = (sourceName, rawJob) => {
     sourceUrl,
     isDirectPosting: false,
     isRemote: true,
-    isWorldwideRemote: true,
+    isWorldwideRemote: isWorldwideOnly(location),
     workplaceType,
     title,
     companyName,
@@ -156,12 +158,17 @@ export const normalizeRemoteJob = (sourceName, rawJob) => {
     seniority: asText(rawJob.seniority || rawJob.experience),
     salary,
     salaryRange: salary || 'Competitive',
+    salaryCurrency: extractSalaryCurrency(
+      rawJob.salaryCurrency || rawJob.salary_currency,
+      salarySource,
+    ),
     categories: Array.isArray(rawJob.categories) ? rawJob.categories.map(asText).filter(Boolean) : [],
     tags: Array.isArray(rawJob.tags) ? rawJob.tags.map(asText).filter(Boolean) : [],
     expiryDate,
     isApproved: true,
     isActive: true,
   };
+  return { ...normalized, ...deriveJobSignals(normalized) };
 };
 
 const getHimalayasJobs = (payload) => {

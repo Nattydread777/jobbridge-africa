@@ -20,6 +20,15 @@ const jobSchema = new mongoose.Schema({
     },
   },
   salaryRange: { type: String, default: 'Competitive' },
+  salaryCurrency: { type: String, trim: true, uppercase: true, maxlength: 3 },
+  eligibilityScope: {
+    type: String,
+    enum: ['worldwide', 'africa_friendly', 'region_restricted', 'unspecified'],
+  },
+  timezonePolicy: {
+    type: String,
+    enum: ['africa_eu_friendly', 'flexible_async', 'specific_timezone', 'unspecified'],
+  },
   description: { type: String, required: true },
   fullDescription: { type: String, default: '' },
   requirements: { type: String }, // Changed from array to string for easier text input

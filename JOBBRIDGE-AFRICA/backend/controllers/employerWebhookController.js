@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import asyncHandler from 'express-async-handler';
 import { load } from 'cheerio';
 import Job from '../models/Job.js';
+import { deriveJobSignals } from '../utils/jobSignals.js';
+import { extractSalaryCurrency } from '../utils/salary.js';
 
 const MAX_JOBS_PER_REQUEST = 50;
 const MAX_TITLE_LENGTH = 300;
@@ -171,7 +173,7 @@ export const normalizeWebhookJobPayload = (rawJob, employer, index = 0) => {
   const companyName = employer.companyName || employer.name;
   const companySlug = companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-  return {
+  const normalized = {
     sourceKey,
     title,
     description,
@@ -183,11 +185,15 @@ export const normalizeWebhookJobPayload = (rawJob, employer, index = 0) => {
     location,
     workplaceType,
     isRemote: workplaceType === 'remote',
-    isWorldwideRemote: workplaceType === 'remote' && /\b(worldwide|global(?:ly)?|anywhere|africa)\b/i.test(location),
+    isWorldwideRemote: workplaceType === 'remote' && /\b(worldwide|global(?:ly)?|anywhere|any location)\b/i.test(location),
     jobType,
     department,
     salary,
     salaryRange: salary || 'Competitive',
+    salaryCurrency: extractSalaryCurrency(
+      rawJob.salaryCurrency || rawJob.salary_currency,
+      rawJob.salaryRange || rawJob.salary || rawJob.compensation || rawJob.baseSalary,
+    ),
     expiryDate,
     pubDate: parseDate(
       rawJob.pubDate || rawJob.datePosted || rawJob.createdAt || jobPostingInfo.startDate,
@@ -203,6 +209,7 @@ export const normalizeWebhookJobPayload = (rawJob, employer, index = 0) => {
     isDirectPosting: true,
     isApproved: true,
   };
+  return { ...normalized, ...deriveJobSignals(normalized) };
 };
 
 export const ingestEmployerWebhookJobs = asyncHandler(async (req, res) => {
