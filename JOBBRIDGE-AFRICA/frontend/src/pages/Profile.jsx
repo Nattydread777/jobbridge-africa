@@ -3,7 +3,11 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../services/api";
 import africaLocations from "../data/jobLocations";
-import { extractResumeText, parseResumeText } from "../utils/resumeParser";
+import {
+  extractResumeText,
+  mapParsedResumeToProfile,
+  parseResumeText,
+} from "../utils/resumeParser";
 
 // Common skills database for AI matching
 const COMMON_SKILLS = [
@@ -167,6 +171,17 @@ const SKILL_GROUPS = [
   ["tools", "Tools / platforms"],
   ["technical", "Technical / analytics"],
 ];
+const PROFILE_SECTIONS = [
+  ["basic", "Overview"],
+  ["experience", "Experience"],
+  ["education", "Education"],
+  ["skills", "Skills"],
+  ["credentials", "Certifications & Projects"],
+  ["preferences", "Work Preferences"],
+  ["resume", "Resume Management"],
+  ["photo", "Profile Photo"],
+  ["alerts", "Job Alerts"],
+];
 const uniqueValues = (values) => [...new Set((values || [])
   .filter((value) => typeof value === "string" && value.trim())
   .map((value) => value.trim()))];
@@ -255,6 +270,7 @@ const Profile = () => {
   const [jobDigestStatus, setJobDigestStatus] = useState(null);
   const [jobDigestSubmitting, setJobDigestSubmitting] = useState(false);
   const [profileSaveStatus, setProfileSaveStatus] = useState(null);
+  const [profileSaving, setProfileSaving] = useState(false);
   const [targetRolesText, setTargetRolesText] = useState("");
   const [preferredLocationsText, setPreferredLocationsText] = useState("");
   const [parsing, setParsing] = useState(false);
@@ -279,23 +295,21 @@ const Profile = () => {
       setParsing(true);
 
       try {
-        const parsedData = parseResumeText(await extractResumeText(file));
-        const nextProfile = {
-          ...profile,
-          name: parsedData.name || profile.name,
-          email: parsedData.email || profile.email,
-          phone: parsedData.phone || profile.phone,
-          bio: parsedData.bio || profile.bio,
-          skills: [...new Set([...profile.skills, ...parsedData.skills])],
-          skillGroups: normalizeSkillGroups(profile.skillGroups, [
-            ...profile.skills,
-            ...parsedData.skills,
-          ]),
-          education: parsedData.education.length ? parsedData.education : profile.education,
-          experience: parsedData.experience.length ? parsedData.experience : profile.experience,
-          certifications: parsedData.certifications?.length ? parsedData.certifications : profile.certifications,
-        };
+        const extension = file.name.split(".").pop()?.toLowerCase();
+        let resumeText;
+        if (extension === "doc") {
+          const formData = new FormData();
+          formData.append("resume", file);
+          const { data } = await api.post("/auth/parse-legacy-resume", formData);
+          resumeText = data.text;
+        } else {
+          resumeText = await extractResumeText(file);
+        }
+        const parsedData = parseResumeText(resumeText);
+        const nextProfile = mapParsedResumeToProfile(parsedData, profile, africaLocations);
         setProfile(nextProfile);
+        setTargetRolesText((nextProfile.workPreferences.targetRoles || []).join(", "));
+        setPreferredLocationsText((nextProfile.workPreferences.preferredLocations || []).join(", "));
         const formData = new FormData();
         formData.append("resume", file);
         await api.post("/auth/upload-resume", formData);
@@ -321,7 +335,7 @@ const Profile = () => {
         setResumeFile(null);
         if (resumeInputRef.current) resumeInputRef.current.value = "";
         setActiveTab("basic");
-        alert("Resume uploaded and readable profile details were prefilled. Review and save your profile.");
+        alert("Resume uploaded. Readable profile details were extracted and saved across your profile sections.");
       } catch (error) {
         console.error("Error uploading resume:", error);
         alert(error.response?.data?.message || error.message || "Failed to upload or read resume");
@@ -517,6 +531,7 @@ const Profile = () => {
 
   const handleSaveProfile = async () => {
     setProfileSaveStatus(null);
+    setProfileSaving(true);
     try {
       const { data: savedProfile } = await api.put("/auth/profile", {
         name: profile.name,
@@ -545,10 +560,22 @@ const Profile = () => {
       setResumeFile(null);
       if (resumeInputRef.current) resumeInputRef.current.value = "";
       setProfileImagePreview(saved.profileImageUrl || null);
-      setProfileSaveStatus({ type: "success", message: "Profile saved successfully." });
+      const currentIndex = PROFILE_SECTIONS.findIndex(([tab]) => tab === activeTab);
+      const nextSection = PROFILE_SECTIONS[currentIndex + 1];
+      if (nextSection) {
+        setActiveTab(nextSection[0]);
+        setProfileSaveStatus({
+          type: "success",
+          message: `Profile saved. Moving to ${nextSection[1]}.`,
+        });
+      } else {
+        setProfileSaveStatus({ type: "success", message: "Profile saved successfully." });
+      }
     } catch (error) {
       console.error("Error saving profile:", error);
       setProfileSaveStatus({ type: "error", message: error.response?.data?.message || "Failed to save profile." });
+    } finally {
+      setProfileSaving(false);
     }
   };
 
@@ -721,28 +748,19 @@ const Profile = () => {
         {/* Tabs */}
         <nav aria-label="Profile sections" className="mb-6 overflow-x-auto border-b">
           <div role="tablist" className="flex min-w-max gap-5">
-            {[
-              ["basic", "Overview"],
-              ["experience", "Experience"],
-              ["education", "Education"],
-              ["skills", "Skills"],
-              ["credentials", "Certifications & Projects"],
-              ["preferences", "Work Preferences"],
-              ["resume", "Resume Management"],
-              ["photo", "Profile Photo"],
-              ["alerts", "Job Alerts"],
-            ].map(([tab, label]) => (
+            {PROFILE_SECTIONS.map(([tab, label]) => (
               <button
                 key={tab}
                 type="button"
                 role="tab"
                 aria-selected={activeTab === tab}
                 onClick={() => setActiveTab(tab)}
+                disabled={profileSaving}
                 className={`border-b-2 px-2 py-3 font-medium transition ${
                   activeTab === tab
                     ? "border-primary text-primary"
                     : "border-transparent text-gray-600 hover:text-gray-800"
-                }`}
+                } disabled:cursor-wait disabled:opacity-60`}
               >
                 {label}
               </button>
@@ -861,10 +879,12 @@ const Profile = () => {
 
             <div className="flex justify-end mt-8">
               <button
+                type="button"
                 onClick={handleSaveProfile}
+                disabled={profileSaving}
                 className="bg-secondary text-white px-6 py-2 rounded hover:bg-green-700 font-semibold"
               >
-                Save Changes
+                {profileSaving ? "Saving..." : "Save Changes"}
               </button>
             </div>
           </div>
@@ -1063,10 +1083,12 @@ const Profile = () => {
               </div>
               <div className="flex gap-3">
                 <button
+                  type="button"
                   onClick={handleSaveProfile}
+                  disabled={profileSaving}
                   className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 transition"
                 >
-                  Save Changes
+                  {profileSaving ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </div>
@@ -1171,10 +1193,12 @@ const Profile = () => {
             )}
             <div className="flex gap-3 mt-6">
               <button
+                type="button"
                 onClick={handleSaveProfile}
+                disabled={profileSaving}
                 className="bg-primary text-white px-6 py-2 rounded hover:bg-yellow-600 transition ml-auto"
               >
-                Save Changes
+                {profileSaving ? "Saving..." : "Save Changes"}
               </button>
             </div>
           </div>
@@ -1289,10 +1313,12 @@ const Profile = () => {
             )}
             <div className="flex gap-3 mt-6">
               <button
+                type="button"
                 onClick={handleSaveProfile}
+                disabled={profileSaving}
                 className="bg-primary text-white px-6 py-2 rounded hover:bg-yellow-600 transition ml-auto"
               >
-                Save Changes
+                {profileSaving ? "Saving..." : "Save Changes"}
               </button>
             </div>
           </div>
@@ -1393,10 +1419,12 @@ const Profile = () => {
             </div>
             <div className="flex gap-3 mt-6">
               <button
+                type="button"
                 onClick={handleSaveProfile}
+                disabled={profileSaving}
                 className="bg-primary text-white px-6 py-2 rounded hover:bg-yellow-600 transition ml-auto"
               >
-                Save Changes
+                {profileSaving ? "Saving..." : "Save Changes"}
               </button>
             </div>
           </div>
@@ -1455,7 +1483,7 @@ const Profile = () => {
               </div>
             </section>
             <div className="flex justify-end border-t pt-5">
-              <button type="button" onClick={handleSaveProfile} className="rounded bg-primary px-6 py-2 font-semibold text-white hover:bg-yellow-600">Save Changes</button>
+              <button type="button" onClick={handleSaveProfile} disabled={profileSaving} className="rounded bg-primary px-6 py-2 font-semibold text-white hover:bg-yellow-600 disabled:opacity-60">{profileSaving ? "Saving..." : "Save Changes"}</button>
             </div>
           </div>
         )}
@@ -1481,7 +1509,7 @@ const Profile = () => {
             <label className="grid gap-1 text-sm font-semibold">Preferred locations <span className="font-normal text-gray-500">Separate cities or countries with commas.</span><input value={preferredLocationsText} onChange={(event) => { setPreferredLocationsText(event.target.value); setProfile((current) => ({ ...current, workPreferences: { ...current.workPreferences, preferredLocations: commaSeparatedValues(event.target.value) } })); }} className="rounded border px-3 py-2 font-normal" placeholder="Lagos, Nigeria" /></label>
             <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={profile.workPreferences.willingToRelocate} onChange={(event) => setProfile((current) => ({ ...current, workPreferences: { ...current.workPreferences, willingToRelocate: event.target.checked } }))} /><span>Open to relocation</span></label>
             <div className="flex justify-end border-t pt-5">
-              <button type="button" onClick={handleSaveProfile} className="rounded bg-primary px-6 py-2 font-semibold text-white hover:bg-yellow-600">Save Changes</button>
+              <button type="button" onClick={handleSaveProfile} disabled={profileSaving} className="rounded bg-primary px-6 py-2 font-semibold text-white hover:bg-yellow-600 disabled:opacity-60">{profileSaving ? "Saving..." : "Save Changes"}</button>
             </div>
           </section>
         )}
@@ -1561,12 +1589,7 @@ const Profile = () => {
             </div>
             <div className="flex gap-3 mt-6">
               <button
-                onClick={() => setActiveTab("skills")}
-                className="bg-gray-600 text-white px-6 py-2 rounded hover:bg-gray-700 transition"
-              >
-                ← Back
-              </button>
-              <button
+                type="button"
                 onClick={() => navigate("/dashboard")}
                 className="bg-primary text-white px-6 py-2 rounded hover:bg-yellow-600 transition ml-auto"
               >
@@ -1575,6 +1598,35 @@ const Profile = () => {
             </div>
           </div>
         )}
+        <nav aria-label="Profile section navigation" className="mt-6 flex items-center justify-between gap-4 rounded-lg border bg-white p-4 shadow-sm">
+          <button
+            type="button"
+            onClick={() => {
+              const index = PROFILE_SECTIONS.findIndex(([tab]) => tab === activeTab);
+              if (index > 0) setActiveTab(PROFILE_SECTIONS[index - 1][0]);
+              setProfileSaveStatus(null);
+            }}
+            disabled={profileSaving || activeTab === PROFILE_SECTIONS[0][0]}
+            className="rounded border border-slate-300 px-4 py-2 font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            ← Previous
+          </button>
+          <span className="text-center text-sm text-slate-500">
+            Section {PROFILE_SECTIONS.findIndex(([tab]) => tab === activeTab) + 1} of {PROFILE_SECTIONS.length}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              const index = PROFILE_SECTIONS.findIndex(([tab]) => tab === activeTab);
+              if (index < PROFILE_SECTIONS.length - 1) setActiveTab(PROFILE_SECTIONS[index + 1][0]);
+              setProfileSaveStatus(null);
+            }}
+            disabled={profileSaving || activeTab === PROFILE_SECTIONS[PROFILE_SECTIONS.length - 1][0]}
+            className="rounded bg-primary px-4 py-2 font-semibold text-white hover:bg-yellow-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Next →
+          </button>
+        </nav>
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ import {
     updateUserProfile,
   uploadProfileImage,
     uploadResume,
+  parseLegacyResume,
     deleteMyCvData,
     deleteMyAccount,
     bootstrapAdmin
@@ -37,6 +38,13 @@ const upload = multer({
     }
   },
 });
+const legacyResumeParseLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { message: 'Too many resume parsing requests. Please wait before trying again.' },
+});
 const resumeUpload = multer({
   storage,
   limits: { fileSize: 10 * 1024 * 1024 },
@@ -47,7 +55,9 @@ const resumeUpload = multer({
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
     ];
-    if (allowedTypes.includes(file.mimetype)) cb(null, true);
+    const legacyDocWithGenericMime = file.originalname.toLowerCase().endsWith('.doc')
+      && ['', 'application/octet-stream', 'application/x-msword'].includes(file.mimetype);
+    if (allowedTypes.includes(file.mimetype) || legacyDocWithGenericMime) cb(null, true);
     else cb(new Error('Resume must be a PDF, DOC, DOCX, or TXT file.'));
   },
 });
@@ -82,6 +92,7 @@ router.post('/logout', logoutUser);
 router.get('/me', protect, getUserProfile); // Uses the 'protect' middleware to ensure a user is logged in
 router.put('/profile', protect, updateUserProfile); // Update user profile
 router.post('/upload-profile-image', protect, upload.single('profileImage'), uploadProfileImage); // Upload profile image
+router.post('/parse-legacy-resume', protect, legacyResumeParseLimiter, resumeUpload.single('resume'), parseLegacyResume);
 router.post('/upload-resume', protect, resumeUpload.single('resume'), uploadResume);
 router.delete('/cv-data', protect, deleteMyCvData);
 router.delete('/account', protect, deleteMyAccount);

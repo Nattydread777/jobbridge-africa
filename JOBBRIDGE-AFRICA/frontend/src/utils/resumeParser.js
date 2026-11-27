@@ -9,6 +9,26 @@ const SKILL_TERMS = [
   "Tableau", "Salesforce", "SEO", "Express.js", "Next.js", "Angular",
   "Vue.js", "WordPress", "Customer Service",
 ];
+const TECHNICAL_SKILLS = new Set([
+  "javascript", "typescript", "python", "java", "c++", "c#", "php", "ruby",
+  "go", "rust", "react", "angular", "vue.js", "node.js", "express.js", "next.js",
+  "django", "flask", "laravel", "mongodb", "mysql", "postgresql", "redis",
+  "machine learning", "data analysis", "sql", "html", "css", "cybersecurity",
+]);
+const TOOL_SKILLS = new Set([
+  "aws", "azure", "google cloud", "docker", "kubernetes", "git", "linux",
+  "figma", "excel", "power bi", "tableau", "salesforce", "wordpress",
+]);
+const classifySkills = (skills) => skills.reduce((groups, skill) => {
+  const normalized = skill.toLowerCase();
+  const group = TECHNICAL_SKILLS.has(normalized)
+    ? "technical"
+    : TOOL_SKILLS.has(normalized)
+      ? "tools"
+      : "core";
+  groups[group].push(skill);
+  return groups;
+}, { core: [], tools: [], technical: [] });
 
 export const extractResumeText = async (file) => {
   const extension = file.name.split(".").pop()?.toLowerCase();
@@ -117,6 +137,7 @@ const RESUME_HEADINGS = [
   ["education", /^(?:education|academic background|qualifications)$/i],
   ["certifications", /^(?:certifications?|licenses?|professional development|training|courses|coursework|programs|programmes)$/i],
   ["projects", /^(?:selected\s+)?projects?$/i],
+  ["preferences", /^(?:work\s+)?(?:preferences|career\s+interests|target\s+roles?|roles?\s+of\s+interest)$/i],
   ["coverLetter", /^(?:cover letter|letter of motivation)$/i],
 ];
 
@@ -223,7 +244,8 @@ const parseExperienceItems = (lines) => {
       current.bullets.push(line);
     }
   }
-  return items.filter((item) => item.title || item.company || item.dates || item.bullets.length);
+  return items.filter((item) => item.title || item.company || item.dates || item.bullets.length)
+    .map((item) => ({ ...item, bullets: item.bullets.filter(Boolean) }));
 };
 
 const splitSkillLines = (lines) => [...new Set(
@@ -231,6 +253,81 @@ const splitSkillLines = (lines) => [...new Set(
     .map((line) => cleanBullet(line).replace(/[.]+$/g, "").trim())
     .filter((line) => line && line.length <= 80),
 )];
+
+const parseEducationItems = (lines) => {
+  const cleanLines = lines.map(cleanBullet).filter(Boolean);
+  const degreeLines = cleanLines.filter((line) =>
+    /\b(?:bachelor|master|doctor|ph\.?d|b\.?sc|m\.?sc|mba|diploma|degree)\b/i.test(line),
+  );
+  const schoolLines = cleanLines.filter((line) =>
+    /\b(?:university|college|institute|school|polytechnic)\b/i.test(line),
+  );
+  const years = cleanLines.join(" ").match(/\b(?:19|20)\d{2}\b/g) || [];
+  return degreeLines.map((degree, index) => {
+    const degreeWithoutYears = degree.replace(/\b(?:19|20)\d{2}\b/g, "").trim();
+    const field = degreeWithoutYears
+      .replace(/^(?:bachelor(?:'s)?|master(?:'s)?|doctor(?:ate)?|ph\.?d|b\.?sc|m\.?sc|mba|diploma|degree)\s*(?:of|in)?\s*/i, "")
+      .trim();
+    const yearIndex = Math.min(index * 2, Math.max(years.length - 1, 0));
+    return {
+      school: schoolLines[index] || schoolLines[0] || "",
+      degree: degreeWithoutYears,
+      field,
+      startYear: years[yearIndex] || "",
+      endYear: years[yearIndex + 1] || years[yearIndex] || "",
+    };
+  }).filter((item) => item.school || item.degree);
+};
+
+const parseProjectItems = (lines) => {
+  const projects = [];
+  for (const rawLine of lines) {
+    const line = cleanBullet(rawLine);
+    if (!line) continue;
+    if (isBullet(rawLine)) {
+      if (projects.length) {
+        projects.at(-1).description = [projects.at(-1).description, line]
+          .filter(Boolean).join("\n");
+      }
+      continue;
+    }
+    const url = line.match(/https?:\/\/\S+/i)?.[0] || "";
+    const text = line.replace(/https?:\/\/\S+/ig, "").replace(/^[-|:,\s]+|[-|:,\s]+$/g, "").trim();
+    const [name, ...descriptionParts] = text.split(/:\s+|\s+[|–—]\s+/).map((part) => part.trim());
+    if (name) projects.push({ name, description: descriptionParts.join(" "), url });
+  }
+  return projects.filter((project) => project.name);
+};
+
+const parseWorkPreferences = (lines) => {
+  const targetRoles = [];
+  const preferredLocations = [];
+  let currentPreference = "";
+  for (const line of lines) {
+    const roleMatch = line.match(/^(?:target\s+roles?|desired\s+(?:roles?|positions?)|roles?\s+of\s+interest)\s*:?\s*(.*)$/i);
+    const locationMatch = line.match(/^(?:preferred\s+locations?|desired\s+locations?)\s*:?\s*(.*)$/i);
+    if (roleMatch) {
+      currentPreference = "roles";
+      if (roleMatch[1]) targetRoles.push(...roleMatch[1].split(/[,;|]/));
+      continue;
+    }
+    if (locationMatch) {
+      currentPreference = "locations";
+      if (locationMatch[1]) preferredLocations.push(...locationMatch[1].split(/[;|]/));
+      continue;
+    }
+    if (RESUME_HEADINGS.some(([, pattern]) => pattern.test(line))) {
+      currentPreference = "";
+      continue;
+    }
+    if (currentPreference === "roles") targetRoles.push(...line.split(/[,;|]/));
+    if (currentPreference === "locations") preferredLocations.push(...line.split(/[;|]/));
+  }
+  return {
+    targetRoles: [...new Set(targetRoles.map((value) => value.trim()).filter(Boolean))],
+    preferredLocations: [...new Set(preferredLocations.map((value) => value.trim()).filter(Boolean))],
+  };
+};
 
 export const splitResumeSections = (sourceText) => {
   const normalizedText = normalizeResumeText(sourceText);
@@ -245,6 +342,7 @@ export const splitResumeSections = (sourceText) => {
     education: [],
     certifications: [],
     projects: [],
+    preferences: [],
     other: [],
     coverLetter: [],
   };
@@ -287,9 +385,12 @@ export const splitResumeSections = (sourceText) => {
       contact: parseContactHeader(sections.header),
       summary: sections.summary.join("\n"),
       skills: structuredSkills.length ? structuredSkills : detectedSkills,
+      skillGroups: classifySkills(structuredSkills.length ? structuredSkills : detectedSkills),
       experience: parseExperienceItems(experienceLines),
-      education: educationLines,
+      education: parseEducationItems(educationLines),
       certifications: splitSkillLines(certificationLines),
+      projects: parseProjectItems(sections.projects),
+      workPreferences: parseWorkPreferences(lines),
     },
   };
 };
@@ -299,14 +400,17 @@ const parseContactHeader = (headerLines) => {
   const lines = headerLines.map((line) => line.trim()).filter(Boolean);
   const email = header.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
   const phone = header.match(/(?:\+?\d{1,3}[\s().-]?)?(?:\d[\s().-]?){7,14}\d/)?.[0] || "";
+  const locationLine = lines.find((line) => /\b(?:address|location|based in)\b/i.test(line))
+    || lines.find((line) => line.includes(",") && !line.includes("@") && !/\d{6,}/.test(line));
+  const location = locationLine?.replace(/^(?:address|location|based in)\s*[:-]?\s*/i, "") || "";
   const name = lines.find((line) => !line.includes("@") && !/\d/.test(line)
+    && line !== locationLine
     && !/^(?:curriculum vitae|resume|résumé|cv|contact)$/i.test(line)) || "";
-  const locationLine = lines.find((line) => /\b(?:address|location|based in)\b/i.test(line)) || "";
   return {
     name,
     email,
     phone,
-    location: locationLine.replace(/^(?:address|location|based in)\s*[:-]?\s*/i, ""),
+    location,
   };
 };
 
@@ -340,23 +444,6 @@ export const parseResumeText = (sourceText) => {
     new RegExp(`(^|[^a-z0-9+#])${skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9+#]|$)`, "i").test(text),
   );
 
-  const educationText = sections.education.join("\n")
-    || sectionText(text, /^(education|academic background|qualifications)\s*:?\s*$/i);
-  const schoolLine = educationText.split(/\r?\n/).find((line) =>
-    /\b(university|college|institute|school|polytechnic)\b/i.test(line),
-  );
-  const degreeLine = educationText.split(/\r?\n/).find((line) =>
-    /\b(bachelor|master|doctor|ph\.?d|b\.?sc|m\.?sc|mba|diploma|degree)\b/i.test(line),
-  );
-  const years = educationText.match(/\b(?:19|20)\d{2}\b/g) || [];
-  const education = schoolLine || degreeLine ? [{
-    school: schoolLine || "",
-    degree: degreeLine || "",
-    field: "",
-    startYear: years[0] || "",
-    endYear: years[1] || "",
-  }] : [];
-
   const experienceText = sections.experience.join("\n")
     || sectionText(text, /^(experience|work experience|employment history|work history)\s*:?\s*$/i);
   const experience = experienceText
@@ -371,12 +458,85 @@ export const parseResumeText = (sourceText) => {
     phone,
     bio: summaryText.slice(0, 1200),
     skills: foundSkills,
-    education,
+    education: sections.structured.education,
     certifications: sections.structured.certifications,
     experience,
+    projects: sections.structured.projects,
+    workPreferences: sections.structured.workPreferences,
     sections,
     structured: sections.structured,
     resumeText: sections.resumeText,
     coverLetter: sections.coverLetter,
+  };
+};
+
+const resumeDateParts = (dateRange) => {
+  const parts = String(dateRange || "").match(
+    /(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:19|20)\d{2}|present|current/gi,
+  ) || [];
+  return {
+    startDate: parts[0] || "",
+    endDate: parts[1] ? parts[1].replace(/^current$/i, "Present") : "",
+  };
+};
+
+export const mapParsedResumeToProfile = (parsedData, currentProfile, countryOptions = []) => {
+  const parsedSkills = parsedData.sections?.structured?.skills || parsedData.skills || [];
+  const parsedGroups = parsedData.sections?.structured?.skillGroups || classifySkills(parsedSkills);
+  const skillGroups = Object.fromEntries(["core", "tools", "technical"].map((group) => [
+    group,
+    [...new Set([...(currentProfile.skillGroups?.[group] || []), ...(parsedGroups[group] || [])])],
+  ]));
+  const skills = [...new Set(Object.values(skillGroups).flat())];
+  const parsedExperience = (parsedData.experience || [])
+    .map((item) => ({
+      company: item.company || "",
+      position: item.title || "",
+      location: item.location || "",
+      ...resumeDateParts(item.dates),
+      description: (item.bullets || []).filter(Boolean).join("\n"),
+    }))
+    .filter((item) => item.position && item.company && item.startDate && item.endDate && item.description);
+  const parsedEducation = (parsedData.education || [])
+    .filter((item) => item.school && item.degree);
+  const parsedCertifications = (parsedData.certifications || [])
+    .map((item) => typeof item === "string" ? { name: item, issuer: "", issueDate: "", credentialUrl: "" } : item)
+    .filter((item) => item.name);
+  const parsedProjects = (parsedData.projects || [])
+    .filter((item) => item.name);
+  const location = parsedData.sections?.structured?.contact?.location || "";
+  const matchedCountry = countryOptions.find(({ country }) =>
+    country && location.toLowerCase().includes(country.toLowerCase()),
+  )?.country;
+  const preferences = parsedData.workPreferences || {};
+  const preferredLocations = [...new Set([
+    ...(preferences.preferredLocations || []),
+    ...(!matchedCountry && location ? [location] : []),
+  ])];
+
+  return {
+    ...currentProfile,
+    name: parsedData.name || currentProfile.name,
+    email: parsedData.email || currentProfile.email,
+    phone: parsedData.phone || currentProfile.phone,
+    country: matchedCountry || currentProfile.country,
+    bio: parsedData.bio ? parsedData.bio.slice(0, 300) : currentProfile.bio,
+    skills,
+    skillGroups,
+    education: parsedEducation.length ? parsedEducation : currentProfile.education,
+    experience: parsedExperience.length ? parsedExperience : currentProfile.experience,
+    certifications: parsedCertifications.length ? parsedCertifications : currentProfile.certifications,
+    projects: parsedProjects.length ? parsedProjects : currentProfile.projects,
+    workPreferences: {
+      ...currentProfile.workPreferences,
+      targetRoles: [...new Set([
+        ...(currentProfile.workPreferences?.targetRoles || []),
+        ...(preferences.targetRoles || []),
+      ])],
+      preferredLocations: [...new Set([
+        ...(currentProfile.workPreferences?.preferredLocations || []),
+        ...preferredLocations,
+      ])],
+    },
   };
 };

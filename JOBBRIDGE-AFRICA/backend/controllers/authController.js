@@ -2,6 +2,7 @@ import asyncHandler from 'express-async-handler';
 import { createHash, randomBytes } from 'node:crypto';
 import mongoose from 'mongoose';
 import { OAuth2Client } from 'google-auth-library';
+import WordExtractor from 'word-extractor';
 import User from '../models/userModel.js';
 import generateToken from '../utils/generateToken.js';
 import cloudinary from '../config/cloudinary.js';
@@ -534,6 +535,29 @@ export const uploadResume = asyncHandler(async (req, res) => {
     resumePublicId: user.resumePublicId,
     message: 'Resume uploaded successfully.',
   });
+});
+
+export const parseLegacyResume = asyncHandler(async (req, res) => {
+  if (!req.file || !req.file.originalname.toLowerCase().endsWith('.doc')) {
+    res.status(400);
+    throw new Error('Choose a legacy Word .doc file to parse.');
+  }
+
+  let text;
+  try {
+    const document = await new WordExtractor().extract(req.file.buffer);
+    text = document.getBody().trim();
+  } catch (error) {
+    console.error('Legacy Word resume extraction failed:', error.message);
+    res.status(422);
+    throw new Error('We could not read this .doc file. Try saving it as .docx or PDF and upload it again.');
+  }
+
+  if (!text) {
+    res.status(422);
+    throw new Error('No readable text was found in this .doc file.');
+  }
+  res.status(200).json({ text });
 });
 
 export const deleteMyCvData = asyncHandler(async (req, res) => {

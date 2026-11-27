@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   extractResumeText,
+  mapParsedResumeToProfile,
   normalizeResumeText,
   parseResumeText,
   splitResumeSections,
@@ -115,6 +116,101 @@ test("core competencies, separated dates, and training records map to the right 
   assert.match(parsed.structured.experience[0].bullets[0], /MERN stack tools for and automation workflows/);
   assert.deepEqual(parsed.certifications, ["PLP Digital Skills Program", "Packt JavaScript Certificate"]);
   assert.ok(parsed.education.some((entry) => /BSc Computer Science/.test(entry.degree)));
+});
+
+test("resume data maps into complete profile records and work preferences", () => {
+  const parsed = parseResumeText([
+    "Ada Example",
+    "ada@example.com",
+    "+254 712 345 678",
+    "Location: Nairobi, Kenya",
+    "Professional Summary",
+    "Data analyst focused on clear reporting and decision support.",
+    "Skills",
+    "SQL, Excel, Project Management",
+    "Experience",
+    "Data Analyst | Acme | Nairobi | Jan 2020 - Present",
+    "- Built reporting dashboards for regional teams.",
+    "Education",
+    "University of Nairobi",
+    "BSc Computer Science | 2016 - 2020",
+    "Certifications",
+    "Power BI Data Analyst Certificate",
+    "Projects",
+    "Regional Sales Dashboard",
+    "- Built a sales dashboard for five markets.",
+    "Target Roles",
+    "Data Analyst, Business Analyst",
+    "Preferred Locations",
+    "Nairobi, Kenya; Remote",
+  ].join("\n"));
+  const mapped = mapParsedResumeToProfile(parsed, {
+    name: "",
+    email: "",
+    phone: "",
+    country: "",
+    bio: "",
+    skills: [],
+    skillGroups: { core: [], tools: [], technical: [] },
+    education: [],
+    experience: [],
+    certifications: [],
+    projects: [],
+    workPreferences: {
+      workModes: [],
+      targetRoles: [],
+      preferredLocations: [],
+      willingToRelocate: false,
+    },
+  }, [{ country: "Kenya" }, { country: "Nigeria" }]);
+
+  assert.equal(mapped.name, "Ada Example");
+  assert.equal(mapped.phone, "+254 712 345 678");
+  assert.equal(mapped.country, "Kenya");
+  assert.match(mapped.bio, /decision support/);
+  assert.deepEqual(mapped.skillGroups.technical, ["SQL"]);
+  assert.deepEqual(mapped.skillGroups.tools, ["Excel"]);
+  assert.deepEqual(mapped.skillGroups.core, ["Project Management"]);
+  assert.equal(mapped.experience[0].position, "Data Analyst");
+  assert.equal(mapped.experience[0].startDate, "Jan 2020");
+  assert.equal(mapped.experience[0].endDate, "Present");
+  assert.match(mapped.experience[0].description, /regional teams/);
+  assert.equal(mapped.education[0].school, "University of Nairobi");
+  assert.equal(mapped.education[0].endYear, "2020");
+  assert.equal(mapped.certifications[0].name, "Power BI Data Analyst Certificate");
+  assert.equal(mapped.projects[0].name, "Regional Sales Dashboard");
+  assert.match(mapped.projects[0].description, /five markets/);
+  assert.deepEqual(mapped.workPreferences.targetRoles, ["Data Analyst", "Business Analyst"]);
+  assert.deepEqual(mapped.workPreferences.preferredLocations, ["Nairobi, Kenya", "Remote"]);
+});
+
+test("incomplete experience records are not added to the profile", () => {
+  const parsed = parseResumeText([
+    "Experience",
+    "Software Engineer | Missing Dates",
+    "- Built internal tools.",
+    "2019 - 2022",
+    "Senior Developer",
+    "Example Corp",
+    "- Improved deployment workflows.",
+  ].join("\n"));
+  const mapped = mapParsedResumeToProfile(parsed, {
+    name: "",
+    email: "",
+    phone: "",
+    country: "",
+    bio: "",
+    skills: [],
+    skillGroups: { core: [], tools: [], technical: [] },
+    education: [],
+    experience: [],
+    certifications: [],
+    projects: [],
+    workPreferences: { workModes: [], targetRoles: [], preferredLocations: [], willingToRelocate: false },
+  });
+
+  assert.equal(mapped.experience.length, 1);
+  assert.equal(mapped.experience[0].position, "Senior Developer");
 });
 
 test("DOCX export uses candidate name first and leaves role headers outside bullet lists", async () => {
