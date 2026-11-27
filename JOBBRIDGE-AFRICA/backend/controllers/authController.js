@@ -18,6 +18,10 @@ import JobAlert from '../models/JobAlert.js';
 import JobOutboundClick from '../models/JobOutboundClick.js';
 import JobReport from '../models/JobReport.js';
 import TailoredCv from '../models/TailoredCv.js';
+import JobDigestDelivery from '../models/JobDigestDelivery.js';
+import { deliverJobDigestForUser } from '../services/jobDigestService.js';
+
+const JOB_ALERT_FREQUENCIES = ['instant', 'daily', 'weekly'];
 
 const clearAuthCookie = (res) => {
   const isProd = process.env.NODE_ENV === 'production';
@@ -50,6 +54,7 @@ export const registerUser = asyncHandler(async (req, res) => {
   const {
     name, email, password, role, companyName, country, phone, bio,
     skills, education, experience, termsAccepted, privacyAccepted,
+    targetRoles, jobAlertsEnabled, jobAlertFrequency,
   } = req.body;
 
   if (!name || !email || !password || !role) {
@@ -75,6 +80,32 @@ export const registerUser = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Choose a valid account type.');
   }
+  if (jobAlertsEnabled !== undefined && typeof jobAlertsEnabled !== 'boolean') {
+    res.status(400);
+    throw new Error('Job alert consent must be true or false.');
+  }
+  const alertFrequency = jobAlertFrequency === undefined ? 'daily' : jobAlertFrequency;
+  if (!JOB_ALERT_FREQUENCIES.includes(alertFrequency)) {
+    res.status(400);
+    throw new Error('Choose a valid job alert frequency.');
+  }
+  if (targetRoles !== undefined
+    && targetRoles !== null
+    && !Array.isArray(targetRoles)
+    && typeof targetRoles !== 'string') {
+    res.status(400);
+    throw new Error('Target roles must be provided as a list of titles.');
+  }
+  const normalizedTargetRoles = Array.isArray(targetRoles)
+    ? targetRoles
+    : typeof targetRoles === 'string'
+      ? targetRoles.split(',')
+      : [];
+  if (normalizedTargetRoles.length > 10
+    || normalizedTargetRoles.some((targetRole) => typeof targetRole !== 'string' || targetRole.trim().length > 80)) {
+    res.status(400);
+    throw new Error('Target roles must be up to 10 titles, each 80 characters or fewer.');
+  }
 
   const verificationToken = randomBytes(32).toString('hex');
   const acceptedAt = new Date();
@@ -96,6 +127,13 @@ export const registerUser = asyncHandler(async (req, res) => {
       skills: Array.isArray(skills) ? skills.slice(0, 100) : [],
       education: Array.isArray(education) ? education.slice(0, 20) : [],
       experience: Array.isArray(experience) ? experience.slice(0, 20) : [],
+      workPreferences: {
+        targetRoles: [...new Set(normalizedTargetRoles.map((targetRole) => targetRole.trim()).filter(Boolean))],
+      },
+      jobAlertPreferences: {
+        enabled: jobAlertsEnabled === true,
+        frequency: alertFrequency,
+      },
     }),
   });
 
@@ -165,6 +203,13 @@ export const verifyEmail = asyncHandler(async (req, res) => {
   user.emailVerificationToken = undefined;
   user.emailVerificationExpires = undefined;
   await user.save();
+  if (user.jobAlertPreferences?.enabled) {
+    try {
+      await deliverJobDigestForUser(user._id, { forceWelcome: true });
+    } catch (error) {
+      console.error(`Initial job digest failed for user ${user._id}:`, error.message);
+    }
+  }
   res.json({ message: 'Your email is verified. You can now sign in.' });
 });
 
@@ -371,6 +416,10 @@ export const getUserProfile = asyncHandler(async (req, res) => {
       certifications: req.user.certifications,
       projects: req.user.projects,
       workPreferences: req.user.workPreferences,
+      jobAlertPreferences: {
+        enabled: Boolean(req.user.jobAlertPreferences?.enabled),
+        frequency: req.user.jobAlertPreferences?.frequency || 'daily',
+      },
     });
   } else {
     res.status(404);
@@ -408,6 +457,13 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
     }
 
     const updatedUser = await user.save();
+    if (updatedUser.jobAlertPreferences?.enabled) {
+      try {
+        await deliverJobDigestForUser(updatedUser._id, { forceWelcome: true });
+      } catch (error) {
+        console.error(`Profile job digest failed for user ${updatedUser._id}:`, error.message);
+      }
+    }
 
     res.json({
       _id: updatedUser._id,
@@ -429,6 +485,10 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
       certifications: updatedUser.certifications,
       projects: updatedUser.projects,
       workPreferences: updatedUser.workPreferences,
+      jobAlertPreferences: {
+        enabled: Boolean(updatedUser.jobAlertPreferences?.enabled),
+        frequency: updatedUser.jobAlertPreferences?.frequency || 'daily',
+      },
     });
 
   } else {
@@ -581,6 +641,7 @@ export const deleteMyAccount = asyncHandler(async (req, res) => {
         { session },
       );
       await TailoredCv.deleteMany({ applicant: currentUser._id }, { session });
+      await JobDigestDelivery.deleteMany({ userId: currentUser._id }, { session });
       await ExternalApplication.deleteMany({ applicant: currentUser._id }, { session });
       await JobOutboundClick.updateMany(
         { userId: currentUser._id },

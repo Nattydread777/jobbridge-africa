@@ -1,6 +1,12 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
-import { subscribeToJobAlerts } from '../controllers/jobAlertController.js';
+import {
+  getJobDigestPreferences,
+  subscribeToJobAlerts,
+  unsubscribeFromJobDigests,
+  updateJobDigestPreferences,
+} from '../controllers/jobAlertController.js';
+import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 const subscriptionLimiter = rateLimit({
@@ -12,5 +18,8 @@ const subscriptionLimiter = rateLimit({
 });
 
 router.post('/', subscriptionLimiter, subscribeToJobAlerts);
+router.get('/preferences', protect, getJobDigestPreferences);
+router.put('/preferences', protect, updateJobDigestPreferences);
+router.post('/unsubscribe', subscriptionLimiter, unsubscribeFromJobDigests);
 
 export default router;

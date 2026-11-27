@@ -1,5 +1,6 @@
 import { useAuth } from "../context/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
+import RecommendedRoles from "../components/RecommendedRoles";
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -141,6 +142,8 @@ const Dashboard = () => {
               </div>
             )}
           </div>
+
+          <RecommendedRoles />
 
           <div className="bg-white p-6 rounded-lg shadow mb-6">
             <h2 className="text-xl font-bold mb-4">Quick Actions</h2>

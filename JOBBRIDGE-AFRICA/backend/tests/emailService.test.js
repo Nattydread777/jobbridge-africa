@@ -4,6 +4,7 @@ import {
   createPasswordResetUrl,
   isEmailConfigured,
   sendEmailVerification,
+  sendJobDigestEmail,
   sendPasswordResetEmail,
 } from '../services/emailService.js';
 
@@ -50,6 +51,65 @@ test('password reset URLs use configured frontend domains and the production def
     environmentKeys.forEach((key) => {
       if (previous[key] === undefined) delete process.env[key];
       else process.env[key] = previous[key];
+    });
+
+    test('job digest email includes structured role details and a confirmed unsubscribe URL', async () => {
+      const previous = {
+        apiKey: process.env.RESEND_API_KEY,
+        resendFrom: process.env.RESEND_FROM,
+        frontendUrl: process.env.FRONTEND_URL,
+        fetch: globalThis.fetch,
+      };
+      const messages = [];
+      process.env.RESEND_API_KEY = 'test-resend-key';
+      process.env.RESEND_FROM = 'verified@example.com';
+      process.env.FRONTEND_URL = 'https://jobbridgeafrica.com';
+      globalThis.fetch = async (url, options) => {
+        assert.equal(url, 'https://api.resend.com/emails');
+        messages.push(JSON.parse(options.body));
+        return { ok: true, json: async () => ({ id: 'digest-email' }) };
+      };
+
+      try {
+        await sendJobDigestEmail({
+          recipient: 'candidate@example.com',
+          name: 'Candidate',
+          unsubscribeUrl: 'https://jobbridgeafrica.com/unsubscribe-job-alerts?token=signed-token',
+          jobs: [{
+            score: 0.9,
+            job: {
+              _id: 'job-123',
+              title: '<Operations Manager>',
+              companyName: 'Example Co',
+              location: 'Remote, Africa',
+              workplaceType: 'remote',
+              jobType: 'Full-Time',
+              seniority: 'Mid-level',
+              salary: '70000–85000',
+              salaryCurrency: 'GBP',
+              responsibilities: 'Lead planning and delivery across regional teams.',
+              tags: ['Operations', 'Project Management'],
+              pubDate: new Date(Date.now() - 2 * 60 * 60 * 1000),
+            },
+          }],
+        });
+
+        assert.equal(messages.length, 1);
+        assert.match(messages[0].text, /Posted 2 hours ago/);
+        assert.match(messages[0].text, /70000–85000 GBP/);
+        assert.match(messages[0].text, /Project Management/);
+        assert.match(messages[0].html, /&lt;Operations Manager&gt;/);
+        assert.match(messages[0].html, /https:\/\/jobbridgeafrica\.com\/jobs\/job-123/);
+        assert.match(messages[0].html, /unsubscribe-job-alerts\?token=signed-token/);
+      } finally {
+        if (previous.apiKey === undefined) delete process.env.RESEND_API_KEY;
+        else process.env.RESEND_API_KEY = previous.apiKey;
+        if (previous.resendFrom === undefined) delete process.env.RESEND_FROM;
+        else process.env.RESEND_FROM = previous.resendFrom;
+        if (previous.frontendUrl === undefined) delete process.env.FRONTEND_URL;
+        else process.env.FRONTEND_URL = previous.frontendUrl;
+        globalThis.fetch = previous.fetch;
+      }
     });
   }
 });

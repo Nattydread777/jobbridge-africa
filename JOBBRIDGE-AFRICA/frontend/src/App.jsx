@@ -33,6 +33,7 @@ import FAQ from "./pages/FAQ";
 import RoyalMerchant from "./pages/RoyalMerchant";
 import NotFound from "./pages/NotFound";
 import VerifyEmail from "./pages/VerifyEmail";
+import UnsubscribeJobAlerts from "./pages/UnsubscribeJobAlerts";
 
 export const AppContent = () => (
   <div className="min-h-screen flex flex-col">
@@ -49,6 +50,7 @@ export const AppContent = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/verify-email/:token" element={<VerifyEmail />} />
+              <Route path="/unsubscribe-job-alerts" element={<UnsubscribeJobAlerts />} />
               <Route path="/reset-password/:token" element={<ResetPassword />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/profile-view" element={<ProfileView />} />

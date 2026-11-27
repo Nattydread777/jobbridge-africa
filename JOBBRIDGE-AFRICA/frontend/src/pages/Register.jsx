@@ -21,7 +21,7 @@ const Register = () => {
   const [searchParams] = useSearchParams();
   const [form, setForm] = useState({
     name: "", email: "", password: "", role: searchParams.get("role") === "employer" ? "employer" : "job_seeker",
-    companyName: "", country: "", phone: "", bio: "",
+    companyName: "", country: "", phone: "", bio: "", targetRoles: "",
   });
   const [resume, setResume] = useState(null);
   const [parsed, setParsed] = useState(emptyParsed);
@@ -32,6 +32,8 @@ const Register = () => {
   const [verificationSent, setVerificationSent] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [jobAlertsEnabled, setJobAlertsEnabled] = useState(false);
+  const [jobAlertFrequency, setJobAlertFrequency] = useState("daily");
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const { register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -89,6 +91,9 @@ const Register = () => {
         skills: parsed.skills,
         education: parsed.education,
         experience: parsed.experience,
+        targetRoles: form.targetRoles.split(",").map((role) => role.trim()).filter(Boolean),
+        jobAlertsEnabled,
+        jobAlertFrequency,
       } : {};
       await register({
         ...form,
@@ -227,6 +232,26 @@ const Register = () => {
               <div className="sm:col-span-2">
                 <label htmlFor="register-bio" className="mb-1.5 block text-sm font-semibold text-slate-700">Professional summary (optional)</label>
                 <textarea id="register-bio" name="bio" value={form.bio} onChange={updateField} rows={3} maxLength={1200} className="w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="A concise introduction to your experience and goals" />
+              </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="register-target-roles" className="mb-1.5 block text-sm font-semibold text-slate-700">Target roles (optional)</label>
+                <input id="register-target-roles" name="targetRoles" value={form.targetRoles} onChange={updateField} className="w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="Operations Manager, Business Analyst" />
+              </div>
+              <div className="sm:col-span-2 rounded-xl border border-slate-200 p-4">
+                <label className="flex items-start gap-3 text-sm leading-6 text-slate-700">
+                  <input type="checkbox" checked={jobAlertsEnabled} onChange={(event) => setJobAlertsEnabled(event.target.checked)} className="mt-1" />
+                  <span><strong className="block">Email me personalized role matches</strong>This is optional. We’ll only send profile-matched roles after you verify your email. Recommendations remain available on your dashboard if you leave this off.</span>
+                </label>
+                {jobAlertsEnabled && (
+                  <label htmlFor="register-alert-frequency" className="mt-3 grid gap-1 text-sm font-semibold text-slate-700">
+                    Email frequency
+                    <select id="register-alert-frequency" value={jobAlertFrequency} onChange={(event) => setJobAlertFrequency(event.target.value)} className="rounded-xl border border-slate-300 px-4 py-3 font-normal">
+                      <option value="instant">As new matches are found</option>
+                      <option value="daily">Daily digest</option>
+                      <option value="weekly">Weekly digest</option>
+                    </select>
+                  </label>
+                )}
               </div>
             </>
           )}

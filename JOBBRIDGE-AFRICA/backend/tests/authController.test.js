@@ -5,6 +5,7 @@ import Application from '../models/Application.js';
 import CvUsage from '../models/CvUsage.js';
 import ExternalApplication from '../models/ExternalApplication.js';
 import JobAlert from '../models/JobAlert.js';
+import JobDigestDelivery from '../models/JobDigestDelivery.js';
 import JobOutboundClick from '../models/JobOutboundClick.js';
 import JobReport from '../models/JobReport.js';
 import TailoredCv from '../models/TailoredCv.js';
@@ -43,6 +44,7 @@ test('deleteMyAccount anonymizes submitted applications and removes private user
     [Application, 'find', () => ({ select: async () => [] })],
     [Application, 'updateMany', async (...args) => { calls.applications = args; }],
     [TailoredCv, 'deleteMany', async (...args) => { calls.tailoredCvs = args; }],
+    [JobDigestDelivery, 'deleteMany', async (...args) => { calls.jobDigestDeliveries = args; }],
     [ExternalApplication, 'deleteMany', async (...args) => { calls.externalApplications = args; }],
     [JobOutboundClick, 'updateMany', async (...args) => { calls.outboundClicks = args; }],
     [JobAlert, 'deleteMany', async (...args) => { calls.jobAlerts = args; }],
@@ -86,6 +88,7 @@ test('deleteMyAccount anonymizes submitted applications and removes private user
     assert.equal(calls.applications[1].$set.applicant, anonymizedApplicant._id);
     assert.equal(calls.applications[1].$set.coverLetter, '');
     assert.deepEqual(calls.externalApplications[0], { applicant: currentUser._id });
+    assert.deepEqual(calls.jobDigestDeliveries[0], { userId: currentUser._id });
     assert.deepEqual(calls.jobAlerts[0], { email: currentUser.email });
     assert.deepEqual(calls.outboundClicks[1].$set, { userId: null });
     assert.deepEqual(calls.deleteUser.filter, { _id: currentUser._id });

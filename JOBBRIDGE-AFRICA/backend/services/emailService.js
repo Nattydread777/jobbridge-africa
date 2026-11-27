@@ -12,7 +12,7 @@ export const isEmailConfigured = () =>
   Boolean(process.env.RESEND_API_KEY?.trim()
     || (process.env.EMAIL_USER?.trim() && process.env.EMAIL_PASS?.trim()));
 
-export const createPasswordResetUrl = (resetToken) => {
+export const getFrontendBaseUrl = () => {
   const configuredFrontendUrl = [
     process.env.FRONTEND_URL,
     process.env.CLIENT_URL,
@@ -21,10 +21,126 @@ export const createPasswordResetUrl = (resetToken) => {
   const isProduction = process.env.NODE_ENV === 'production'
     || process.env.RENDER === 'true'
     || Boolean(process.env.RENDER_SERVICE_ID);
-  const frontendUrl = configuredFrontendUrl
+  return configuredFrontendUrl
     || (isProduction ? 'https://jobbridgeafrica.com' : 'http://localhost:5173');
+};
 
+export const createPasswordResetUrl = (resetToken) => {
+  const frontendUrl = getFrontendBaseUrl();
   return new URL(`/reset-password/${encodeURIComponent(resetToken)}`, frontendUrl).toString();
+};
+
+const postedTimeFor = (value) => {
+  const postedAt = new Date(value);
+  if (!value || Number.isNaN(postedAt.getTime())) return 'Posted recently';
+  const hours = Math.max(0, Math.floor((Date.now() - postedAt.getTime()) / (60 * 60 * 1000)));
+  if (hours < 1) {
+    const minutes = Math.max(1, Math.floor((Date.now() - postedAt.getTime()) / (60 * 1000)));
+    return `Posted ${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  }
+  if (hours < 24) return `Posted ${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  return `Posted ${days} day${days === 1 ? '' : 's'} ago`;
+};
+
+const digestText = (value, limit = 420) => {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (text.length <= limit) return text;
+  const excerpt = text.slice(0, limit);
+  const boundary = excerpt.lastIndexOf(' ');
+  return `${excerpt.slice(0, boundary > limit * 0.6 ? boundary : limit).trim()}…`;
+};
+
+const digestListingUrl = (job) => {
+  const id = job._id || job.id;
+  if (!id) throw new Error('Job digest entries must have an ID.');
+  return new URL(`/jobs/${encodeURIComponent(id)}`, getFrontendBaseUrl()).toString();
+};
+
+export const sendJobDigestEmail = async ({
+  recipient,
+  name,
+  jobs,
+  unsubscribeUrl,
+  context = 'These roles were selected using the skills, experience, and work preferences on your profile.',
+}) => {
+  if (!recipient || !Array.isArray(jobs) || !jobs.length || !unsubscribeUrl) {
+    throw new Error('A job digest requires a recipient, matching roles, and an unsubscribe URL.');
+  }
+  const safeName = escapeHtml(name || 'there');
+  const safeContext = escapeHtml(context);
+  const safeUnsubscribeUrl = escapeHtml(unsubscribeUrl);
+  const entries = jobs.map(({ job }) => {
+    if (!job) throw new Error('Job digest entries must include a job.');
+    const title = escapeHtml(job.title || 'Job opportunity');
+    const company = escapeHtml(job.companyName || 'Company not listed');
+    const location = escapeHtml(job.location || 'Location not specified');
+    const mode = escapeHtml(job.workplaceType || (job.isRemote ? 'Remote' : 'Not specified'));
+    const type = escapeHtml(job.jobType || 'Not specified');
+    const level = escapeHtml(job.seniority || 'Not specified');
+    const compensationValue = job.salary || job.salaryRange;
+    const compensation = compensationValue
+      ? `${escapeHtml(compensationValue)}${job.salaryCurrency ? ` ${escapeHtml(job.salaryCurrency)}` : ''}`
+      : 'Not listed';
+    const posted = postedTimeFor(job.pubDate || job.createdAt);
+    const highlights = digestText(
+      job.responsibilities || job.fullDescription || job.description || job.excerpt || 'View the listing for role details.',
+    );
+    const tags = [...new Set([...(job.tags || []), ...(job.categories || [])])]
+      .filter(Boolean)
+      .slice(0, 8);
+    const url = digestListingUrl(job);
+    const safeUrl = escapeHtml(url);
+    const safeHighlights = escapeHtml(highlights);
+    const tagText = tags.length ? tags.join(', ') : 'Not specified';
+    const htmlTags = tags.map((tag) => `<span style="display:inline-block;margin:3px;padding:4px 8px;border-radius:12px;background:#f1f5f9;color:#334155">${escapeHtml(tag)}</span>`).join('');
+    return {
+      text: [
+        `${job.title || 'Job opportunity'} — ${job.companyName || 'Company not listed'}`,
+        posted,
+        `Location: ${job.location || 'Not specified'} · ${job.workplaceType || (job.isRemote ? 'Remote' : 'Not specified')}`,
+        `Type: ${job.jobType || 'Not specified'} · Level: ${job.seniority || 'Not specified'} · Compensation: ${compensationValue || 'Not listed'}${job.salaryCurrency ? ` ${job.salaryCurrency}` : ''}`,
+        `Highlights: ${highlights}`,
+        `Skills / domain: ${tagText}`,
+        `Apply ↗: ${url}`,
+      ].join('\n'),
+      html: `<article style="margin:20px 0;padding:20px;border:1px solid #e2e8f0;border-radius:12px">
+        <p style="margin:0;color:#64748b">${escapeHtml(posted)}</p>
+        <h2 style="margin:8px 0"><a href="${safeUrl}" style="color:#92400e">${title}</a></h2>
+        <p style="margin:0 0 12px;color:#334155">${company}</p>
+        <p><strong>Location:</strong> ${location} · ${mode}<br>
+          <strong>Type:</strong> ${type} · <strong>Level:</strong> ${level}<br>
+          <strong>Compensation:</strong> ${compensation}</p>
+        <p><strong>Responsibilities / highlights:</strong> ${safeHighlights}</p>
+        <p><strong>Skills / domain:</strong> ${htmlTags || escapeHtml(tagText)}</p>
+        <p><a href="${safeUrl}" style="display:inline-block;padding:10px 16px;border-radius:8px;background:#b45309;color:#fff;text-decoration:none;font-weight:bold">View role &amp; apply ↗</a></p>
+      </article>`,
+    };
+  });
+  const text = [
+    `Hello ${name || 'there'},`,
+    '',
+    context,
+    '',
+    ...entries.map((entry) => entry.text),
+    '',
+    `Manage or unsubscribe from these alerts: ${unsubscribeUrl}`,
+  ].join('\n\n');
+  const html = `<main style="max-width:680px;margin:auto;font-family:Arial,sans-serif;color:#0f172a;line-height:1.55">
+    <h1 style="color:#0f172a">Roles that fit your profile</h1>
+    <p>Hello ${safeName},</p>
+    <p>${safeContext}</p>
+    ${entries.map((entry) => entry.html).join('')}
+    <hr style="border:0;border-top:1px solid #e2e8f0;margin-top:28px">
+    <p style="font-size:13px;color:#64748b">You received this because you opted in to personalized JobBridge Africa job alerts. <a href="${safeUnsubscribeUrl}">Manage or unsubscribe</a>.</p>
+  </main>`;
+
+  return sendTransactionalEmail({
+    to: recipient,
+    subject: `Job matches for your profile (${jobs.length})`,
+    text,
+    html,
+  });
 };
 
 const createTransporter = () => {

@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
+import RecommendedRoles from "../components/RecommendedRoles";
 
 const PROFILE_TABS = [
   { id: "overview", label: "Overview" },
@@ -384,6 +385,9 @@ const ProfileView = () => {
 
       {isJobSeeker ? (
         <>
+          <div className="mt-6">
+            <RecommendedRoles />
+          </div>
           <nav aria-label="Profile sections" className="mt-6 overflow-x-auto border-b border-slate-200">
             <div role="tablist" className="flex min-w-max gap-1">
               {PROFILE_TABS.map((tab) => (

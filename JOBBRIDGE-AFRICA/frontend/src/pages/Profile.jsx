@@ -225,6 +225,9 @@ const Profile = () => {
   const [emailNotifications, setEmailNotifications] = useState(false);
   const [jobAlertStatus, setJobAlertStatus] = useState(null);
   const [jobAlertSubmitting, setJobAlertSubmitting] = useState(false);
+  const [jobDigestPreferences, setJobDigestPreferences] = useState({ enabled: false, frequency: "daily" });
+  const [jobDigestStatus, setJobDigestStatus] = useState(null);
+  const [jobDigestSubmitting, setJobDigestSubmitting] = useState(false);
   const [profileSaveStatus, setProfileSaveStatus] = useState(null);
   const [targetRolesText, setTargetRolesText] = useState("");
   const [preferredLocationsText, setPreferredLocationsText] = useState("");
@@ -250,6 +253,10 @@ const Profile = () => {
       });
       setTargetRolesText((user.workPreferences?.targetRoles || []).join(", "));
       setPreferredLocationsText((user.workPreferences?.preferredLocations || []).join(", "));
+      setJobDigestPreferences({
+        enabled: Boolean(user.jobAlertPreferences?.enabled),
+        frequency: user.jobAlertPreferences?.frequency || "daily",
+      });
     }
   }, [user]);
 
@@ -534,6 +541,23 @@ const Profile = () => {
       });
     } finally {
       setJobAlertSubmitting(false);
+    }
+  };
+
+  const handleSaveJobDigestPreferences = async () => {
+    setJobDigestStatus(null);
+    setJobDigestSubmitting(true);
+    try {
+      const { data } = await api.put("/job-alerts/preferences", jobDigestPreferences);
+      setJobDigestStatus({ type: "success", message: data.message || "Your personalized alert preferences are saved." });
+      await refreshUser();
+    } catch (error) {
+      setJobDigestStatus({
+        type: "error",
+        message: error.response?.data?.message || "We couldn't save your personalized alert preferences.",
+      });
+    } finally {
+      setJobDigestSubmitting(false);
     }
   };
 
@@ -1431,9 +1455,49 @@ const Profile = () => {
             </h2>
 
             <div className="space-y-6">
+              <section className="rounded-xl border border-amber-200 bg-amber-50/60 p-5">
+                <h3 className="font-bold text-slate-900">Personalized role digest</h3>
+                <p className="mt-1 text-sm text-slate-600">Get suitable roles selected from your skills, experience, target roles, and work preferences. Dashboard recommendations do not depend on this email setting.</p>
+                <label className="mt-4 flex items-start gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={jobDigestPreferences.enabled}
+                    onChange={(event) => setJobDigestPreferences((current) => ({ ...current, enabled: event.target.checked }))}
+                    className="mt-1 h-4 w-4 accent-amber-600"
+                  />
+                  <span><strong className="block">Email me matching roles</strong>Optional. You can turn this off here at any time or unsubscribe from a digest email.</span>
+                </label>
+                <label className="mt-4 grid max-w-sm gap-1 text-sm font-semibold">
+                  Frequency
+                  <select
+                    value={jobDigestPreferences.frequency}
+                    onChange={(event) => setJobDigestPreferences((current) => ({ ...current, frequency: event.target.value }))}
+                    disabled={!jobDigestPreferences.enabled}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal disabled:bg-slate-100"
+                  >
+                    <option value="instant">As new matches are found</option>
+                    <option value="daily">Daily digest</option>
+                    <option value="weekly">Weekly digest</option>
+                  </select>
+                </label>
+                {jobDigestStatus && (
+                  <p role={jobDigestStatus.type === "error" ? "alert" : "status"} className={`mt-3 rounded-lg border p-3 text-sm ${jobDigestStatus.type === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+                    {jobDigestStatus.message}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={handleSaveJobDigestPreferences}
+                  disabled={jobDigestSubmitting}
+                  className="mt-4 rounded-lg bg-amber-700 px-5 py-2 font-semibold text-white hover:bg-amber-800 disabled:cursor-wait disabled:opacity-60"
+                >
+                  {jobDigestSubmitting ? "Saving…" : "Save personalized alerts"}
+                </button>
+              </section>
+
               <label className="flex items-start gap-3 rounded-lg border p-4 text-sm">
                 <input type="checkbox" checked={emailNotifications} onChange={(event) => setEmailNotifications(event.target.checked)} className="mt-1 h-4 w-4 accent-amber-600" />
-                <span><strong className="block">Email Notifications</strong> I agree to receive job alert emails at {profile.email || "the email address on my profile"}. Your choice is saved with the subscription; contact JobBridge Africa to withdraw it.</span>
+                <span><strong className="block">General job newsletter</strong>This is a separate, optional subscription for general latest-job notices at {profile.email || "the email address on my profile"}.</span>
               </label>
 
               <div className="border-t pt-6">

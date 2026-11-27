@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { randomBytes } from 'node:crypto';
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -71,6 +72,21 @@ const userSchema = new mongoose.Schema({
     targetRoles: { type: [String], default: [] },
     preferredLocations: { type: [String], default: [] },
     willingToRelocate: { type: Boolean, default: false },
+  },
+  jobAlertPreferences: {
+    enabled: { type: Boolean, default: false },
+    frequency: { type: String, enum: ['instant', 'daily', 'weekly'], default: 'daily' },
+    unsubscribeVersion: {
+      type: String,
+      default: () => randomBytes(24).toString('hex'),
+      select: false,
+    },
+    unsubscribedAt: { type: Date, select: false },
+    welcomeDigestSentAt: { type: Date, select: false },
+    lastDigestAt: { type: Date, select: false },
+    lastDigestCheckAt: { type: Date, select: false },
+    digestLockToken: { type: String, select: false },
+    digestLockUntil: { type: Date, select: false },
   },
 }, { timestamps: true });
 

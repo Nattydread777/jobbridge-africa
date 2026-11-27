@@ -28,6 +28,7 @@ import { scheduleCareerScrapes } from './services/careerScraperService.js';
 import { scheduleRemoteApiIngestion } from './services/remoteApiIngestor.js';
 import { scheduleMyJobMagScrapes } from './services/localAggregatorScraper.js';
 import { scheduleHubstaffTalentIngestion } from './services/hubstaffTalentScraper.js';
+import { scheduleJobDigests } from './services/jobDigestService.js';
 
 // -------------------
 // Environment Validation
@@ -192,6 +193,7 @@ const startServer = async () => {
   scheduleRemoteApiIngestion();
   scheduleMyJobMagScrapes();
   scheduleHubstaffTalentIngestion();
+  scheduleJobDigests();
 
   await new Promise((resolve, reject) => {
     const server = app.listen(PORT, () => {
