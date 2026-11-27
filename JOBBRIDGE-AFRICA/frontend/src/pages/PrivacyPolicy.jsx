@@ -57,7 +57,7 @@ const PrivacyPolicy = () => {
             <ul className="list-disc pl-6 space-y-2 mb-4">
               <li>IP address, browser type, and device information</li>
               <li>Limited technical and request information processed by our hosting and security providers to operate and protect the platform</li>
-              <li>Essential cookies and stored preferences; analytics and advertising tracking are not currently active</li>
+              <li>Essential cookies and stored preferences; advertising trackers are not active. We record when job links are opened to external sources, associating the click with an account only when the visitor is signed in.</li>
             </ul>
 
             <h3 className="text-xl font-medium text-gray-800 mb-3">
@@ -90,6 +90,11 @@ const PrivacyPolicy = () => {
               <li>
                 <strong>Communication:</strong> To send account and application
                 messages and, if enabled, job-alert emails
+              </li>
+              <li>
+                <strong>External job applications:</strong> To record outbound
+                clicks by job, source, and link type, and to save applications
+                that signed-in job seekers choose to add to their tracker
               </li>
               <li>
                 <strong>Platform Improvement:</strong> To analyze usage patterns

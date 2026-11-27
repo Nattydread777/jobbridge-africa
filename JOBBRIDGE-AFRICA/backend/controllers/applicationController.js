@@ -1,6 +1,7 @@
 import asyncHandler from 'express-async-handler';
 import mongoose from 'mongoose';
 import Application from '../models/Application.js';
+import ExternalApplication from '../models/ExternalApplication.js';
 import Job from '../models/Job.js';
 import TailoredCv from '../models/TailoredCv.js';
 import User from '../models/userModel.js';
@@ -143,6 +144,82 @@ export const getMyApplications = asyncHandler(async (req, res) => {
     .populate('job', 'title companyName location jobType salaryRange expiryDate')
     .sort('-createdAt');
 
+  res.status(200).json(applications);
+});
+
+export const markExternalApplication = asyncHandler(async (req, res) => {
+  if (req.user.role !== 'job_seeker') {
+    res.status(403);
+    throw new Error('Only job seekers can track external applications.');
+  }
+  if (!mongoose.isValidObjectId(req.params.jobId)) {
+    res.status(400);
+    throw new Error('Invalid job ID.');
+  }
+
+  const job = await Job.findById(req.params.jobId);
+  if (!job) {
+    res.status(404);
+    throw new Error('Job not found.');
+  }
+  const isDirectPosting = job.source === 'employer'
+    || (job.source == null && job.isDirectPosting !== false);
+  if (isDirectPosting) {
+    res.status(400);
+    throw new Error('Only external listings can be tracked here.');
+  }
+
+  let parsedApplicationLink;
+  try {
+    parsedApplicationLink = new URL(job.applicationLink);
+  } catch {
+    res.status(400);
+    throw new Error('This job does not have a valid external application link.');
+  }
+  if (!['http:', 'https:'].includes(parsedApplicationLink.protocol)) {
+    res.status(400);
+    throw new Error('This job does not have a valid external application link.');
+  }
+
+  const source = job.sourceName || job.sourceProvider || job.source || 'External source';
+  let trackedApplication;
+  try {
+    trackedApplication = await ExternalApplication.findOneAndUpdate(
+      { job: job._id, applicant: req.user._id },
+      {
+        $set: {
+          source,
+          applicationLink: parsedApplicationLink.href,
+          jobTitle: job.title,
+          companyName: job.companyName,
+          location: job.location,
+        },
+        $setOnInsert: { appliedAt: new Date() },
+      },
+      { new: true, upsert: true, runValidators: true },
+    );
+  } catch (error) {
+    if (error.code !== 11000) throw error;
+    trackedApplication = await ExternalApplication.findOne({
+      job: job._id,
+      applicant: req.user._id,
+    });
+  }
+  if (!trackedApplication) {
+    res.status(409);
+    throw new Error('Your external application could not be added to the tracker. Please try again.');
+  }
+
+  res.status(200).json({
+    message: 'This external application has been added to your tracker.',
+    application: trackedApplication,
+  });
+});
+
+export const getMyExternalApplications = asyncHandler(async (req, res) => {
+  const applications = await ExternalApplication.find({ applicant: req.user._id })
+    .populate('job', 'title companyName location')
+    .sort({ appliedAt: -1 });
   res.status(200).json(applications);
 });
 

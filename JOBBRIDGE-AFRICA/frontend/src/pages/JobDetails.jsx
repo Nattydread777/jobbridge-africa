@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import PageBreadcrumb from "../components/PageBreadcrumb";
+import ExternalJobLink from "../components/ExternalJobLink";
 import { updatePageMetadata } from "../utils/pageMetadata";
 
 const normalizeJobText = (value) => String(value || "")
@@ -106,6 +107,7 @@ const JobDetails = () => {
     ? null
     : Math.max(0, Math.floor((Date.now() - postedTimestamp) / 86400000));
   const sourceLabel = job?.sourceName || job?.sourceProvider || (job?.source === "employer" ? "Direct employer" : "External source");
+  const isExternalListing = job?.source !== "employer" && job?.isDirectPosting !== true;
   const remoteScope = job?.locationRestriction || job?.location || "";
   const isGlobalRemote = /\b(worldwide|global(?:ly)?|anywhere|any location)\b/i.test(remoteScope);
   const remoteEligibilityLabel = isGlobalRemote
@@ -310,10 +312,9 @@ const JobDetails = () => {
           <p className="mb-6 rounded-lg bg-slate-100 p-4 text-sm text-slate-800">
             This is a sample listing shown while the external job feed is unavailable. It is not an active vacancy and cannot accept applications.
           </p>
-        ) : job.source !== "employer" && job.isDirectPosting !== true && (
+        ) : isExternalListing && (
           <p className="mb-6 rounded-lg bg-amber-50 p-4 text-sm text-amber-950">
-            This is an external {isGlobalRemote ? "worldwide remote" : `remote listing with eligibility: ${remoteEligibilityLabel}`} listing
-            from our Worldwide Remote Network. Applications are handled on the official employer career site.
+            This is an external listing from {sourceLabel}. Applications are handled on the official employer or source site.
           </p>
         )}
 
@@ -340,6 +341,11 @@ const JobDetails = () => {
 
         <div className="mb-6">
           <h2 className="text-2xl font-bold mb-3">Full Job Description</h2>
+          {isExternalListing && (
+            <p className="mb-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+              Summary provided by source feed — view full role details on the official listing.
+            </p>
+          )}
           <FormattedJobText text={fullJobDescription} />
         </div>
 
@@ -386,14 +392,18 @@ const JobDetails = () => {
           </div>
         )}
         {externalApplicationLink && (
-          <p className="mb-6 break-all text-sm text-gray-600">
-            Application link: <a href={externalApplicationLink} target="_blank" rel="noopener noreferrer" className="text-primary underline">{externalApplicationLink}</a>
-          </p>
+          <div className="mb-6 break-all text-sm text-gray-600">
+            <ExternalJobLink jobId={job._id} href={externalApplicationLink}>
+              Application link: {externalApplicationLink}
+            </ExternalJobLink>
+          </div>
         )}
         {sourceUrl && (
-          <p className="mb-6 text-sm text-gray-600">
-            Source listing: <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline">{sourceLabel}</a>
-          </p>
+          <div className="mb-6 text-sm text-gray-600">
+            <ExternalJobLink jobId={job._id} href={sourceUrl} linkType="source" className="text-primary underline">
+              Source listing: {sourceLabel} ↗
+            </ExternalJobLink>
+          </div>
         )}
 
         <div className="flex flex-wrap gap-4">
@@ -403,16 +413,15 @@ const JobDetails = () => {
           >
             Check my CV fit
           </Link>
-          {job.source !== "employer" && job.isDirectPosting !== true ? (
+          {isExternalListing ? (
             externalApplicationLink ? (
-              <a
+              <ExternalJobLink
+                jobId={job._id}
                 href={externalApplicationLink}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="rounded bg-accent px-8 py-3 font-semibold text-white transition hover:bg-red-700"
               >
-                Apply on official site
-              </a>
+                Apply on official site ↗
+              </ExternalJobLink>
             ) : (
               <p className="text-sm text-gray-600">
                 {job.sourceProvider === "jobbridge-fallback"

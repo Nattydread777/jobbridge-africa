@@ -1,6 +1,7 @@
 import asyncHandler from 'express-async-handler';
 import mongoose from 'mongoose';
 import Job from '../models/Job.js';
+import JobOutboundClick from '../models/JobOutboundClick.js';
 import User from '../models/userModel.js';
 import JobReport from '../models/JobReport.js';
 import { buildActiveJobFilter } from '../utils/jobFilters.js';
@@ -8,6 +9,72 @@ import { buildActiveJobFilter } from '../utils/jobFilters.js';
 const AFRICAN_LOCATION_PATTERN = '\\b(?:africa|algeria|angola|benin|botswana|burkina faso|burundi|cabo verde|cameroon|central african republic|chad|comoros|democratic republic of the congo|djibouti|egypt|equatorial guinea|eritrea|eswatini|ethiopia|gabon|gambia|ghana|guinea|guinea-bissau|ivory coast|kenya|lesotho|liberia|libya|madagascar|malawi|mali|mauritania|mauritius|morocco|mozambique|namibia|niger|nigeria|republic of the congo|rwanda|sao tome and principe|senegal|seychelles|sierra leone|somalia|south africa|south sudan|sudan|tanzania|togo|tunisia|uganda|zambia|zimbabwe)\\b';
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const normalizeDeduplicationField = (field) => ({
+  $toLower: {
+    $trim: {
+      input: {
+        $regexReplace: {
+          input: {
+            $convert: {
+              input: `$${field}`,
+              to: 'string',
+              onError: '',
+              onNull: '',
+            },
+          },
+          regex: '\\s+',
+          replacement: ' ',
+        },
+      },
+    },
+  },
+});
+
+const jobFieldLength = (field) => ({
+  $strLenCP: {
+    $convert: {
+      input: `$${field}`,
+      to: 'string',
+      onError: '',
+      onNull: '',
+    },
+  },
+});
+
+const jobDeduplicationStages = () => [
+  {
+    $addFields: {
+      _deduplicationKey: {
+        title: normalizeDeduplicationField('title'),
+        companyName: normalizeDeduplicationField('companyName'),
+      },
+      _listingCompleteness: {
+        $add: [
+          jobFieldLength('fullDescription'),
+          jobFieldLength('description'),
+          jobFieldLength('excerpt'),
+          jobFieldLength('requirements'),
+          jobFieldLength('qualifications'),
+          jobFieldLength('responsibilities'),
+          jobFieldLength('benefits'),
+          jobFieldLength('applicationInstructions'),
+          jobFieldLength('applicationLink'),
+          jobFieldLength('salary'),
+        ],
+      },
+    },
+  },
+  { $sort: { _listingCompleteness: -1, pubDate: -1, createdAt: -1, _id: -1 } },
+  {
+    $group: {
+      _id: '$_deduplicationKey',
+      job: { $first: '$$ROOT' },
+    },
+  },
+  { $replaceRoot: { newRoot: '$job' } },
+  { $unset: ['_deduplicationKey', '_listingCompleteness'] },
+];
 
 const parseOptionalExpiryDate = (value, res) => {
   if (value === undefined || value === null || value === '') return null;
@@ -271,7 +338,7 @@ export const getJobs = asyncHandler(async (req, res) => {
       },
     },
   };
-  const pipeline = [{ $match: query }, priorityStage];
+  const pipeline = [{ $match: query }, priorityStage, ...jobDeduplicationStages()];
   if (cursorValue) {
     const cursorDate = new Date(cursorValue.createdAt);
     const cursorPriority = Number(cursorValue.priority);
@@ -322,10 +389,15 @@ export const getJobs = asyncHandler(async (req, res) => {
     },
     { $unset: 'postedByUser' },
   );
-  const [jobs, total] = await Promise.all([
+  const [jobs, totalCounts] = await Promise.all([
     Job.aggregate(pipeline),
-    Job.countDocuments({ $and: countFilters }),
+    Job.aggregate([
+      { $match: { $and: countFilters } },
+      ...jobDeduplicationStages(),
+      { $count: 'total' },
+    ]),
   ]);
+  const total = totalCounts[0]?.total || 0;
   const hasMore = jobs.length > pageSize;
   if (hasMore) jobs.pop();
   const lastJob = jobs[jobs.length - 1];
@@ -407,6 +479,46 @@ export const reportJob = asyncHandler(async (req, res) => {
     email: normalizedEmail,
   });
   res.status(201).json({ message: 'Thank you. Your report has been sent for review.' });
+});
+
+export const trackOutboundClick = asyncHandler(async (req, res) => {
+  const jobId = String(req.params.id);
+  if (!mongoose.isValidObjectId(jobId)) {
+    res.status(400);
+    throw new Error('Invalid job ID.');
+  }
+  const linkType = req.body?.linkType || 'application';
+  if (!['application', 'source'].includes(linkType)) {
+    res.status(400);
+    throw new Error('Link type must be application or source.');
+  }
+  const job = await Job.findById(jobId).select(
+    'source sourceProvider sourceName applicationLink sourceUrl',
+  );
+  if (!job) {
+    res.status(404);
+    throw new Error('Job not found.');
+  }
+  const targetUrl = linkType === 'source' ? job.sourceUrl : job.applicationLink;
+  let parsedTarget;
+  try {
+    parsedTarget = new URL(targetUrl);
+  } catch {
+    res.status(400);
+    throw new Error('This job does not have a valid external link.');
+  }
+  if (!['http:', 'https:'].includes(parsedTarget.protocol)) {
+    res.status(400);
+    throw new Error('This job does not have a valid external link.');
+  }
+
+  await JobOutboundClick.create({
+    jobId: job._id,
+    source: job.sourceName || job.sourceProvider || job.source || 'unknown',
+    userId: req.user?._id || null,
+    linkType,
+  });
+  res.status(202).json({ message: 'Outbound click recorded.' });
 });
 
 // @desc    Create a new job (employer only)

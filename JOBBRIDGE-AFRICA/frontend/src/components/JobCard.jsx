@@ -3,6 +3,21 @@ import PropTypes from "prop-types";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { getJobPath } from "../utils/jobUrl";
+import ExternalJobLink from "./ExternalJobLink";
+
+const getDescriptionPreview = (value, maxLength = 150) => {
+  const description = String(value || "").replace(/\s+/g, " ").trim();
+  if (description.length <= maxLength) return description;
+
+  const candidate = description.slice(0, maxLength);
+  const sentenceEnd = [...candidate.matchAll(/[.!?](?=\s|$)/g)].at(-1)?.index;
+  const wordEnd = candidate.lastIndexOf(" ");
+  const boundary = sentenceEnd >= maxLength * 0.6
+    ? sentenceEnd + 1
+    : wordEnd > 0 ? wordEnd : maxLength;
+
+  return `${description.slice(0, boundary).trimEnd()}…`;
+};
 
 const getRelativePostedTime = (value) => {
   const postedDate = new Date(value);
@@ -62,6 +77,8 @@ const JobCard = ({ job }) => {
   const salaryLabel = [job.salary, job.salaryRange]
     .map((value) => String(value || "").trim())
     .find((value) => value && !/^competitive$/i.test(value)) || "";
+  const isExternalListing = !isDirectPosting && !isSampleListing;
+  const descriptionPreview = getDescriptionPreview(job.description || job.excerpt);
 
   const handleApply = () => {
     if (!isAuthenticated) {
@@ -107,7 +124,7 @@ const JobCard = ({ job }) => {
         </p>
       ) : (
         <p className="mt-2 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-terracotta-dark">
-          {locationEligibility} · {sourceLabel}
+          External listing · {sourceLabel}
         </p>
       )}
       {salaryLabel && (
@@ -126,10 +143,13 @@ const JobCard = ({ job }) => {
         )}
       </div>
       <p className="mt-2 text-gray-700">
-        {job.description.length > 150
-          ? `${job.description.slice(0, 150)}...`
-          : job.description}
+        {descriptionPreview}
       </p>
+      {isExternalListing && (
+        <p className="mt-1 text-xs text-slate-600">
+          Summary provided by source feed — view full role details on the official listing.
+        </p>
+      )}
       <div className="mt-4 flex gap-3">
         <Link
           to={jobPath}
@@ -138,14 +158,13 @@ const JobCard = ({ job }) => {
           View Details →
         </Link>
         {!isSampleListing && !isDirectPosting && job.applicationLink ? (
-          <a
+          <ExternalJobLink
+            jobId={job._id}
             href={job.applicationLink}
-            target="_blank"
-            rel="noopener noreferrer"
             className="rounded bg-accent px-4 py-2 font-semibold text-white transition hover:bg-red-700"
           >
-            Apply on official site
-          </a>
+            Apply on official site ↗
+          </ExternalJobLink>
         ) : isDirectPosting && !isSampleListing ? (
           <button
             onClick={handleApply}

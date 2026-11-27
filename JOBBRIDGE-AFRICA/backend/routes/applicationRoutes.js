@@ -3,7 +3,9 @@ import multer from 'multer';
 import {
   submitApplication,
   getMyApplications,
+  getMyExternalApplications,
   getJobApplications,
+  markExternalApplication,
   updateApplicationStatus,
   deleteApplication
 } from '../controllers/applicationController.js';
@@ -35,6 +37,8 @@ const upload = multer({
 // Routes
 router.post('/', protect, upload.single('resume'), submitApplication);
 router.get('/my-applications', protect, getMyApplications);
+router.get('/my-external-applications', protect, getMyExternalApplications);
+router.post('/external/:jobId', protect, markExternalApplication);
 router.get('/job/:jobId', protect, getJobApplications);
 router.put('/:id/status', protect, updateApplicationStatus);
 router.delete('/:id', protect, deleteApplication);

@@ -7,6 +7,7 @@ import { getJobPath } from "../utils/jobUrl";
 const MyJobs = () => {
   const { user } = useAuth();
   const [appliedJobs, setAppliedJobs] = useState([]);
+  const [externalApplications, setExternalApplications] = useState([]);
   const [activeTab, setActiveTab] = useState("applied");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -15,8 +16,12 @@ const MyJobs = () => {
     const fetchApplications = async () => {
       try {
         setLoading(true);
-        const response = await api.get("/applications/my-applications");
-        setAppliedJobs(response.data);
+        const [applicationsResponse, externalApplicationsResponse] = await Promise.all([
+          api.get("/applications/my-applications"),
+          api.get("/applications/my-external-applications"),
+        ]);
+        setAppliedJobs(applicationsResponse.data);
+        setExternalApplications(externalApplicationsResponse.data);
         setError("");
       } catch (error) {
         console.error("Error fetching applications:", error);
@@ -89,7 +94,7 @@ const MyJobs = () => {
               : "text-gray-600"
           }`}
         >
-          Applied ({appliedJobs.length})
+          Applied ({appliedJobs.length + externalApplications.length})
         </button>
         <button
           onClick={() => setActiveTab("saved")}
@@ -114,7 +119,7 @@ const MyJobs = () => {
       </div>
 
       <div className="space-y-4">
-        {activeTab === "applied" && appliedJobs.length === 0 && (
+        {activeTab === "applied" && appliedJobs.length === 0 && externalApplications.length === 0 && (
           <div className="text-center py-12 bg-white rounded-lg shadow">
             <p className="text-gray-600 mb-4">
               You haven't applied to any jobs yet
@@ -192,6 +197,50 @@ const MyJobs = () => {
                   </a>
                 </div>
               )}
+            </div>
+          ))}
+
+        {activeTab === "applied" &&
+          externalApplications.map((application) => (
+            <div
+              key={`external-${application._id}`}
+              className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition"
+            >
+              <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
+                <div>
+                  <h3 className="text-xl font-bold mb-2">
+                    {application.job?.title || application.jobTitle}
+                  </h3>
+                  <p className="text-gray-600">
+                    {application.job?.companyName || application.companyName}
+                  </p>
+                  <p className="text-gray-500 text-sm">
+                    📍 {application.job?.location || application.location || "Location not specified"}
+                  </p>
+                </div>
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-900">
+                  Applied externally
+                </span>
+              </div>
+              <div className="flex flex-wrap justify-between items-center gap-3 text-sm text-gray-600">
+                <p>Tracked: {new Date(application.appliedAt).toLocaleDateString()}</p>
+                {application.job?._id && (
+                  <Link
+                    to={getJobPath(application.job)}
+                    className="text-primary hover:underline"
+                  >
+                    View Job Details →
+                  </Link>
+                )}
+              </div>
+              <a
+                href={application.applicationLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-block text-sm font-semibold text-primary underline"
+              >
+                Open official application listing ↗
+              </a>
             </div>
           ))}
 
