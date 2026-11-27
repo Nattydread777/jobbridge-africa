@@ -14,6 +14,8 @@ const Home = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [jobCount, setJobCount] = useState(null);
   const [featuredEmployers, setFeaturedEmployers] = useState([]);
+  const [featuredEmployerError, setFeaturedEmployerError] = useState("");
+  const [showAllEmployers, setShowAllEmployers] = useState(false);
   const [sampleJob, setSampleJob] = useState(null);
   const [isPaused, setIsPaused] = useState(false);
   const navigate = useNavigate();
@@ -25,14 +27,19 @@ const Home = () => {
       if (!active) return;
       const jobs = Array.isArray(data?.jobs) ? data.jobs : [];
       setJobCount(Number.isFinite(data?.total) ? data.total : jobs.length);
-      setFeaturedEmployers([...new Set(jobs
-        .filter((job) => job.sourceProvider !== "jobbridge-fallback")
-        .map((job) => job.companyName)
-        .filter(Boolean))].slice(0, 4));
       const representative = jobs.find((job) => job.sourceProvider !== "jobbridge-fallback");
       if (representative) setSampleJob(representative);
     }).catch((error) => {
       console.error("Could not load live job count:", error);
+    });
+    api.get("/jobs/featured-employers?all=true").then(({ data }) => {
+      if (!active) return;
+      setFeaturedEmployers(Array.isArray(data?.employers) ? data.employers : []);
+      setFeaturedEmployerError("");
+    }).catch((error) => {
+      if (!active) return;
+      console.error("Could not load featured employers:", error);
+      setFeaturedEmployerError("Featured employers could not be loaded right now.");
     });
     return () => { active = false; };
   }, []);
@@ -480,12 +487,33 @@ const Home = () => {
           <p className="text-sm text-slate-300">Current active listings on JobBridge Africa</p>
           <p className="mt-1 text-3xl font-black">{jobCount === null ? "Loading…" : jobCount.toLocaleString()}</p>
         </div>
-        {featuredEmployers.length > 0 && (
+        {(featuredEmployers.length > 0 || featuredEmployerError) && (
           <section className="mt-8 rounded-2xl bg-white p-6 shadow-sm">
             <h2 className="text-xl font-bold text-charcoal">Featured employers in current listings</h2>
+            <p className="mt-1 text-sm text-slate-600">Ranked from active listings by listing volume and recent activity.</p>
+            {featuredEmployerError && <p role="status" className="mt-3 text-sm text-slate-600">{featuredEmployerError}</p>}
             <ul className="mt-4 flex flex-wrap gap-3">
-              {featuredEmployers.map((employer) => <li key={employer} className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700">{employer}</li>)}
+              {(showAllEmployers ? featuredEmployers : featuredEmployers.slice(0, 12)).map((employer) => (
+                <li key={employer.name.toLocaleLowerCase("en")} className="rounded-full border border-slate-200 text-sm font-semibold text-slate-700">
+                  <Link
+                    to={`/jobs?company=${encodeURIComponent(employer.name)}`}
+                    className="inline-flex items-center gap-2 rounded-full px-4 py-2 hover:border-primary hover:bg-amber-50 hover:text-charcoal"
+                  >
+                    {employer.name}
+                    <span className="text-xs font-normal text-slate-500">{employer.listingCount}</span>
+                  </Link>
+                </li>
+              ))}
             </ul>
+            {featuredEmployers.length > 12 && (
+              <button
+                type="button"
+                onClick={() => setShowAllEmployers((current) => !current)}
+                className="mt-4 font-semibold text-terracotta underline"
+              >
+                {showAllEmployers ? "Show fewer employers" : `View all ${featuredEmployers.length} employers`}
+              </button>
+            )}
           </section>
         )}
       </section>

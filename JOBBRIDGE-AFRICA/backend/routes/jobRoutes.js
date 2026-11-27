@@ -4,6 +4,7 @@ import rateLimit from 'express-rate-limit';
 import { optionalProtect, protect, employer } from '../middleware/authMiddleware.js';
 import { 
     getJobs, 
+    getFeaturedEmployers,
     getEmployerJobs,
     getJobById, 
     createJob, 
@@ -31,6 +32,7 @@ const outboundClickLimiter = rateLimit({
 
 // Public routes
 router.route('/').get(getJobs);
+router.get('/featured-employers', getFeaturedEmployers);
 router.get('/my-postings', protect, employer, getEmployerJobs);
 router.post('/:id/report', reportLimiter, reportJob);
 router.post('/:id/outbound-click', outboundClickLimiter, optionalProtect, trackOutboundClick);

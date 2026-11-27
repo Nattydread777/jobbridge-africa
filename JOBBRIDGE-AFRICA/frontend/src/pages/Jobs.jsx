@@ -15,6 +15,7 @@ const Jobs = () => {
   // Filter states
   const [filters, setFilters] = useState({
     search: searchParams.get("search") || searchParams.get("q") || "",
+    company: searchParams.get("company") || "",
     location: searchParams.get("location") || "",
     country: searchParams.get("country") || "",
     city: searchParams.get("city") || "",
@@ -38,6 +39,7 @@ const Jobs = () => {
     const seniority = params.get("seniority") || "";
     setFilters({
       search: params.get("q") || params.get("search") || "",
+      company: params.get("company") || "",
       location: params.get("location") || "",
       country: params.get("country") || "",
       city: params.get("city") || "",
@@ -166,6 +168,7 @@ const Jobs = () => {
   const resetFilters = () => {
     setFilters({
       search: "",
+      company: "",
       location: "",
       country: "",
       city: "",
@@ -198,6 +201,14 @@ const Jobs = () => {
       <p className="mb-6 inline-flex rounded-full bg-amber-100 px-4 py-2 text-sm font-semibold text-terracotta-dark">
         UN SDG 8 · Decent Work and Economic Growth · Africa-first matching
       </p>
+      {filters.company && (
+        <p className="mb-5 flex flex-wrap items-center gap-2 text-sm text-slate-700">
+          Showing active listings from <strong>{filters.company}</strong>
+          <button type="button" onClick={() => handleFilterChange("company", "")} className="font-semibold text-primary underline">
+            Clear employer filter
+          </button>
+        </p>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Filters Sidebar */}
         <aside className="lg:col-span-1 space-y-6">

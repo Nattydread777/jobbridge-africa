@@ -88,6 +88,119 @@ const parseBoolean = (value, name, res) => {
   throw new Error(`${name} must be true or false`);
 };
 
+const normalizeEmployerName = (value) => (
+  typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : ''
+);
+const employerNameKey = (value) => normalizeEmployerName(value).toLocaleLowerCase('en');
+const PLACEHOLDER_EMPLOYER_NAMES = new Set([
+  '',
+  'unknown',
+  'n/a',
+  'na',
+  'none',
+  'null',
+  'not specified',
+  'not provided',
+  'confidential',
+  'company confidential',
+  'undisclosed',
+  'employer',
+  'various',
+]);
+
+const featuredEmployerPipeline = () => [
+  {
+    $match: {
+      $and: [
+        buildActiveJobFilter(),
+        { sourceProvider: { $ne: 'jobbridge-fallback' } },
+      ],
+    },
+  },
+  ...jobDeduplicationStages(),
+  {
+    $addFields: {
+      _employerKey: {
+        $toLower: {
+          $trim: {
+            input: {
+              $convert: {
+                input: '$companyName',
+                to: 'string',
+                onError: '',
+                onNull: '',
+              },
+            },
+          },
+        },
+      },
+      _employerActivity: {
+        $ifNull: ['$lastSeenAt', { $ifNull: ['$pubDate', '$createdAt'] }],
+      },
+      _globalRemoteListing: {
+        $cond: [{ $eq: ['$isWorldwideRemote', true] }, 1, 0],
+      },
+    },
+  },
+  { $match: { _employerKey: { $ne: '' } } },
+  { $sort: { _employerActivity: -1, _id: 1 } },
+  {
+    $group: {
+      _id: '$_employerKey',
+      name: { $first: '$companyName' },
+      listingCount: { $sum: 1 },
+      mostRecent: { $max: '$_employerActivity' },
+      globalRemoteListings: { $sum: '$_globalRemoteListing' },
+    },
+  },
+  { $sort: { listingCount: -1, mostRecent: -1, globalRemoteListings: -1, name: 1 } },
+];
+
+const collectFeaturedEmployers = (rows) => {
+  const employersByName = new Map();
+  for (const row of rows) {
+    const name = normalizeEmployerName(row.name);
+    const key = employerNameKey(name);
+    if (PLACEHOLDER_EMPLOYER_NAMES.has(key)) continue;
+
+    const existing = employersByName.get(key);
+    if (!existing) {
+      employersByName.set(key, {
+        name,
+        listingCount: Number(row.listingCount) || 0,
+        mostRecent: row.mostRecent || null,
+        globalRemoteListings: Number(row.globalRemoteListings) || 0,
+      });
+      continue;
+    }
+
+    existing.listingCount += Number(row.listingCount) || 0;
+    existing.globalRemoteListings += Number(row.globalRemoteListings) || 0;
+    if (new Date(row.mostRecent || 0) > new Date(existing.mostRecent || 0)) {
+      existing.name = name;
+      existing.mostRecent = row.mostRecent;
+    }
+  }
+  return [...employersByName.values()].sort((a, b) => (
+    b.listingCount - a.listingCount
+    || new Date(b.mostRecent || 0) - new Date(a.mostRecent || 0)
+    || b.globalRemoteListings - a.globalRemoteListings
+    || a.name.localeCompare(b.name)
+  ));
+};
+
+export const getFeaturedEmployers = asyncHandler(async (req, res) => {
+  const rows = await Job.aggregate(featuredEmployerPipeline());
+  const employers = collectFeaturedEmployers(rows);
+  const all = String(req.query?.all || '').toLowerCase() === 'true';
+  const requestedLimit = Number.parseInt(req.query?.limit, 10) || 12;
+  const limit = Math.min(24, Math.max(1, requestedLimit));
+  res.status(200).json({
+    employers: all ? employers : employers.slice(0, limit),
+    total: employers.length,
+  });
+});
+
 // @desc    Get all jobs (public)
 // @route   GET /api/jobs
 // @access  Public
@@ -95,6 +208,7 @@ export const getJobs = asyncHandler(async (req, res) => {
   const {
     q,
     search,
+    company,
     location,
     country,
     city,
@@ -137,6 +251,15 @@ export const getJobs = asyncHandler(async (req, res) => {
         { tags: regex },
       ],
     });
+  }
+  const companyName = String(company || '').trim();
+  if (companyName) {
+    if (companyName.length > 160) {
+      res.status(400);
+      throw new Error('Company filter must be 160 characters or fewer.');
+    }
+    const companyPattern = companyName.split(/\s+/).map(escapeRegex).join('\\s+');
+    filters.push({ companyName: { $regex: `^${companyPattern}$`, $options: 'i' } });
   }
 
   const worldwideCountry = String(country || '').toLowerCase() === 'worldwide';
