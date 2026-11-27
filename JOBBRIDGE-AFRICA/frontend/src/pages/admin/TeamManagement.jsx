@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import api from "../../services/api";
 
 const TeamManagement = () => {
+  const photoInputRef = useRef(null);
   const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -66,6 +67,7 @@ const TeamManagement = () => {
     setPhotoPreview("");
     setEditingMember(null);
     setShowForm(false);
+    if (photoInputRef.current) photoInputRef.current.value = "";
   };
 
   const handleSubmit = async (e) => {
@@ -95,7 +97,7 @@ const TeamManagement = () => {
       }
 
       resetForm();
-      fetchTeamMembers();
+      await fetchTeamMembers();
     } catch (err) {
       setError(err.response?.data?.message || "Operation failed");
     }
@@ -272,6 +274,7 @@ const TeamManagement = () => {
                     Photo
                   </label>
                   <input
+                    ref={photoInputRef}
                     type="file"
                     accept="image/*"
                     onChange={handlePhotoChange}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../services/api";
@@ -190,10 +190,36 @@ const emptyWorkPreferences = () => ({
   willingToRelocate: false,
 });
 const commaSeparatedValues = (value) => uniqueValues(value.split(","));
+const normalizeProfileItems = (items) => (Array.isArray(items) ? items : [])
+  .filter((item) => item && typeof item === "object")
+  .map((item) => Object.fromEntries(Object.entries(item).map(([key, value]) => [
+    key,
+    typeof value === "string" ? value.trim() : value,
+  ])))
+  .filter((item) => Object.values(item).some((value) => (
+    typeof value === "string" ? value.length > 0 : value !== undefined && value !== null
+  )));
+const profileStateFromUser = (source = {}) => ({
+  name: source.name || "",
+  email: source.email || "",
+  phone: source.phone || "",
+  country: source.country || "",
+  bio: source.bio || "",
+  skills: uniqueValues(source.skills || []),
+  skillGroups: normalizeSkillGroups(source.skillGroups, source.skills),
+  education: normalizeProfileItems(source.education),
+  experience: normalizeProfileItems(source.experience),
+  certifications: normalizeProfileItems(source.certifications),
+  projects: normalizeProfileItems(source.projects),
+  workPreferences: { ...emptyWorkPreferences(), ...(source.workPreferences || {}) },
+  languages: source.languages || [],
+});
 
 const Profile = () => {
   const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
+  const resumeInputRef = useRef(null);
+  const profileImageInputRef = useRef(null);
   const [activeTab, setActiveTab] = useState("basic");
   const [resumeFile, setResumeFile] = useState(null);
   const [profileImagePreview, setProfileImagePreview] = useState(
@@ -236,21 +262,7 @@ const Profile = () => {
   // Load user data into profile state when user changes
   useEffect(() => {
     if (user) {
-      setProfile({
-        name: user.name || "",
-        email: user.email || "",
-        phone: user.phone || "",
-        country: user.country || "",
-        bio: user.bio || "",
-        skills: user.skills || [],
-        skillGroups: normalizeSkillGroups(user.skillGroups, user.skills),
-        education: user.education || [],
-        experience: user.experience || [],
-        certifications: user.certifications || [],
-        projects: user.projects || [],
-        workPreferences: { ...emptyWorkPreferences(), ...(user.workPreferences || {}) },
-        languages: user.languages || [],
-      });
+      setProfile(profileStateFromUser(user));
       setTargetRolesText((user.workPreferences?.targetRoles || []).join(", "));
       setPreferredLocationsText((user.workPreferences?.preferredLocations || []).join(", "));
       setJobDigestPreferences({
@@ -287,7 +299,7 @@ const Profile = () => {
         const formData = new FormData();
         formData.append("resume", file);
         await api.post("/auth/upload-resume", formData);
-        await api.put("/auth/profile", {
+        const { data: savedProfile } = await api.put("/auth/profile", {
           name: nextProfile.name,
           email: nextProfile.email,
           phone: nextProfile.phone,
@@ -295,19 +307,26 @@ const Profile = () => {
           bio: nextProfile.bio,
           skills: nextProfile.skills,
           skillGroups: nextProfile.skillGroups,
-          education: nextProfile.education,
-          experience: nextProfile.experience,
-          certifications: nextProfile.certifications,
-          projects: nextProfile.projects,
+          education: normalizeProfileItems(nextProfile.education),
+          experience: normalizeProfileItems(nextProfile.experience),
+          certifications: normalizeProfileItems(nextProfile.certifications),
+          projects: normalizeProfileItems(nextProfile.projects),
           workPreferences: nextProfile.workPreferences,
         });
-        await refreshUser();
+        const refreshedUser = await refreshUser();
+        const saved = refreshedUser || savedProfile;
+        setProfile(profileStateFromUser(saved));
+        setTargetRolesText((saved.workPreferences?.targetRoles || []).join(", "));
+        setPreferredLocationsText((saved.workPreferences?.preferredLocations || []).join(", "));
+        setResumeFile(null);
+        if (resumeInputRef.current) resumeInputRef.current.value = "";
         setActiveTab("basic");
         alert("Resume uploaded and readable profile details were prefilled. Review and save your profile.");
       } catch (error) {
         console.error("Error uploading resume:", error);
         alert(error.response?.data?.message || error.message || "Failed to upload or read resume");
         setResumeFile(null);
+        if (resumeInputRef.current) resumeInputRef.current.value = "";
         setParsing(false);
         return;
       }
@@ -337,7 +356,8 @@ const Profile = () => {
         return;
       }
 
-      setProfileImagePreview(URL.createObjectURL(file));
+      const previewUrl = URL.createObjectURL(file);
+      setProfileImagePreview(previewUrl);
       setUploadingImage(true);
 
       try {
@@ -365,12 +385,18 @@ const Profile = () => {
         });
 
         // Refresh user data from server
-        await refreshUser();
+        const refreshedUser = await refreshUser();
+        const uploadedImageUrl = refreshedUser?.profileImageUrl || profileImageUrl;
+        URL.revokeObjectURL(previewUrl);
+        setProfileImagePreview(uploadedImageUrl);
+        if (profileImageInputRef.current) profileImageInputRef.current.value = "";
 
         alert("✅ Profile photo uploaded successfully!");
         setUploadingImage(false);
       } catch (error) {
         console.error("Error uploading profile image:", error);
+        if (profileImageInputRef.current) profileImageInputRef.current.value = "";
+        URL.revokeObjectURL(previewUrl);
         alert(
           error.response?.data?.message || "Failed to upload profile image"
         );
@@ -492,23 +518,33 @@ const Profile = () => {
   const handleSaveProfile = async () => {
     setProfileSaveStatus(null);
     try {
-      await api.put("/auth/profile", {
+      const { data: savedProfile } = await api.put("/auth/profile", {
         name: profile.name,
         email: profile.email,
         phone: profile.phone,
         country: profile.country,
         bio: profile.bio,
-        education: profile.education,
-        experience: profile.experience,
+        education: normalizeProfileItems(profile.education),
+        experience: normalizeProfileItems(profile.experience),
         skills: profile.skills,
         skillGroups: profile.skillGroups,
-        certifications: profile.certifications,
-        projects: profile.projects,
+        certifications: normalizeProfileItems(profile.certifications),
+        projects: normalizeProfileItems(profile.projects),
         workPreferences: profile.workPreferences,
       });
 
-      // Refresh user data from server
-      await refreshUser();
+      const refreshedUser = await refreshUser();
+      const saved = refreshedUser || savedProfile;
+      setProfile(profileStateFromUser(saved));
+      setTargetRolesText((saved.workPreferences?.targetRoles || []).join(", "));
+      setPreferredLocationsText((saved.workPreferences?.preferredLocations || []).join(", "));
+      setNewSkill("");
+      setNewSkillGroup("core");
+      setSkillSuggestions([]);
+      setShowSuggestions(false);
+      setResumeFile(null);
+      if (resumeInputRef.current) resumeInputRef.current.value = "";
+      setProfileImagePreview(saved.profileImageUrl || null);
       setProfileSaveStatus({ type: "success", message: "Profile saved successfully." });
     } catch (error) {
       console.error("Error saving profile:", error);
@@ -533,6 +569,7 @@ const Profile = () => {
         location: profile.country,
         consent: true,
       });
+      setEmailNotifications(false);
       setJobAlertStatus({ type: "success", message: data.message || "Your job alert subscription is saved." });
     } catch (error) {
       setJobAlertStatus({
@@ -782,6 +819,7 @@ const Profile = () => {
               {/* Upload Button */}
               <div>
                 <input
+                  ref={profileImageInputRef}
                   type="file"
                   id="profile-image-upload"
                   accept="image/jpeg,image/jpg,image/png,image/webp"
@@ -869,6 +907,7 @@ const Profile = () => {
               }`}
             >
               <input
+                ref={resumeInputRef}
                 type="file"
                 id="resume-upload"
                 accept=".pdf,.doc,.docx,.txt"

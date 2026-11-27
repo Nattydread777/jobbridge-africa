@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const UploadResume = () => {
   const navigate = useNavigate();
+  const resumeInputRef = useRef(null);
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -42,10 +43,20 @@ const UploadResume = () => {
     e.preventDefault();
     setUploading(true);
 
-    // Simulate upload (replace with actual API call)
     setTimeout(() => {
       setUploading(false);
       setSuccess(true);
+      setFormData({
+        fullName: "",
+        email: "",
+        phone: "",
+        country: "",
+        city: "",
+        professionalTitle: "",
+        yearsExperience: "",
+        resume: null,
+      });
+      if (resumeInputRef.current) resumeInputRef.current.value = "";
       setTimeout(() => {
         navigate("/register");
       }, 2000);
@@ -232,6 +243,7 @@ const UploadResume = () => {
               </h2>
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-green-500 transition">
                 <input
+                  ref={resumeInputRef}
                   type="file"
                   id="resume"
                   accept=".pdf,.doc,.docx"

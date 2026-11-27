@@ -27,6 +27,7 @@ const ForgotPasswordModal = ({ initialEmail, onClose }) => {
         { timeout: 20000 },
       );
       setMessage(response.data.message);
+      setEmail("");
     } catch (requestError) {
       setError(
         requestError.response?.data?.message

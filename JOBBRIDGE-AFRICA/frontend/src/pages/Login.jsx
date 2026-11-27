@@ -25,6 +25,8 @@ const Login = () => {
     setSubmitting(true);
     try {
       await login(email.trim(), password);
+      setEmail("");
+      setPassword("");
       navigate("/profile-view", { replace: true });
     } catch (err) {
       setError(err.response?.data?.message || "We couldn't sign you in. Check your connection and try again.");

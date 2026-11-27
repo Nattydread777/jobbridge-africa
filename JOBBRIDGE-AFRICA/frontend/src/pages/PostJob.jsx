@@ -3,26 +3,32 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 
+const createEmptyJobForm = () => ({
+  title: "",
+  companyName: "",
+  location: "",
+  jobType: "Full-Time",
+  workplaceType: "on-site",
+  salaryRange: "",
+  description: "",
+  requirements: "",
+  qualifications: "",
+  responsibilities: "",
+  benefits: "",
+  applicationInstructions: "",
+  expiryDate: "",
+  applicationEmail: "",
+});
+
 const PostJob = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState({
-    title: "",
+  const [formData, setFormData] = useState(() => ({
+    ...createEmptyJobForm(),
     companyName: user?.companyName || "",
-    location: "",
-    jobType: "Full-Time",
-    workplaceType: "on-site",
-    salaryRange: "",
-    description: "",
-    requirements: "",
-    qualifications: "",
-    responsibilities: "",
-    benefits: "",
-    applicationInstructions: "",
-    expiryDate: "",
     applicationEmail: user?.email || "",
-  });
+  }));
 
   const [loading, setLoading] = useState(false);
 
@@ -55,6 +61,7 @@ const PostJob = () => {
       };
 
       await api.post("/jobs", jobData);
+      setFormData(createEmptyJobForm());
       alert("Job posted successfully!");
       navigate("/dashboard");
     } catch (error) {

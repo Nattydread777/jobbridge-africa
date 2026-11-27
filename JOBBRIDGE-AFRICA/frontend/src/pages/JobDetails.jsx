@@ -1,5 +1,5 @@
 import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
 import PageBreadcrumb from "../components/PageBreadcrumb";
@@ -73,6 +73,7 @@ const JobDetails = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
+  const applicationResumeInputRef = useRef(null);
   const [job, setJob] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -256,6 +257,8 @@ const JobDetails = () => {
       const { data } = await api.post("/applications", body);
 
       setApplied(true);
+      setApplicationData({ coverLetter: "", resume: null });
+      if (applicationResumeInputRef.current) applicationResumeInputRef.current.value = "";
       setShowApplicationModal(false);
       setSubmitting(false);
       alert(data.notificationSent
@@ -284,6 +287,7 @@ const JobDetails = () => {
         email: reportEmail,
       });
       setReportStatus(data.message);
+      setReportReason("inaccurate");
       setReportDetails("");
       setReportEmail("");
     } catch (requestError) {
@@ -548,6 +552,7 @@ const JobDetails = () => {
                   )}
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
                     <input
+                      ref={applicationResumeInputRef}
                       type="file"
                       id="resume-upload"
                       accept=".pdf,.doc,.docx"

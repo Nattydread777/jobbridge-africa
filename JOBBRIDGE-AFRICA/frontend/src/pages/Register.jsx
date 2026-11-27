@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ForgotPasswordModal from "../components/ForgotPasswordModal";
@@ -19,6 +19,7 @@ const emptyParsed = {
 
 const Register = () => {
   const [searchParams] = useSearchParams();
+  const resumeInputRef = useRef(null);
   const [form, setForm] = useState({
     name: "", email: "", password: "", role: searchParams.get("role") === "employer" ? "employer" : "job_seeker",
     companyName: "", country: "", phone: "", bio: "", targetRoles: "",
@@ -30,6 +31,7 @@ const Register = () => {
   const [submitting, setSubmitting] = useState(false);
   const [hasRegistered, setHasRegistered] = useState(false);
   const [verificationSent, setVerificationSent] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [jobAlertsEnabled, setJobAlertsEnabled] = useState(false);
@@ -44,6 +46,36 @@ const Register = () => {
 
   const updateField = (event) =>
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+
+  const resetRegistrationDraft = (emailAddress) => {
+    setRegisteredEmail(emailAddress);
+    setForm({
+      name: "",
+      email: "",
+      password: "",
+      role: searchParams.get("role") === "employer" ? "employer" : "job_seeker",
+      companyName: "",
+      country: "",
+      phone: "",
+      bio: "",
+      targetRoles: "",
+    });
+    setResume(null);
+    setParsed({ ...emptyParsed, skills: [], education: [], experience: [] });
+    setPastedText("");
+    setTermsAccepted(false);
+    setPrivacyAccepted(false);
+    setJobAlertsEnabled(false);
+    setJobAlertFrequency("daily");
+    setForgotPasswordOpen(false);
+    if (resumeInputRef.current) resumeInputRef.current.value = "";
+  };
+
+  const completeRegistration = (emailAddress) => {
+    resetRegistrationDraft(emailAddress);
+    setHasRegistered(true);
+    setVerificationSent(true);
+  };
 
   const applyParsedDetails = (details) => {
     setParsed(details);
@@ -95,20 +127,19 @@ const Register = () => {
         jobAlertsEnabled,
         jobAlertFrequency,
       } : {};
+      const emailAddress = form.email.trim();
       await register({
         ...form,
         ...profileData,
         termsAccepted,
         privacyAccepted,
       });
-      setHasRegistered(true);
-      setVerificationSent(true);
+      completeRegistration(emailAddress);
     } catch (registrationError) {
       const message = registrationError.response?.data?.message || "We couldn't create your account. Check your connection and try again.";
       setError(message);
       if (registrationError.response?.status === 503 && message.toLowerCase().includes("account was created")) {
-        setHasRegistered(true);
-        setVerificationSent(true);
+        completeRegistration(form.email.trim());
       }
     } finally {
       setSubmitting(false);
@@ -136,8 +167,8 @@ const Register = () => {
         {verificationSent && (
           <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
             <p className="font-semibold">Account created. Verify your email before signing in.</p>
-            <p className="mt-1">We sent a one-time verification link to {form.email}. If you don’t see it, check your spam folder or request another link.</p>
-            <ResendVerification initialEmail={form.email} />
+            <p className="mt-1">We sent a one-time verification link to {registeredEmail}. If you don’t see it, check your spam folder or request another link.</p>
+            <ResendVerification initialEmail={registeredEmail} />
           </div>
         )}
 
@@ -147,7 +178,7 @@ const Register = () => {
             <p className="mt-1 text-sm text-slate-600">PDF, DOCX, or TXT. Text is extracted in your browser; the file itself is not uploaded until you choose to add it to your profile after verifying your account.</p>
             <label htmlFor="registration-resume" className="mt-4 flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-amber-400 bg-white px-4 py-5 text-center font-semibold text-amber-900 hover:bg-amber-50">
               {resume ? `Selected: ${resume.name}` : "Choose a resume file"}
-              <input id="registration-resume" type="file" accept=".pdf,.docx,.txt" onChange={handleResume} className="sr-only" />
+              <input ref={resumeInputRef} id="registration-resume" type="file" accept=".pdf,.docx,.txt" onChange={handleResume} className="sr-only" />
             </label>
             {parsed.skills.length > 0 && (
               <div className="mt-3 text-sm text-slate-700">

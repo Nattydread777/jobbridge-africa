@@ -22,6 +22,8 @@ const ResetPassword = () => {
     try {
       const response = await api.post(`/auth/reset-password/${encodeURIComponent(token || "")}`, { password });
       setSuccess(response.data.message);
+      setPassword("");
+      setConfirmPassword("");
     } catch (requestError) {
       setError(requestError.response?.data?.message || "We couldn’t reset your password. Request a new reset link and try again.");
     } finally {
