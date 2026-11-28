@@ -262,7 +262,7 @@ const Register = () => {
               </div>
               <div className="sm:col-span-2">
                 <label htmlFor="register-bio" className="mb-1.5 block text-sm font-semibold text-slate-700">Professional summary (optional)</label>
-                <textarea id="register-bio" name="bio" value={form.bio} onChange={updateField} rows={3} maxLength={1200} className="w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="A concise introduction to your experience and goals" />
+                <textarea id="register-bio" name="bio" value={form.bio} onChange={updateField} rows={3} maxLength={1500} className="w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="A professional summary of your experience and goals" />
               </div>
               <div className="sm:col-span-2">
                 <label htmlFor="register-target-roles" className="mb-1.5 block text-sm font-semibold text-slate-700">Target roles (optional)</label>

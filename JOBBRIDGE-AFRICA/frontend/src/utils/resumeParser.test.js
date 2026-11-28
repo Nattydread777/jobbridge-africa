@@ -213,6 +213,58 @@ test("incomplete experience records are not added to the profile", () => {
   assert.equal(mapped.experience[0].position, "Senior Developer");
 });
 
+test("multiple roles and labeled or numbered work bullets map to separate profile entries", () => {
+  const parsed = parseResumeText([
+    "Experience",
+    "Senior Product Manager | Alpha Ltd | Lagos | Jan 2022 - Present",
+    "- Led product strategy for regional teams.",
+    "Project Management: Coordinated five cross-functional launches.",
+    "Data & BI: Built weekly performance dashboards.",
+    "1. Improved reporting turnaround by 30%.",
+    "Product Analyst | Beta Group | Accra | Jan 2020 - Dec 2021",
+    "- Analyzed customer and sales trends.",
+    "Business Analyst | Gamma Co | Nairobi | 2018 - 2019",
+    "- Documented business requirements.",
+    "Operations Associate | Delta Ltd | Kampala | 2016 - 2018",
+    "- Streamlined onboarding processes.",
+    "Research Assistant | Epsilon Org | Kigali | 2014 - 2016",
+    "- Prepared research summaries.",
+  ].join("\n"));
+  const mapped = mapParsedResumeToProfile(parsed, {
+    name: "",
+    email: "",
+    phone: "",
+    country: "",
+    bio: "",
+    skills: [],
+    skillGroups: { core: [], tools: [], technical: [] },
+    education: [],
+    experience: [],
+    certifications: [],
+    projects: [],
+    workPreferences: { workModes: [], targetRoles: [], preferredLocations: [], willingToRelocate: false },
+  });
+
+  assert.equal(mapped.experience.length, 5);
+  assert.deepEqual(
+    mapped.experience.slice(0, 2).map(({ position, company }) => [position, company]),
+    [["Senior Product Manager", "Alpha Ltd"], ["Product Analyst", "Beta Group"]],
+  );
+  assert.deepEqual(mapped.experience[0].description.split("\n"), [
+    "Led product strategy for regional teams.",
+    "Project Management: Coordinated five cross-functional launches.",
+    "Data & BI: Built weekly performance dashboards.",
+    "Improved reporting turnaround by 30%.",
+  ]);
+  assert.equal(mapped.experience[0].startDate, "Jan 2022");
+  assert.equal(mapped.experience[0].endDate, "Present");
+});
+
+test("resume summaries retain up to 1,500 characters", () => {
+  const parsed = parseResumeText(`Professional Summary\n${"A".repeat(1600)}`);
+  assert.equal(parsed.bio.length, 1500);
+});
+
 test("DOCX export uses candidate name first and leaves role headers outside bullet lists", async () => {
   const blob = await createCvDocxBlob({
     contact: { name: "Ada Example", email: "ada@example.com", phone: "", location: "" },

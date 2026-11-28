@@ -49,6 +49,11 @@ const ProfileView = () => {
   }
 
   const isJobSeeker = user.role === "job_seeker";
+  const resumeViewUrl = api.getUri({ url: "/auth/resume" });
+  const resumeDownloadUrl = api.getUri({
+    url: "/auth/resume",
+    params: { download: "1" },
+  });
   const completionFields = [
     Boolean(user.profileImageUrl),
     Boolean(user.resumeUrl),
@@ -61,7 +66,8 @@ const ProfileView = () => {
   const completionPercentage = isJobSeeker
     ? Math.round((completionFields.filter(Boolean).length / completionFields.length) * 100)
     : 100;
-  const resumeIsPdf = /\.pdf(?:$|[?#])/i.test(user.resumeUrl || "");
+  const resumeIsPdf = user.resumeMimeType === "application/pdf"
+    || /\.pdf(?:$|[?#])/i.test(user.resumeFileName || user.resumeUrl || "");
 
   const handleLogout = async () => {
     try {
@@ -295,7 +301,7 @@ const ProfileView = () => {
           <div className="flex items-center gap-3">
             <span aria-hidden="true" className="flex h-11 w-11 items-center justify-center rounded-lg bg-white text-xl shadow-sm">📄</span>
             <div>
-              <p className="font-semibold text-slate-900">Resume / CV uploaded</p>
+              <p className="font-semibold text-slate-900">{user.resumeFileName || "Resume / CV uploaded"}</p>
               <button type="button" onClick={() => setResumePreviewOpen((open) => !open)} aria-expanded={resumePreviewOpen} className="mt-1 text-sm font-medium text-amber-800 underline underline-offset-2">
                 {resumePreviewOpen ? "Hide preview" : "Preview document"}
               </button>
@@ -304,6 +310,14 @@ const ProfileView = () => {
           <button type="button" onClick={() => resumeInput.current?.click()} disabled={uploadingResume} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60">
             {uploadingResume ? "Uploading…" : "Replace CV"}
           </button>
+          <div className="flex w-full flex-wrap gap-4 border-t border-slate-200 pt-4">
+            <a href={resumeViewUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-amber-800 underline">
+              View resume
+            </a>
+            <a href={resumeDownloadUrl} className="text-sm font-semibold text-amber-800 underline">
+              Download original
+            </a>
+          </div>
         </div>
       ) : (
         <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center">
@@ -326,10 +340,10 @@ const ProfileView = () => {
         <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:p-5">
           <div className="mb-3 flex items-center justify-between gap-3">
             <p className="text-sm font-semibold text-slate-800">Resume preview</p>
-            <a href={user.resumeUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-amber-800 underline">Open in new tab</a>
+            <a href={resumeViewUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-amber-800 underline">Open in new tab</a>
           </div>
           {resumeIsPdf
-            ? <iframe title="Uploaded resume preview" src={user.resumeUrl} loading="lazy" className="h-[70vh] min-h-96 w-full rounded-lg border border-slate-300 bg-white" />
+            ? <iframe title="Uploaded resume preview" src={resumeViewUrl} loading="lazy" className="h-[70vh] min-h-96 w-full rounded-lg border border-slate-300 bg-white" />
             : <p className="rounded-lg bg-white p-4 text-sm text-slate-700">This Word document opens in a new tab; in-page preview is available for PDF files.</p>}
         </div>
       )}
@@ -417,7 +431,7 @@ const ProfileView = () => {
                     <Link to="/profile" className="text-sm font-semibold text-amber-800 hover:underline">Edit profile</Link>
                   </div>
                   <p className="mt-4 whitespace-pre-line leading-7 text-slate-700">
-                    {user.bio || "Add a concise introduction about your experience, strengths, and career goals."}
+                    {user.bio || "Add a professional summary of your experience, strengths, and career goals."}
                   </p>
                   {user.resumeUrl && (
                     <button type="button" onClick={() => { setActiveTab("resume"); setResumePreviewOpen(true); }} className="mt-5 inline-flex items-center gap-2 font-semibold text-amber-800 hover:underline">

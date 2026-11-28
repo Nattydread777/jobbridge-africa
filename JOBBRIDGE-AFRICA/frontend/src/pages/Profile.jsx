@@ -745,6 +745,42 @@ const Profile = () => {
           </div>
         )}
 
+        {user.role === "job_seeker" && (
+          <section className="mb-6 flex flex-col gap-4 rounded-xl border border-amber-200 bg-amber-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="font-bold text-slate-900">Start with your CV or enter details manually</h2>
+              <p className="mt-1 text-sm text-slate-600">Auto-fill saves matching details across your profile. You can review and edit every section afterward.</p>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => resumeInputRef.current?.click()}
+                disabled={parsing || profileSaving}
+                className="rounded-lg bg-amber-500 px-4 py-2 font-semibold text-slate-950 hover:bg-amber-400 disabled:cursor-wait disabled:opacity-60"
+              >
+                {parsing ? "Reading CV…" : "Auto-fill from CV"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("basic")}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-semibold text-slate-800 hover:bg-slate-100"
+              >
+                Manual entry
+              </button>
+            </div>
+          </section>
+        )}
+
+        <input
+          ref={resumeInputRef}
+          type="file"
+          id="resume-upload"
+          accept=".pdf,.doc,.docx,.txt"
+          onChange={handleResumeUpload}
+          disabled={parsing}
+          className="hidden"
+        />
+
         {/* Tabs */}
         <nav aria-label="Profile sections" className="mb-6 overflow-x-auto border-b">
           <div role="tablist" className="flex min-w-max gap-5">
@@ -900,10 +936,15 @@ const Profile = () => {
             </p>
             {user.resumeUrl && (
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
-                <span className="font-medium text-gray-800">A resume is currently attached to your profile.</span>
-                <a href={user.resumeUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
-                  View current resume
-                </a>
+                <span className="font-medium text-gray-800">{user.resumeFileName || "A resume is currently attached to your profile."}</span>
+                <div className="flex flex-wrap gap-4">
+                  <a href={api.getUri({ url: "/auth/resume" })} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
+                    View current resume
+                  </a>
+                  <a href={api.getUri({ url: "/auth/resume", params: { download: "1" } })} className="font-semibold text-primary hover:underline">
+                    Download original
+                  </a>
+                </div>
               </div>
             )}
 
@@ -926,15 +967,6 @@ const Profile = () => {
                 parsing ? "border-primary bg-primary/5" : "border-gray-300"
               }`}
             >
-              <input
-                ref={resumeInputRef}
-                type="file"
-                id="resume-upload"
-                accept=".pdf,.doc,.docx,.txt"
-                onChange={handleResumeUpload}
-                disabled={parsing}
-                className="hidden"
-              />
               <label
                 htmlFor="resume-upload"
                 className={`inline-block ${
@@ -1074,11 +1106,11 @@ const Profile = () => {
                   rows="4"
                   className="w-full border rounded px-4 py-2"
                   placeholder="Brief overview of your professional background and career goals..."
-                  maxLength={300}
+                  maxLength={1500}
                   required
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  {profile.bio.length}/300 characters
+                  {profile.bio.length}/1500 characters
                 </p>
               </div>
               <div className="flex gap-3">

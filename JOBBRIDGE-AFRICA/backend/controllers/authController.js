@@ -1,6 +1,9 @@
 import asyncHandler from 'express-async-handler';
+import axios from 'axios';
 import { createHash, randomBytes } from 'node:crypto';
 import mongoose from 'mongoose';
+import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import { OAuth2Client } from 'google-auth-library';
 import WordExtractor from 'word-extractor';
 import User from '../models/userModel.js';
@@ -23,6 +26,19 @@ import JobDigestDelivery from '../models/JobDigestDelivery.js';
 import { deliverJobDigestForUser } from '../services/jobDigestService.js';
 
 const JOB_ALERT_FREQUENCIES = ['instant', 'daily', 'weekly'];
+const RESUME_MIME_TYPES = {
+  '.pdf': 'application/pdf',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.txt': 'text/plain',
+};
+
+const validateBio = (bio, res) => {
+  if (bio !== undefined && bio !== null && (typeof bio !== 'string' || bio.length > 1500)) {
+    res.status(400);
+    throw new Error('Professional bio must be 1,500 characters or fewer.');
+  }
+};
 
 const clearAuthCookie = (res) => {
   const isProd = process.env.NODE_ENV === 'production';
@@ -58,6 +74,7 @@ export const registerUser = asyncHandler(async (req, res) => {
     targetRoles, jobAlertsEnabled, jobAlertFrequency,
   } = req.body;
 
+  validateBio(bio, res);
   if (!name || !email || !password || !role) {
     res.status(400);
     throw new Error('Please fill in all required fields.');
@@ -407,6 +424,8 @@ export const getUserProfile = asyncHandler(async (req, res) => {
       bio: req.user.bio,
       resumeUrl: req.user.resumeUrl,
       resumePublicId: req.user.resumePublicId,
+      resumeFileName: req.user.resumeFileName,
+      resumeMimeType: req.user.resumeMimeType,
       profileImageUrl: req.user.profileImageUrl,
       profileImagePublicId: req.user.profileImagePublicId,
       companyName: req.user.companyName,
@@ -429,6 +448,7 @@ export const getUserProfile = asyncHandler(async (req, res) => {
 });
 
 export const updateUserProfile = asyncHandler(async (req, res) => {
+  validateBio(req.body.bio, res);
   const user = await User.findById(req.user._id);
 
   if (user) {
@@ -476,6 +496,8 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
       bio: updatedUser.bio,
       resumeUrl: updatedUser.resumeUrl,
       resumePublicId: updatedUser.resumePublicId,
+      resumeFileName: updatedUser.resumeFileName,
+      resumeMimeType: updatedUser.resumeMimeType,
       profileImageUrl: updatedUser.profileImageUrl,
       profileImagePublicId: updatedUser.profileImagePublicId,
       companyName: updatedUser.companyName,
@@ -504,9 +526,29 @@ export const uploadResume = asyncHandler(async (req, res) => {
     throw new Error('Choose a resume file to upload.');
   }
 
+  const extension = path.extname(req.file.originalname).toLowerCase();
+  const mimeType = RESUME_MIME_TYPES[extension];
+  const allowedGenericWordMime = extension === '.doc'
+    && ['', 'application/octet-stream', 'application/x-msword'].includes(req.file.mimetype);
+  if (!mimeType || (req.file.mimetype !== mimeType && !allowedGenericWordMime)) {
+    res.status(400);
+    throw new Error('Resume must be a PDF, DOC, DOCX, or TXT file.');
+  }
+  const fileName = req.file.originalname
+    .split(/[\\/]/)
+    .pop()
+    .replace(/[\u0000-\u001f\u007f"]/g, '')
+    .trim()
+    .slice(0, 180) || `resume${extension}`;
+
   const result = await new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder: 'jobbridge/resumes', resource_type: 'raw' },
+      {
+        folder: 'jobbridge/resumes',
+        resource_type: 'raw',
+        public_id: `${randomBytes(16).toString('hex')}${extension}`,
+        filename_override: fileName,
+      },
       (error, uploaded) => (error ? reject(error) : resolve(uploaded)),
     );
     stream.end(req.file.buffer);
@@ -520,6 +562,8 @@ export const uploadResume = asyncHandler(async (req, res) => {
   const previousPublicId = user.resumePublicId;
   user.resumeUrl = result.secure_url;
   user.resumePublicId = result.public_id;
+  user.resumeFileName = fileName;
+  user.resumeMimeType = mimeType;
   await user.save();
 
   if (previousPublicId) {
@@ -533,8 +577,70 @@ export const uploadResume = asyncHandler(async (req, res) => {
   res.status(200).json({
     resumeUrl: user.resumeUrl,
     resumePublicId: user.resumePublicId,
+    resumeFileName: user.resumeFileName,
+    resumeMimeType: user.resumeMimeType,
     message: 'Resume uploaded successfully.',
   });
+});
+
+export const getResume = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id)
+    .select('resumeUrl resumeFileName resumeMimeType');
+  if (!user?.resumeUrl) {
+    res.status(404);
+    throw new Error('No resume is available on this profile.');
+  }
+
+  let resumeUrl;
+  try {
+    resumeUrl = new URL(user.resumeUrl);
+  } catch {
+    res.status(502);
+    throw new Error('The saved resume URL is invalid.');
+  }
+  if (resumeUrl.protocol !== 'https:' || resumeUrl.hostname !== 'res.cloudinary.com') {
+    res.status(502);
+    throw new Error('The saved resume is unavailable from its storage provider.');
+  }
+
+  let storedFile;
+  try {
+    storedFile = await axios.get(resumeUrl.toString(), {
+      responseType: 'stream',
+      timeout: 15000,
+    });
+  } catch {
+    res.status(502);
+    throw new Error('The saved resume is temporarily unavailable.');
+  }
+
+  const urlFileName = resumeUrl.pathname.split('/').pop() || '';
+  const fileName = (user.resumeFileName || urlFileName || 'resume')
+    .split(/[\\/]/)
+    .pop()
+    .replace(/[\u0000-\u001f\u007f"]/g, '')
+    .trim()
+    .slice(0, 180) || 'resume';
+  const mimeType = user.resumeMimeType
+    || RESUME_MIME_TYPES[path.extname(fileName).toLowerCase()]
+    || storedFile.headers['content-type']?.split(';')[0]
+    || 'application/octet-stream';
+  const asciiFileName = fileName.replace(/[^\x20-\x7e"\\;]/g, '_').replace(/["\\;]/g, '_') || 'resume';
+  const encodedFileName = encodeURIComponent(fileName)
+    .replace(/['()*]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
+  const download = ['1', 'true'].includes(String(req.query.download || '').toLowerCase());
+
+  res.setHeader('Content-Type', mimeType);
+  res.setHeader(
+    'Content-Disposition',
+    `${download || mimeType !== 'application/pdf' ? 'attachment' : 'inline'}; filename="${asciiFileName}"; filename*=UTF-8''${encodedFileName}`,
+  );
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Cache-Control', 'private, no-store');
+  if (storedFile.headers['content-length']) {
+    res.setHeader('Content-Length', storedFile.headers['content-length']);
+  }
+  await pipeline(storedFile.data, res);
 });
 
 export const parseLegacyResume = asyncHandler(async (req, res) => {
@@ -584,7 +690,7 @@ export const deleteMyCvData = asyncHandler(async (req, res) => {
   await Promise.all([
     User.updateOne(
       { _id: user._id },
-      { $unset: { resumeUrl: '', resumePublicId: '' } },
+      { $unset: { resumeUrl: '', resumePublicId: '', resumeFileName: '', resumeMimeType: '' } },
     ),
     Application.updateMany(
       { applicant: user._id },
@@ -660,7 +766,7 @@ export const deleteMyAccount = asyncHandler(async (req, res) => {
             tailoredCvDeletedAt: deletedAt,
             candidateNotes: '',
           },
-          $unset: { resumePublicId: '', tailoredCv: '', candidateStage: '' },
+          $unset: { resumePublicId: '', resumeFileName: '', resumeMimeType: '', tailoredCv: '', candidateStage: '' },
         },
         { session },
       );

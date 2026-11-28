@@ -12,6 +12,7 @@ import {
     resetPassword,
     logoutUser,
     getUserProfile,
+    getResume,
     updateUserProfile,
   uploadProfileImage,
     uploadResume,
@@ -90,6 +91,7 @@ router.post('/bootstrap-admin', bootstrapAdmin);
 // Private/Protected Routes
 router.post('/logout', logoutUser);
 router.get('/me', protect, getUserProfile); // Uses the 'protect' middleware to ensure a user is logged in
+router.get('/resume', protect, getResume);
 router.put('/profile', protect, updateUserProfile); // Update user profile
 router.post('/upload-profile-image', protect, upload.single('profileImage'), uploadProfileImage); // Upload profile image
 router.post('/parse-legacy-resume', protect, legacyResumeParseLimiter, resumeUpload.single('resume'), parseLegacyResume);

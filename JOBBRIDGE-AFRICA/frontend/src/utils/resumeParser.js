@@ -144,6 +144,8 @@ const RESUME_HEADINGS = [
 const RESUME_DATE_RANGE = /\b(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:19|20)\d{2}\s*(?:-|–|to|through)\s*(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:(?:19|20)\d{2}|present|current)\b/i;
 const isBullet = (line) => /^(?:[-*•▪◦‣]|\d+[.)])\s+/.test(line);
 const cleanBullet = (line) => line.replace(/^(?:[-*•▪◦‣]|\d+[.)])\s+/, "").trim();
+const EXPERIENCE_LABEL = /^([A-Z][\w &/()'–-]{1,39}):(?:\s*(.*))?$/;
+const isExperienceLabel = (line) => EXPERIENCE_LABEL.test(line);
 const EXPERIENCE_ACTION_PATTERN = /^(?:built|created|designed|developed|delivered|implemented|launched|led|managed|owned|improved|increased|reduced|supported|coordinated|analyzed|analysed|maintained|automated|trained|taught)\b/i;
 const isCredentialRecord = (line) => {
   const content = cleanBullet(line);
@@ -182,8 +184,10 @@ export const normalizeResumeText = (sourceText) => String(sourceText || "")
       return state;
     }
     const roleHeader = RESUME_DATE_RANGE.test(line) || /\s(?:\|| at )\s/i.test(line);
+    const labeledExperience = state.section === "experience" && isExperienceLabel(line);
     const continuation = (isBullet(previous)
       && !roleHeader
+      && !labeledExperience
       && !isCredentialRecord(line)
       && !isEducationRecord(line))
       || (previous.length > 18
@@ -202,10 +206,11 @@ export const normalizeResumeText = (sourceText) => String(sourceText || "")
 const parseExperienceItems = (lines) => {
   const items = [];
   let current = null;
+  let pendingLabel = "";
   const startRole = (header = "") => {
     const dates = header.match(RESUME_DATE_RANGE)?.[0] || "";
     const withoutDates = header.replace(RESUME_DATE_RANGE, "").replace(/[|,;–—-]+$/g, "").trim();
-    const parts = withoutDates.split(/\s*(?:\||•|·| at )\s*/i).map((part) => part.trim()).filter(Boolean);
+    const parts = withoutDates.split(/\s*(?:\||•|·| at |–|—)\s*|\s+-\s+/i).map((part) => part.trim()).filter(Boolean);
     current = {
       title: parts[0] || "",
       company: parts[1] || "",
@@ -214,11 +219,23 @@ const parseExperienceItems = (lines) => {
       bullets: [],
     };
     items.push(current);
+    pendingLabel = "";
   };
   for (const line of lines) {
-    if (isBullet(line)) {
+    const labelMatch = line.match(EXPERIENCE_LABEL);
+    if (labelMatch) {
       if (!current) startRole();
-      current.bullets.push(cleanBullet(line));
+      const label = labelMatch[1].trim();
+      if (labelMatch[2]) {
+        current.bullets.push(`${label}: ${labelMatch[2].trim()}`);
+        pendingLabel = "";
+      } else {
+        pendingLabel = label;
+      }
+    } else if (isBullet(line)) {
+      if (!current) startRole();
+      const bullet = cleanBullet(line);
+      current.bullets.push(pendingLabel ? `${pendingLabel}: ${bullet}` : bullet);
     } else if (!current) {
       startRole(line);
     } else if (RESUME_DATE_RANGE.test(line) && !line.replace(RESUME_DATE_RANGE, "").trim()) {
@@ -227,11 +244,14 @@ const parseExperienceItems = (lines) => {
     } else if (current.dates && !current.title && !current.bullets.length) {
       const dates = current.dates;
       const header = line.match(RESUME_DATE_RANGE) ? line : `${line} | ${dates}`;
-      const parsed = header.replace(RESUME_DATE_RANGE, "").split(/\s*(?:\||•|·| at )\s*/i).map((part) => part.trim()).filter(Boolean);
+      const parsed = header.replace(RESUME_DATE_RANGE, "").split(/\s*(?:\||•|·| at |–|—)\s*|\s+-\s+/i).map((part) => part.trim()).filter(Boolean);
       current.title = parsed[0] || "";
       current.company = parsed[1] || "";
       current.location = parsed[2] || "";
       current.dates = line.match(RESUME_DATE_RANGE)?.[0] || dates;
+    } else if (pendingLabel && !RESUME_DATE_RANGE.test(line)) {
+      current.bullets.push(`${pendingLabel}: ${line}`);
+      pendingLabel = "";
     } else if (current.bullets.length || RESUME_DATE_RANGE.test(line)) {
       startRole(line);
     } else if (!current.title) {
@@ -446,9 +466,7 @@ export const parseResumeText = (sourceText) => {
 
   const experienceText = sections.experience.join("\n")
     || sectionText(text, /^(experience|work experience|employment history|work history)\s*:?\s*$/i);
-  const experience = experienceText
-    ? parseExperienceItems(experienceText.split(/\r?\n/).slice(0, 40))
-    : [];
+  const experience = experienceText ? parseExperienceItems(experienceText.split(/\r?\n/)) : [];
   const summaryText = sections.summary
     || sectionText(text, /^(summary|professional summary|profile|about me|objective)\s*:?\s*$/i);
 
@@ -456,7 +474,7 @@ export const parseResumeText = (sourceText) => {
     name,
     email,
     phone,
-    bio: summaryText.slice(0, 1200),
+    bio: summaryText.slice(0, 1500),
     skills: foundSkills,
     education: sections.structured.education,
     certifications: sections.structured.certifications,
@@ -496,7 +514,8 @@ export const mapParsedResumeToProfile = (parsedData, currentProfile, countryOpti
       ...resumeDateParts(item.dates),
       description: (item.bullets || []).filter(Boolean).join("\n"),
     }))
-    .filter((item) => item.position && item.company && item.startDate && item.endDate && item.description);
+    .filter((item) => item.position && item.company && item.startDate)
+    .slice(0, 20);
   const parsedEducation = (parsedData.education || [])
     .filter((item) => item.school && item.degree);
   const parsedCertifications = (parsedData.certifications || [])
@@ -520,7 +539,7 @@ export const mapParsedResumeToProfile = (parsedData, currentProfile, countryOpti
     email: parsedData.email || currentProfile.email,
     phone: parsedData.phone || currentProfile.phone,
     country: matchedCountry || currentProfile.country,
-    bio: parsedData.bio ? parsedData.bio.slice(0, 300) : currentProfile.bio,
+    bio: parsedData.bio ? parsedData.bio.slice(0, 1500) : currentProfile.bio,
     skills,
     skillGroups,
     education: parsedEducation.length ? parsedEducation : currentProfile.education,
