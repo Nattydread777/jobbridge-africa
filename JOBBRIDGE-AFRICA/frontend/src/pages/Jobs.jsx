@@ -215,9 +215,9 @@ const Jobs = () => {
           </button>
         </p>
       )}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,1fr))]">
         {/* Filters Sidebar */}
-        <aside className="lg:col-span-1 space-y-6">
+        <aside className="min-w-0 space-y-6">
           <div className="bg-white p-4 rounded-lg shadow">
             <label htmlFor="job-search" className="mb-2 block font-bold">Search jobs</label>
             <input
@@ -455,7 +455,7 @@ const Jobs = () => {
         </aside>
 
         {/* Jobs List */}
-        <main className="lg:col-span-3">
+        <main className="min-w-0 lg:col-span-3">
           <h2 className="text-2xl font-bold mb-4">
             Available Jobs {!loading && `(${pagination.total})`}
           </h2>
@@ -490,7 +490,7 @@ const Jobs = () => {
             </section>
           ) : (
             <>
-              <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid min-w-0 gap-6 md:grid-cols-2 xl:grid-cols-3">
                 {jobs.map((job) => (
                   <JobCard key={job._id} job={job} />
                 ))}

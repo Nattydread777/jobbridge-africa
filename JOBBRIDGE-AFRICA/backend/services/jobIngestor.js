@@ -98,7 +98,7 @@ export const normalizeJob = (job) => {
     return null;
   }
 
-  const stableIdentity = externalId || `${companySlug}\u0000${title.toLowerCase()}`;
+  const stableIdentity = externalId || applicationLink.toLowerCase() || `${companySlug}\u0000${title.toLowerCase()}`;
   const sourceKey = createHash('sha256').update(stableIdentity).digest('hex');
   const salary = asText(job.salary || job.salaryRange);
   const categories = asList(job.categories);

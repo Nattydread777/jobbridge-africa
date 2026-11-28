@@ -49,6 +49,10 @@ const jobDeduplicationStages = () => [
       _deduplicationKey: {
         title: normalizeDeduplicationField('title'),
         companyName: normalizeDeduplicationField('companyName'),
+        department: normalizeDeduplicationField('department'),
+        jobType: normalizeDeduplicationField('jobType'),
+        location: normalizeDeduplicationField('location'),
+        eligibilityScope: normalizeDeduplicationField('eligibilityScope'),
       },
       _listingCompleteness: {
         $add: [

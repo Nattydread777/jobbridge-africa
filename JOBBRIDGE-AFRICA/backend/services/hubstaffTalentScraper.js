@@ -10,8 +10,7 @@ import {
 import { extractSalaryCurrency } from '../utils/salary.js';
 
 const HUBSTAFF_ORIGIN = 'https://hubstafftalent.net';
-const HUBSTAFF_SEARCH_URL = `${HUBSTAFF_ORIGIN}/search/jobs?search%5Bkeywords%5D=&page=1&search%5Btype%5D=&search%5Blast_slider%5D=&search%5Bnewer_than%5D=&search%5Bnewer_than%5D=&search%5Bpayrate_start%5D=1&search%5Bpayrate_end%5D=100&search%5Bpayrate_null%5D=0&search%5Bpayrate_null%5D=1&search%5Bbudget_start%5D=1&search%5Bbudget_end%5D=100000&search%5Bbudget_null%5D=0&search%5Bbudget_null%5D=1&search%5Bexperience_level%5D=-1&search%5Bcountries%5D%5B%5D=&search%5Blanguages%5D%5B%5D=`;
-const PAGE_COUNT = 3;
+const MAX_PAGES = 50;
 const REQUEST_DELAY_MS = 1000;
 const REQUEST_TIMEOUT_MS = 20000;
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
@@ -19,6 +18,16 @@ const SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const USER_AGENT = 'JobBridgeAfricaBot/1.0 (+https://jobbridgeafrica.com)';
 
 const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+export const buildHubstaffSearchPageUrl = (page) => {
+  const url = new URL('/search/jobs', HUBSTAFF_ORIGIN);
+  url.searchParams.set('page', String(page));
+  url.searchParams.set('search[keywords]', '');
+  url.searchParams.set('search[type]', '');
+  url.searchParams.set('search[countries][]', '');
+  url.searchParams.set('search[languages][]', '');
+  url.searchParams.set('search[experience_level]', '-1');
+  return url;
+};
 
 const textOf = (element) => element
   .text()
@@ -100,6 +109,11 @@ export const parseHubstaffTalentListings = (html, baseUrl = HUBSTAFF_ORIGIN) => 
     const title = textOf(titleLink);
     const companyName = firstText(card, ['.job-company a.job-agency', '.job-company .job-agency']);
     const description = firstText(card, ['.profil-bio', '.job-description', '.description']);
+    const locationRestriction = firstText(card, [
+      '.job-location-restriction',
+      '.location-restriction',
+      '.job-location',
+    ]);
     const remote = card.find('.hi-remote').length > 0
       || /\bremote job\b/i.test(firstText(card, ['.job-company']));
     if (!title || !companyName || !description || !remote) return;
@@ -123,6 +137,7 @@ export const parseHubstaffTalentListings = (html, baseUrl = HUBSTAFF_ORIGIN) => 
       title,
       companyName,
       description,
+      locationRestriction,
       sourceUrl,
       applicationUrl,
       salary,
@@ -147,6 +162,12 @@ export const normalizeHubstaffTalentListing = (listing, now = new Date()) => {
 
   const pubDate = parseDate(listing.postedDate) || now;
   const sourceKey = createHash('sha256').update(sourceUrl.toLowerCase()).digest('hex');
+  const statedLocation = String(listing.locationRestriction || listing.location || '').trim();
+  const hasSpecificLocation = Boolean(
+    statedLocation && !/^(?:fully\s+)?remote(?:\s+job)?$/i.test(statedLocation),
+  );
+  // The unfiltered remote search does not limit applicants to a particular country.
+  const locationRestriction = hasSpecificLocation ? statedLocation : 'Worldwide';
   const normalized = {
     sourceKey,
     source: 'aggregated',
@@ -155,13 +176,13 @@ export const normalizeHubstaffTalentListing = (listing, now = new Date()) => {
     sourceUrl,
     isDirectPosting: false,
     isRemote: true,
-    isWorldwideRemote: false,
+    isWorldwideRemote: !hasSpecificLocation || /\b(worldwide|global(?:ly)?|anywhere|any location)\b/i.test(locationRestriction),
     workplaceType: 'remote',
     title,
     companyName,
     companySlug: companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
-    location: 'Remote',
-    locationRestriction: '',
+    location: locationRestriction === 'Worldwide' ? 'Worldwide remote' : locationRestriction,
+    locationRestriction,
     excerpt: description.slice(0, 400),
     description,
     applicationLink,
@@ -220,8 +241,11 @@ export const ingestHubstaffTalentJobs = async () => {
   let upserted = 0;
   let skipped = 0;
   let failedPages = 0;
+  let pages = 0;
+  let pageLimitReached = false;
+  const seenListingUrls = new Set();
   let csrfToken = '';
-  const firstPageUrl = new URL(HUBSTAFF_SEARCH_URL);
+  const firstPageUrl = buildHubstaffSearchPageUrl(1);
 
   try {
     const initialResponse = await axios.get(firstPageUrl.href, {
@@ -234,12 +258,11 @@ export const ingestHubstaffTalentJobs = async () => {
     csrfToken = load(initialResponse.data)('meta[name="csrf-token"]').attr('content') || '';
   } catch (error) {
     console.error('Hubstaff Talent could not initialize its search session:', error.message);
-    return { pages: 0, fetched, upserted, skipped, failedPages: PAGE_COUNT };
+    return { pages, fetched, upserted, skipped, failedPages: 1 };
   }
 
-  for (let page = 1; page <= PAGE_COUNT; page += 1) {
-    const pageUrl = new URL(HUBSTAFF_SEARCH_URL);
-    pageUrl.searchParams.set('page', String(page));
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
+    const pageUrl = buildHubstaffSearchPageUrl(page);
 
     try {
       const response = await axios.get(pageUrl.href, {
@@ -255,9 +278,13 @@ export const ingestHubstaffTalentJobs = async () => {
       });
       const html = extractHubstaffResultsHtml(response.data);
       const listings = parseHubstaffTalentListings(html, pageUrl.href);
-      fetched += listings.length;
+      pages += 1;
+      const newListings = listings.filter(({ sourceUrl }) => !seenListingUrls.has(sourceUrl));
+      newListings.forEach(({ sourceUrl }) => seenListingUrls.add(sourceUrl));
+      if (!newListings.length) break;
+      fetched += newListings.length;
 
-      for (const listing of listings) {
+      for (const listing of newListings) {
         const normalized = normalizeHubstaffTalentListing(listing);
         if (!normalized) {
           skipped += 1;
@@ -267,17 +294,21 @@ export const ingestHubstaffTalentJobs = async () => {
         if (result.upsertedCount || result.modifiedCount) upserted += 1;
       }
 
-      console.info(`Hubstaff Talent page ${page}: parsed ${listings.length} remote listings.`);
+      console.info(`Hubstaff Talent page ${page}: parsed ${newListings.length} new remote listings.`);
+      if (page === MAX_PAGES) pageLimitReached = true;
     } catch (error) {
       failedPages += 1;
       console.error(`Hubstaff Talent page ${page} failed:`, error.message);
     } finally {
-      if (page < PAGE_COUNT) await pause(REQUEST_DELAY_MS);
+      if (page < MAX_PAGES) await pause(REQUEST_DELAY_MS);
     }
   }
 
-  console.info(`Hubstaff Talent ingestion: ${fetched} fetched, ${upserted} inserted or updated, ${skipped} skipped, ${failedPages} failed pages.`);
-  return { pages: PAGE_COUNT, fetched, upserted, skipped, failedPages };
+  if (pageLimitReached) {
+    console.warn(`Hubstaff Talent pagination stopped at the safety limit of ${MAX_PAGES} pages.`);
+  }
+  console.info(`Hubstaff Talent ingestion: ${pages} pages, ${fetched} fetched, ${upserted} inserted or updated, ${skipped} skipped, ${failedPages} failed pages.`);
+  return { pages, fetched, upserted, skipped, failedPages, pageLimitReached };
 };
 
 export const scheduleHubstaffTalentIngestion = () => {

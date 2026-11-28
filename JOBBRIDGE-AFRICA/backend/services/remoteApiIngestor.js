@@ -16,7 +16,7 @@ const REQUEST_TIMEOUT_MS = 20000;
 const HIMALAYAS_DAILY_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const REMOTIVE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const HIMALAYAS_REQUEST_DELAY_MS = 1000;
-const HIMALAYAS_MAX_PAGES = 5;
+const HIMALAYAS_MAX_PAGES = 50;
 const API_USER_AGENT = 'JobBridgeAfricaRemoteJobs/1.0 (+https://jobbridgeafrica.com)';
 
 const sleep = (milliseconds) =>
@@ -77,7 +77,9 @@ const safeHttpUrl = (value) => {
 
 const sourceIdentity = (sourceName, job, companyName, companySlug, title, location, sourceUrl) => {
   if (sourceName === 'Himalayas') {
-    const legacyIdentity = asText(job.slug || job.id) || `${companySlug}\u0000${title.toLowerCase()}`;
+    const legacyIdentity = asText(job.slug || job.id)
+      || sourceUrl.toLowerCase()
+      || `${companySlug}\u0000${title.toLowerCase()}`;
     return createHash('sha256').update(legacyIdentity).digest('hex');
   }
   const externalId = asText(job.id || job.slug || job.job_id || job.guid);
@@ -212,20 +214,35 @@ export const ingestHimalayasRemoteJobs = async () => {
   let accepted = 0;
   let rejected = 0;
   let upserted = 0;
+  const seenPages = new Set();
 
   for (let page = 1; page <= HIMALAYAS_MAX_PAGES; page += 1) {
     try {
       const payload = await getJson(`${HIMALAYAS_API}`, { q: '', sort: 'recent', page });
       const jobs = getHimalayasJobs(payload);
+      if (jobs.length === 0) break;
+      const pageKey = createHash('sha256').update(JSON.stringify(jobs)).digest('hex');
+      if (seenPages.has(pageKey)) {
+        console.warn(`Himalayas API repeated page ${page}; stopping pagination to avoid duplicate ingestion.`);
+        break;
+      }
+      seenPages.add(pageKey);
       const result = await upsertJobs('Himalayas', jobs);
       fetched += result.fetched;
       accepted += result.accepted;
       rejected += result.rejected;
       upserted += result.upserted;
 
-      const totalPages = Number(payload?.totalPages || payload?.total_pages || payload?.pagination?.totalPages);
-      if (jobs.length === 0 || (Number.isFinite(totalPages) && totalPages > 0 && page >= totalPages)) break;
-      if (!Number.isFinite(totalPages) && jobs.length < 20) break;
+      const totalPages = Number(
+        payload?.totalPages
+        || payload?.total_pages
+        || payload?.pagination?.totalPages
+        || payload?.pagination?.total_pages,
+      );
+      if (Number.isFinite(totalPages) && totalPages > 0 && page >= totalPages) break;
+      if (page === HIMALAYAS_MAX_PAGES) {
+        console.warn(`Himalayas API pagination stopped at the safety limit of ${HIMALAYAS_MAX_PAGES} pages.`);
+      }
       if (page < HIMALAYAS_MAX_PAGES) await sleep(HIMALAYAS_REQUEST_DELAY_MS);
     } catch (error) {
       console.error(`Himalayas API ingestion failed on page ${page}:`, error.message);

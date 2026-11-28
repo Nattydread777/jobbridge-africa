@@ -117,6 +117,9 @@ test('public jobs listing deduplicates before pagination and counts deduplicated
       assert.ok(deduplicationStage);
       assert.ok(deduplicationStage.$addFields._deduplicationKey.title.$toLower);
       assert.ok(deduplicationStage.$addFields._deduplicationKey.title.$toLower.$trim);
+      assert.ok(deduplicationStage.$addFields._deduplicationKey.location.$toLower);
+      assert.ok(deduplicationStage.$addFields._deduplicationKey.department.$toLower);
+      assert.ok(deduplicationStage.$addFields._deduplicationKey.eligibilityScope.$toLower);
       assert.equal(JSON.stringify(pipeline).includes('$regexReplace'), false);
       assert.ok(pipeline.some((stage) => stage.$group?._id === '$_deduplicationKey'));
     }

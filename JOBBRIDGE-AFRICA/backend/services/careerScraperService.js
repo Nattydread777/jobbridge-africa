@@ -338,6 +338,7 @@ export const extractSchemaJobPostings = (html, pageUrl) => {
       validThrough: parseDate(job.validThrough),
       datePosted: parseDate(job.datePosted),
       applicationUrl: getApplicationUrl(job, page),
+      identifier: asText(job.identifier),
       employerName: asText(job.hiringOrganization?.name),
       department: asText(job.industry || job.occupationalCategory || job.department),
     };
@@ -484,6 +485,7 @@ export const normalizeSchemaJobPosting = (posting, rootUrlValue, crawledAt = new
   const provider = domainProvider(rootUrl.hostname);
   const identity = [
     rootUrl.hostname.toLowerCase(),
+    posting.identifier || posting.applicationUrl,
     posting.title.trim().toLowerCase(),
     location.trim().toLowerCase(),
   ].join('\u0000');

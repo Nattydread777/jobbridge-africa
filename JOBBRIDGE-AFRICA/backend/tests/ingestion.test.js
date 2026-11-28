@@ -22,6 +22,7 @@ import {
   parseMyJobMagListings,
 } from '../services/localAggregatorScraper.js';
 import {
+  buildHubstaffSearchPageUrl,
   extractHubstaffResultsHtml,
   normalizeHubstaffTalentListing,
   parseHubstaffTalentListings,
@@ -164,7 +165,16 @@ test('extracts JobPosting JSON-LD from arrays and graphs, then normalizes it for
     'https://careers.example.com',
     new Date('2026-10-13T00:00:00.000Z'),
   );
+  const secondOpening = normalizeSchemaJobPosting(
+    {
+      ...postings[0],
+      applicationUrl: 'https://careers.example.com/jobs/remote-designer-second-opening',
+    },
+    'https://careers.example.com',
+    crawledAt,
+  );
   assert.equal(normalized.sourceKey, normalizedAgain.sourceKey);
+  assert.notEqual(normalized.sourceKey, secondOpening.sourceKey);
   assert.equal(normalized.companyName, 'Example Company');
   assert.equal(normalized.sourceProvider, 'career-crawler:careers.example.com');
   assert.equal(normalized.source, 'aggregated');
@@ -299,6 +309,11 @@ test('Himalayas ingestion rejects closed or unspecified geography and retains el
   const worldwide = normalizeJob({ ...base, locationRestriction: 'Worldwide remote' });
   const africaRemote = normalizeJob({ ...base, locationRestriction: 'Remote - Africa' });
   const emeaRemote = normalizeJob({ ...base, locationRestriction: 'Remote - EMEA' });
+  const secondOpening = normalizeJob({
+    ...base,
+    applicationLink: 'https://company.example/apply/second',
+    locationRestriction: 'Worldwide remote',
+  });
   const languageGated = normalizeJob({
     ...base,
     locationRestriction: 'Worldwide remote',
@@ -308,6 +323,7 @@ test('Himalayas ingestion rejects closed or unspecified geography and retains el
   assert.equal(worldwide.eligibilityScope, 'worldwide');
   assert.equal(africaRemote.eligibilityScope, 'africa_friendly');
   assert.equal(emeaRemote.eligibilityScope, 'africa_friendly');
+  assert.notEqual(worldwide.sourceKey, secondOpening.sourceKey);
   assert.equal(worldwide.isActive, true);
   assert.equal(isEligibleJobForUser(languageGated), false);
   assert.equal(isEligibleJobForUser(languageGated, ['French']), true);
@@ -334,6 +350,19 @@ test('normalizes remote API jobs with provider attribution and validates the Job
   assert.equal(normalized.sourceProvider, 'himalayas');
   assert.equal(normalized.sourceName, 'Himalayas');
   assert.equal(normalized.sourceUrl, listingUrl);
+
+  const noIdRole = (url) => normalizeRemoteJob('Himalayas', {
+    company_name: 'Example Company',
+    title: 'Specialist',
+    description: 'Deliver reliable services.',
+    locationRestrictions: 'Worldwide',
+    url,
+    applicationLink: applyUrl,
+  });
+  assert.notEqual(
+    noIdRole('https://himalayas.app/jobs/specialist-1').sourceKey,
+    noIdRole('https://himalayas.app/jobs/specialist-2').sourceKey,
+  );
   assert.equal(normalized.expiryDate, null);
   assert.equal(normalized.applicationLink, applyUrl);
   assert.equal(normalized.isDirectPosting, false);
@@ -458,6 +487,11 @@ test('parses MyJobMag agency listings and normalizes attribution for the Job mod
 });
 
 test('parses Hubstaff Talent remote jobs and normalizes them for the Job model', () => {
+  const searchUrl = buildHubstaffSearchPageUrl(4);
+  assert.equal(searchUrl.searchParams.get('page'), '4');
+  assert.equal(searchUrl.searchParams.get('search[countries][]'), '');
+  assert.equal([...searchUrl.searchParams.keys()].some((key) => /payrate|budget/.test(key)), false);
+
   const resultHtml = `
     <div class="search-result">
       <div class="main-details">
@@ -469,7 +503,7 @@ test('parses Hubstaff Talent remote jobs and normalizes them for the Job model',
           <i class="hi-remote"></i>
           <span class="a-tooltip" data-original-title="November 15, 2026 at 11:24 am">5 hrs ago</span>
         </div>
-        <div class="profil-bio">Design and maintain accessible product interfaces. Open to remote candidates worldwide.</div>
+        <div class="profil-bio">Design and maintain accessible product interfaces.</div>
         <div class="list-inline"><a class="tag">Figma</a><a class="tag">Product Design</a></div>
       </div>
     </div>
@@ -479,7 +513,7 @@ test('parses Hubstaff Talent remote jobs and normalizes them for the Job model',
         <span class="label label-fixed_price">fixed price</span>
         <div class="budget">$1,200</div>
         <div class="job-company"><a class="job-agency">Another Client</a><i class="hi-remote"></i></div>
-        <div class="profil-bio">Build an integration for the client platform. Open to remote candidates worldwide.</div>
+        <div class="profil-bio">Build an integration for the client platform.</div>
       </div>
     </div>
     <div class="search-result">
@@ -499,7 +533,8 @@ test('parses Hubstaff Talent remote jobs and normalizes them for the Job model',
   assert.deepEqual(listings[0], {
     title: 'Remote Product Designer',
     companyName: 'Example Client',
-    description: 'Design and maintain accessible product interfaces. Open to remote candidates worldwide.',
+    description: 'Design and maintain accessible product interfaces.',
+    locationRestriction: '',
     sourceUrl: 'https://hubstafftalent.net/jobs/remote-product-designer',
     applicationUrl: 'https://hubstafftalent.net/jobs/remote-product-designer/apply',
     salary: '$25/hr',
@@ -509,6 +544,19 @@ test('parses Hubstaff Talent remote jobs and normalizes them for the Job model',
   });
   assert.equal(listings[1].salary, '$1,200');
   assert.equal(listings[1].jobType, 'fixed price');
+  assert.equal(
+    parseHubstaffTalentListings(`
+      <div class="search-result">
+        <div class="main-details">
+          <a class="name" href="/jobs/location-restricted">Designer</a>
+          <div class="job-company"><a class="job-agency">Example Client</a><i class="hi-remote"></i></div>
+          <div class="job-location">United States</div>
+          <div class="profil-bio">Design interfaces.</div>
+        </div>
+      </div>
+    `)[0].locationRestriction,
+    'United States',
+  );
 
   const normalized = normalizeHubstaffTalentListing(listings[0], new Date('2026-11-15T12:00:00Z'));
   const normalizedAgain = normalizeHubstaffTalentListing(listings[0], new Date('2026-11-16T12:00:00Z'));
@@ -516,7 +564,7 @@ test('parses Hubstaff Talent remote jobs and normalizes them for the Job model',
   assert.equal(normalized.source, 'aggregated');
   assert.equal(normalized.sourceProvider, 'hubstafftalent');
   assert.equal(normalized.sourceName, 'Hubstaff Talent');
-  assert.equal(normalized.location, 'Remote');
+  assert.equal(normalized.location, 'Worldwide remote');
   assert.equal(normalized.workplaceType, 'remote');
   assert.equal(normalized.salaryCurrency, '');
   assert.equal(normalized.eligibilityScope, 'worldwide');
@@ -533,4 +581,11 @@ test('parses Hubstaff Talent remote jobs and normalizes them for the Job model',
   const normalizedFixedPrice = normalizeHubstaffTalentListing(listings[1]);
   assert.ok(normalizedFixedPrice);
   assert.equal(normalizedFixedPrice.jobType, 'Contract');
+  assert.equal(
+    normalizeHubstaffTalentListing({
+      ...listings[0],
+      description: 'Applicants must be US residents.',
+    }),
+    null,
+  );
 });

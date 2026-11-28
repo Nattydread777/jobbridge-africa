@@ -49,8 +49,8 @@ const ExternalJobLink = ({ jobId, href, linkType = "application", className = ""
   };
 
   return (
-    <div className="flex flex-col items-start gap-2">
-      <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-950">
+    <div className="flex min-w-0 max-w-full flex-col items-start gap-2">
+      <span className="inline-flex max-w-full break-words rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-950">
         External listing · opens outside JobBridge Africa
       </span>
       <a

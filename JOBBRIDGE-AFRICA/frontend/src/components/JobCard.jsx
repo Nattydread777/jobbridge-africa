@@ -103,7 +103,7 @@ const JobCard = ({ job }) => {
   };
 
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+    <article className="min-w-0 break-words rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <div className="flex items-start gap-3">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100 text-lg font-bold text-slate-600">
           {companyLogo && !logoFailed
@@ -111,21 +111,21 @@ const JobCard = ({ job }) => {
             : companyInitial}
         </div>
         <div className="min-w-0">
-          <h3 className="text-lg font-semibold leading-snug text-primary">{job.title}</h3>
-          <p className="mt-1 text-sm text-slate-700">{job.companyName}</p>
+          <h3 className="break-words text-lg font-semibold leading-snug text-primary">{job.title}</h3>
+          <p className="mt-1 break-words text-sm text-slate-700">{job.companyName}</p>
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium">
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">📍 {job.location}</span>
-        <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-900">
+        <span className="max-w-full break-words rounded-full bg-slate-100 px-3 py-1 text-slate-700">📍 {job.location}</span>
+        <span className="max-w-full break-words rounded-full bg-blue-50 px-3 py-1 text-blue-900">
           {workMode === "Remote" ? locationEligibility : workMode}
         </span>
         {job.jobType && job.jobType !== workMode && (
-          <span className="rounded-full bg-violet-50 px-3 py-1 text-violet-900">
+          <span className="max-w-full break-words rounded-full bg-violet-50 px-3 py-1 text-violet-900">
             {job.jobType}
           </span>
         )}
-        <span className={`rounded-full px-3 py-1 ${
+        <span className={`max-w-full break-words rounded-full px-3 py-1 ${
           job.eligibilityScope === "region_restricted"
             ? "bg-rose-100 text-rose-900"
             : job.eligibilityScope === "africa_friendly"
@@ -135,7 +135,7 @@ const JobCard = ({ job }) => {
           {eligibilityLabel}
         </span>
         {timezoneLabel && (
-          <span className="rounded-full bg-indigo-50 px-3 py-1 text-indigo-900">{timezoneLabel}</span>
+          <span className="max-w-full break-words rounded-full bg-indigo-50 px-3 py-1 text-indigo-900">{timezoneLabel}</span>
         )}
       </div>
       {isSampleListing ? (
@@ -166,7 +166,7 @@ const JobCard = ({ job }) => {
           </span>
         )}
       </div>
-      <p className="mt-2 text-gray-700">
+      <p className="mt-2 break-words text-gray-700">
         {descriptionPreview}
       </p>
       {isExternalListing && (
@@ -174,10 +174,10 @@ const JobCard = ({ job }) => {
           Summary provided by source feed — view full role details on the official listing.
         </p>
       )}
-      <div className="mt-4 flex gap-3">
+      <div className="mt-4 flex min-w-0 flex-wrap items-start gap-3">
         <Link
           to={jobPath}
-          className="text-accent hover:underline font-medium"
+          className="min-w-0 break-words font-medium text-accent hover:underline"
         >
           View Details →
         </Link>
@@ -185,14 +185,14 @@ const JobCard = ({ job }) => {
           <ExternalJobLink
             jobId={job._id}
             href={job.applicationLink}
-            className="rounded bg-accent px-4 py-2 font-semibold text-white transition hover:bg-red-700"
+            className="max-w-full whitespace-normal break-words rounded bg-accent px-4 py-2 font-semibold text-white transition hover:bg-red-700"
           >
             Apply on official site ↗
           </ExternalJobLink>
         ) : isDirectPosting && !isSampleListing ? (
           <button
             onClick={handleApply}
-            className="rounded bg-accent px-4 py-2 font-semibold text-white transition hover:bg-red-700"
+            className="max-w-full whitespace-normal break-words rounded bg-accent px-4 py-2 font-semibold text-white transition hover:bg-red-700"
           >
             Apply Now
           </button>
@@ -203,7 +203,7 @@ const JobCard = ({ job }) => {
         target="_blank"
         rel="noopener noreferrer"
         aria-label={`Share ${job.title} on WhatsApp`}
-        className="mt-3 inline-flex rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50"
+        className="mt-3 inline-flex max-w-full whitespace-normal break-words rounded-lg border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-50"
       >
         Share on WhatsApp
       </a>
