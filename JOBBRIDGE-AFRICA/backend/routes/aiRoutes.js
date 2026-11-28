@@ -1,7 +1,7 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { optionalProtect, protect } from '../middleware/authMiddleware.js';
-import { getAiMatches, optimizeCv } from '../controllers/aiController.js';
+import { getAiMatches, optimizeCv, parseProfileCv } from '../controllers/aiController.js';
 import { saveTailoredCv } from '../controllers/tailoredCvController.js';
 
 const router = express.Router();
@@ -11,6 +11,13 @@ const cvOptimizerLimiter = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   message: { message: 'Too many CV optimization requests. Please try again later.' },
+});
+const profileCvParseLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { message: 'Too many CV parsing requests. Please try again later.' },
 });
 const aiMatchLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -29,6 +36,7 @@ const saveTailoredCvLimiter = rateLimit({
 
 // GET /api/ai/match - Get recommended jobs for current user
 router.get('/match', aiMatchLimiter, protect, getAiMatches);
+router.post('/parse-cv', profileCvParseLimiter, protect, parseProfileCv);
 router.post('/optimize-cv', cvOptimizerLimiter, optionalProtect, optimizeCv);
 router.post('/tailored-cvs', saveTailoredCvLimiter, protect, saveTailoredCv);
 

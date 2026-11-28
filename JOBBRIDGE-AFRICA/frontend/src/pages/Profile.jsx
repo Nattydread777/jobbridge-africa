@@ -274,6 +274,7 @@ const Profile = () => {
   const [targetRolesText, setTargetRolesText] = useState("");
   const [preferredLocationsText, setPreferredLocationsText] = useState("");
   const [parsing, setParsing] = useState(false);
+  const [resumePreview, setResumePreview] = useState(null);
 
   // Load user data into profile state when user changes
   useEffect(() => {
@@ -288,62 +289,104 @@ const Profile = () => {
     }
   }, [user]);
 
-  const handleResumeUpload = async (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setResumeFile(file);
-      setParsing(true);
+  const handleResumeUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-      try {
-        const extension = file.name.split(".").pop()?.toLowerCase();
-        let resumeText;
-        if (extension === "doc") {
-          const formData = new FormData();
-          formData.append("resume", file);
-          const { data } = await api.post("/auth/parse-legacy-resume", formData);
-          resumeText = data.text;
-        } else {
-          resumeText = await extractResumeText(file);
-        }
-        const parsedData = parseResumeText(resumeText);
-        const nextProfile = mapParsedResumeToProfile(parsedData, profile, africaLocations);
-        setProfile(nextProfile);
-        setTargetRolesText((nextProfile.workPreferences.targetRoles || []).join(", "));
-        setPreferredLocationsText((nextProfile.workPreferences.preferredLocations || []).join(", "));
+    setResumeFile(file);
+    setResumePreview(null);
+    setParsing(true);
+    try {
+      const extension = file.name.split(".").pop()?.toLowerCase();
+      let resumeText;
+      if (extension === "doc") {
         const formData = new FormData();
         formData.append("resume", file);
-        await api.post("/auth/upload-resume", formData);
-        const { data: savedProfile } = await api.put("/auth/profile", {
-          name: nextProfile.name,
-          email: nextProfile.email,
-          phone: nextProfile.phone,
-          country: nextProfile.country,
-          bio: nextProfile.bio,
-          skills: nextProfile.skills,
-          skillGroups: nextProfile.skillGroups,
-          education: normalizeProfileItems(nextProfile.education),
-          experience: normalizeProfileItems(nextProfile.experience),
-          certifications: normalizeProfileItems(nextProfile.certifications),
-          projects: normalizeProfileItems(nextProfile.projects),
-          workPreferences: nextProfile.workPreferences,
-        });
-        const refreshedUser = await refreshUser();
-        const saved = refreshedUser || savedProfile;
-        setProfile(profileStateFromUser(saved));
-        setTargetRolesText((saved.workPreferences?.targetRoles || []).join(", "));
-        setPreferredLocationsText((saved.workPreferences?.preferredLocations || []).join(", "));
-        setResumeFile(null);
-        if (resumeInputRef.current) resumeInputRef.current.value = "";
-        setActiveTab("basic");
-        alert("Resume uploaded. Readable profile details were extracted and saved across your profile sections.");
-      } catch (error) {
-        console.error("Error uploading resume:", error);
-        alert(error.response?.data?.message || error.message || "Failed to upload or read resume");
-        setResumeFile(null);
-        if (resumeInputRef.current) resumeInputRef.current.value = "";
-        setParsing(false);
-        return;
+        const { data } = await api.post("/auth/parse-legacy-resume", formData);
+        resumeText = data.text;
+      } else {
+        resumeText = await extractResumeText(file);
       }
+
+      const parsedData = parseResumeText(resumeText);
+      let extractionWarning = "";
+      try {
+        const { data } = await api.post("/ai/parse-cv", { cvText: resumeText });
+        const structuredExperience = data.cv?.experience;
+        const experienceScore = (roles) => (roles || []).reduce((score, role) => (
+          score
+          + Number(Boolean(role.title))
+          + Number(Boolean(role.company))
+          + Number(Boolean(role.dates))
+          + (role.bullets?.length || 0)
+        ), 0);
+        if (Array.isArray(structuredExperience)
+          && experienceScore(structuredExperience) > experienceScore(parsedData.experience)) {
+          parsedData.experience = structuredExperience;
+        }
+      } catch (error) {
+        console.warn("Structured CV extraction is unavailable; using the browser parser.", error);
+        extractionWarning = "Server structured extraction was unavailable, so this preview uses the browser parser. Review it before applying.";
+      }
+
+      const nextProfile = mapParsedResumeToProfile(parsedData, profile, africaLocations);
+      setResumePreview({ file, profile: nextProfile, warning: extractionWarning });
+      setActiveTab("basic");
+    } catch (error) {
+      console.error("Error parsing resume:", error);
+      alert(error.response?.data?.message || error.message || "Failed to read resume");
+      setResumeFile(null);
+      if (resumeInputRef.current) resumeInputRef.current.value = "";
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const cancelResumePreview = () => {
+    setResumePreview(null);
+    setResumeFile(null);
+    if (resumeInputRef.current) resumeInputRef.current.value = "";
+  };
+
+  const applyResumePreview = async () => {
+    if (!resumePreview) return;
+    const { file, profile: nextProfile } = resumePreview;
+    setParsing(true);
+    try {
+      const formData = new FormData();
+      formData.append("resume", file);
+      await api.post("/auth/upload-resume", formData);
+      const { data: savedProfile } = await api.put("/auth/profile", {
+        name: nextProfile.name,
+        email: nextProfile.email,
+        phone: nextProfile.phone,
+        country: nextProfile.country,
+        bio: nextProfile.bio,
+        skills: nextProfile.skills,
+        skillGroups: nextProfile.skillGroups,
+        education: normalizeProfileItems(nextProfile.education),
+        experience: normalizeProfileItems(nextProfile.experience),
+        certifications: normalizeProfileItems(nextProfile.certifications),
+        projects: normalizeProfileItems(nextProfile.projects),
+        workPreferences: nextProfile.workPreferences,
+      });
+      const refreshedUser = await refreshUser();
+      const saved = refreshedUser || savedProfile;
+      setProfile(profileStateFromUser(saved));
+      setTargetRolesText((saved.workPreferences?.targetRoles || []).join(", "));
+      setPreferredLocationsText((saved.workPreferences?.preferredLocations || []).join(", "));
+      setResumePreview(null);
+      setResumeFile(null);
+      if (resumeInputRef.current) resumeInputRef.current.value = "";
+      setActiveTab("basic");
+      alert("Resume uploaded and profile details saved. Review each section and edit anything that needs correction.");
+    } catch (error) {
+      console.error("Error applying resume profile:", error);
+      setResumePreview((current) => current && ({
+        ...current,
+        warning: error.response?.data?.message || error.message || "The profile could not be saved. Review the preview and try again.",
+      }));
+    } finally {
       setParsing(false);
     }
   };
@@ -762,7 +805,10 @@ const Profile = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("basic")}
+                onClick={() => {
+                  cancelResumePreview();
+                  setActiveTab("basic");
+                }}
                 className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-semibold text-slate-800 hover:bg-slate-100"
               >
                 Manual entry
@@ -780,6 +826,87 @@ const Profile = () => {
           disabled={parsing}
           className="hidden"
         />
+
+        {resumePreview && (
+          <section aria-labelledby="resume-preview-title" className="mb-6 rounded-xl border border-blue-200 bg-blue-50 p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 id="resume-preview-title" className="text-xl font-bold text-slate-900">Review extracted CV details</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  {resumePreview.file.name} · {resumePreview.profile.experience.length} work roles · {resumePreview.profile.skills.length} skills
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={applyResumePreview}
+                  disabled={parsing || profileSaving}
+                  className="rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white hover:bg-blue-800 disabled:cursor-wait disabled:opacity-60"
+                >
+                  {parsing ? "Applying…" : "Apply and save profile"}
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelResumePreview}
+                  disabled={parsing}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-semibold text-slate-800 hover:bg-slate-100 disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+            {resumePreview.warning && (
+              <p role="status" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                {resumePreview.warning}
+              </p>
+            )}
+            <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="font-semibold text-slate-700">Name and email</dt>
+                <dd className="text-slate-600">
+                  {[resumePreview.profile.name, resumePreview.profile.email].filter(Boolean).join(" · ") || "No contact details detected"}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-slate-700">Education and credentials</dt>
+                <dd className="text-slate-600">
+                  {resumePreview.profile.education.length} education entries · {resumePreview.profile.certifications.length} certifications · {resumePreview.profile.projects.length} projects
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="font-semibold text-slate-700">Professional summary</dt>
+                <dd className="text-slate-600">
+                  {resumePreview.profile.bio
+                    ? `${resumePreview.profile.bio.slice(0, 240)}${resumePreview.profile.bio.length > 240 ? "…" : ""}`
+                    : "No professional summary detected"}
+                </dd>
+              </div>
+            </dl>
+            <div className="mt-4 border-t border-blue-200 pt-4">
+              <h3 className="font-semibold text-slate-800">Experience preview</h3>
+              {resumePreview.profile.experience.length ? (
+                <ol className="mt-2 space-y-2">
+                  {resumePreview.profile.experience.slice(0, 8).map((role, index) => (
+                    <li key={`${role.company}-${role.position}-${index}`} className="rounded-lg bg-white p-3 text-sm">
+                      <p className="font-semibold text-slate-900">{role.position} · {role.company}</p>
+                      <p className="text-slate-600">
+                        {role.startDate || "Start date not detected"} – {role.endDate || "End date not detected"}
+                        {" · "}{String(role.description || "").split(/\r?\n/).filter(Boolean).length} highlights
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="mt-1 text-sm text-slate-600">No complete dated roles were detected. You can still enter work history manually.</p>
+              )}
+              {resumePreview.profile.experience.length > 8 && (
+                <p className="mt-2 text-sm text-slate-600">
+                  Plus {resumePreview.profile.experience.length - 8} more roles.
+                </p>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Tabs */}
         <nav aria-label="Profile sections" className="mb-6 overflow-x-auto border-b">
@@ -976,7 +1103,7 @@ const Profile = () => {
                 <div className="text-4xl mb-4">📄</div>
                 <p className="text-lg font-medium mb-2">
                   {resumeFile
-                    ? `Uploaded: ${resumeFile.name}`
+                    ? `Selected: ${resumeFile.name}`
                     : user.resumeUrl ? "Click to replace your resume" : "Click to upload your resume"}
                 </p>
                 <p className="text-sm text-gray-500">
@@ -991,22 +1118,17 @@ const Profile = () => {
                   <span className="text-2xl">✅</span>
                   <div>
                     <p className="font-semibold text-green-900">
-                      Resume processed successfully!
+                      CV parsed and ready for review.
                     </p>
                     <p className="text-sm text-green-700">
-                      Check the other tabs to review auto-filled information
+                      Review the preview above, then apply the extracted profile details.
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => {
-                    setResumeFile(null);
-                    if (
-                      confirm(
-                        "Are you sure you want to remove the uploaded resume? This won't delete the auto-filled data."
-                      )
-                    ) {
-                      setResumeFile(null);
+                    if (confirm("Discard this CV preview? No profile changes have been applied yet.")) {
+                      cancelResumePreview();
                     }
                   }}
                   className="text-accent hover:underline font-medium"
@@ -1022,7 +1144,7 @@ const Profile = () => {
                   onClick={() => setActiveTab("basic")}
                   className="bg-primary text-white px-6 py-2 rounded hover:bg-yellow-600 transition"
                 >
-                  Review profile details →
+                  Review parsed preview →
                 </button>
               </div>
             )}

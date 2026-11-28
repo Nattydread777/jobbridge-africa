@@ -105,8 +105,10 @@ export const normalizeCvText = (text) => String(text || '')
   .split('\n')
   .map((line) => line.replace(/[ \t]+$/g, '').trim())
   .filter((line) => line.length > 0)
-  .reduce((state, line) => {
+  .reduce((state, line, index, lines) => {
     const { normalized } = state;
+    const nextLine = lines[index + 1];
+    const followingLine = lines[index + 2];
     const sectionHeading = SECTION_HEADINGS.find(({ pattern }) => pattern.test(line.replace(/[:\s]+$/, '')));
     if (sectionHeading || REQUIREMENT_SECTION_HEADING_PATTERN.test(line)) {
       if (sectionHeading) state.section = sectionHeading.key;
@@ -128,13 +130,17 @@ export const normalizeCvText = (text) => String(text || '')
       && !hasDate
       && state.section !== 'skills'
       && !(state.section === 'experience' && !previousIsBullet)
+      && !(state.section === 'experience' && isExperienceLabel(line))
+      && !(state.section === 'experience' && isCompanyHeadingBeforeRole(line, nextLine, followingLine))
       && resumesSentence;
     const continuedBullet = previousIsBullet
       && !/[.!?]$/.test(previous)
       && !NON_SKILL_REQUIREMENT_TERMS.test(line)
       && !isCredentialRecord(line)
       && !isEducationRecord(line)
-      && !looksLikeRoleHeader;
+      && !looksLikeRoleHeader
+      && !(state.section === 'experience' && isExperienceLabel(line))
+      && !(state.section === 'experience' && isCompanyHeadingBeforeRole(line, nextLine, followingLine));
     if (continuedBullet || unfinishedParagraph) {
       normalized[normalized.length - 1] = `${previous} ${line}`.replace(/\s+/g, ' ').trim();
     } else {
@@ -149,6 +155,28 @@ const normalizeLines = (text) => normalizeCvText(text).split('\n');
 const DATE_RANGE = /\b(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:19|20)\d{2}\s*(?:-|–|to|through)\s*(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:(?:19|20)\d{2}|present|current)\b/i;
 const isBulletLine = (line) => /^(?:[-*•▪◦‣]|\d+[.)])\s+/.test(line);
 const cleanBullet = (line) => line.replace(/^(?:[-*•▪◦‣]|\d+[.)])\s+/, '').trim();
+const EXPERIENCE_LABEL = /^([A-Z][\w &/()'–-]{1,39}):(?:\s*(.*))?$/;
+const isExperienceLabel = (line) => EXPERIENCE_LABEL.test(line);
+const isDateOnlyLine = (line) => DATE_RANGE.test(line)
+  && !line.replace(DATE_RANGE, '').replace(/[()[\],;|•·.\s–—-]/g, '').trim();
+const isDatedRoleHeader = (line) => DATE_RANGE.test(line)
+  && Boolean(line.replace(DATE_RANGE, '').replace(/[()[\],;|•·.\s–—-]/g, '').trim());
+const isCompanyHeadingBeforeRole = (line, nextLine, followingLine) => {
+  const isPlainHeading = line && !isBulletLine(line) && !isExperienceLabel(line)
+    && !/[.!?]$/.test(line) && !DATE_RANGE.test(line)
+    && !/\s(?:\|| at )\s/i.test(line);
+  return isPlainHeading && (
+    isDatedRoleHeader(nextLine)
+    || (!isBulletLine(nextLine) && isDateOnlyLine(followingLine))
+    || (isDateOnlyLine(nextLine) && followingLine && !isBulletLine(followingLine) && !DATE_RANGE.test(followingLine))
+  );
+};
+const splitRoleHeader = (header) => header
+  .replace(DATE_RANGE, '')
+  .replace(/\(\s*\)/g, '')
+  .split(/\s*(?:\||•|·| at |–|—)\s*|\s+-\s+/i)
+  .map((part) => part.trim())
+  .filter(Boolean);
 const EXPERIENCE_ACTION_PATTERN = /^(?:built|created|designed|developed|delivered|implemented|launched|led|managed|owned|improved|increased|reduced|supported|coordinated|analyzed|analysed|maintained|automated|trained|taught)\b/i;
 const isCredentialRecord = (line) => {
   const content = cleanBullet(line);
@@ -165,44 +193,67 @@ const isEducationRecord = (line) => {
 const parseExperience = (lines) => {
   const items = [];
   let current = null;
+  let pendingCompany = '';
+  let pendingLabel = '';
   const startRole = (header = '') => {
     const dateMatch = header.match(DATE_RANGE);
     const dates = dateMatch?.[0] || '';
-    const withoutDates = header.replace(DATE_RANGE, '').replace(/[|,;–—-]+$/g, '').trim();
-    const parts = withoutDates.split(/\s*(?:\||•|·| at )\s*/i).map((part) => part.trim()).filter(Boolean);
+    const parts = splitRoleHeader(header.replace(/[|,;–—-]+$/g, '').trim());
     current = {
       title: parts[0] || '',
-      company: parts[1] || '',
+      company: parts[1] || pendingCompany,
       dates,
       location: parts[2] || '',
       bullets: [],
     };
     items.push(current);
+    if (parts[1]) pendingCompany = parts[1];
+    pendingLabel = '';
   };
 
-  for (const line of lines) {
-    if (isBulletLine(line)) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (isCompanyHeadingBeforeRole(line, lines[index + 1], lines[index + 2])) {
+      pendingCompany = line;
+      continue;
+    }
+    const labelMatch = line.match(EXPERIENCE_LABEL);
+    if (labelMatch) {
       if (!current) startRole();
-      current.bullets.push(cleanBullet(line));
+      const label = labelMatch[1].trim();
+      if (labelMatch[2]) {
+        current.bullets.push(`${label}: ${labelMatch[2].trim()}`);
+        pendingLabel = '';
+      } else {
+        pendingLabel = label;
+      }
+    } else if (isBulletLine(line)) {
+      if (!current) startRole();
+      const bullet = cleanBullet(line);
+      current.bullets.push(pendingLabel ? `${pendingLabel}: ${bullet}` : bullet);
     } else if (!current) {
       startRole(line);
-    } else if (DATE_RANGE.test(line) && !line.replace(DATE_RANGE, '').trim()) {
+    } else if (isDateOnlyLine(line)) {
       if (!current.dates && !current.bullets.length) current.dates = line.match(DATE_RANGE)?.[0] || '';
       else startRole(line);
     } else if (current.dates && !current.title && !current.bullets.length) {
       const dates = current.dates;
-      const header = line.match(DATE_RANGE) ? line : `${line} | ${dates}`;
-      const parsed = header.replace(DATE_RANGE, '').split(/\s*(?:\||•|·| at )\s*/i).map((part) => part.trim()).filter(Boolean);
+      const header = DATE_RANGE.test(line) ? line : `${line} | ${dates}`;
+      const parsed = splitRoleHeader(header);
       current.title = parsed[0] || '';
-      current.company = parsed[1] || '';
+      current.company = parsed[1] || current.company || pendingCompany;
       current.location = parsed[2] || '';
       current.dates = line.match(DATE_RANGE)?.[0] || dates;
+    } else if (pendingLabel && !DATE_RANGE.test(line)) {
+      current.bullets.push(`${pendingLabel}: ${line}`);
+      pendingLabel = '';
     } else if (current.bullets.length || DATE_RANGE.test(line)) {
       startRole(line);
     } else if (!current.title) {
       current.title = line;
     } else if (!current.company) {
       current.company = line;
+      pendingCompany = line;
     } else if (!current.location) {
       current.location = line;
     } else {

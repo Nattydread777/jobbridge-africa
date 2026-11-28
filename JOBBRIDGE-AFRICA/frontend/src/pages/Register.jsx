@@ -180,23 +180,34 @@ const Register = () => {
               {resume ? `Selected: ${resume.name}` : "Choose a resume file"}
               <input ref={resumeInputRef} id="registration-resume" type="file" accept=".pdf,.docx,.txt" onChange={handleResume} className="sr-only" />
             </label>
-            {parsed.skills.length > 0 && (
-              <div className="mt-3 text-sm text-slate-700">
-                <p><strong>Detected skills:</strong> {parsed.skills.join(", ")}</p>
+            {(parsed.name || parsed.email || parsed.bio || parsed.skills.length > 0 || parsed.education.length > 0 || parsed.experience.length > 0) && (
+              <div className="mt-3 space-y-3 rounded-xl bg-white p-4 text-sm text-slate-700">
+                <p className="font-semibold text-slate-900">Review detected details; you can edit the form fields before creating your account.</p>
+                {(parsed.name || parsed.email) && (
+                  <p><strong>Contact:</strong> {[parsed.name, parsed.email].filter(Boolean).join(" · ")}</p>
+                )}
+                {parsed.bio && <p><strong>Summary:</strong> {parsed.bio.slice(0, 240)}{parsed.bio.length > 240 ? "…" : ""}</p>}
+                {parsed.skills.length > 0 && (
+                  <p><strong>Skills ({parsed.skills.length}):</strong> {parsed.skills.slice(0, 10).join(", ")}{parsed.skills.length > 10 ? "…" : ""}</p>
+                )}
                 {parsed.education.length > 0 && (
-                  <div className="mt-2">
-                    <strong>Education preview:</strong>
+                  <div>
+                    <strong>Education ({parsed.education.length}):</strong>
                     {parsed.education.map((entry, index) => (
                       <p key={`education-${index}`} className="mt-1">{[entry.degree, entry.field, entry.school, entry.startYear, entry.endYear].filter(Boolean).join(" · ")}</p>
                     ))}
                   </div>
                 )}
                 {parsed.experience.length > 0 && (
-                  <div className="mt-2">
-                    <strong>Experience text detected:</strong>
-                    {parsed.experience.slice(0, 3).map((entry, index) => (
-                      <p key={`experience-${index}`} className="mt-1">{entry.position}</p>
+                  <div>
+                    <strong>Experience ({parsed.experience.length} roles):</strong>
+                    {parsed.experience.slice(0, 8).map((entry, index) => (
+                      <p key={`experience-${index}`} className="mt-1">
+                        {[entry.title, entry.company, entry.dates].filter(Boolean).join(" · ")}
+                        {" · "}{entry.bullets?.length || 0} highlights
+                      </p>
                     ))}
+                    {parsed.experience.length > 8 && <p className="mt-1">Plus {parsed.experience.length - 8} more roles.</p>}
                   </div>
                 )}
               </div>

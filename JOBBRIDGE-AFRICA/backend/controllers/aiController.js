@@ -19,6 +19,7 @@ import {
 import { getAiApiKey, tailorCvInParallel } from '../services/aiCvService.js';
 
 const CV_TEXT_LIMIT = 30000;
+const PROFILE_CV_PARSE_LIMIT = 50000;
 const JOB_TEXT_LIMIT = 15000;
 const COVER_LETTER_LIMIT = 10000;
 const REQUEST_BYTE_LIMIT = 250000;
@@ -32,6 +33,20 @@ const getDailyAiLimit = () => {
   const parsed = Number.parseInt(process.env.CV_DAILY_AI_LIMIT || '2', 10);
   return Number.isInteger(parsed) ? Math.min(10, Math.max(1, parsed)) : 2;
 };
+
+export const parseProfileCv = asyncHandler(async (req, res) => {
+  const { cvText } = req.body || {};
+  if (typeof cvText !== 'string' || !cvText.trim()) {
+    res.status(400);
+    throw new Error('Provide readable CV text to parse.');
+  }
+  if (cvText.length > PROFILE_CV_PARSE_LIMIT) {
+    res.status(413);
+    throw new Error('The CV text exceeds the 50,000 character parsing limit.');
+  }
+
+  res.status(200).json({ cv: parseCvStructure(cvText) });
+});
 
 const consumeDailyAllowance = async (req, aiReview) => {
   const dayKey = new Date().toISOString().slice(0, 10);

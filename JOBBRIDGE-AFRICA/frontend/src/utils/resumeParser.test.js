@@ -260,6 +260,61 @@ test("multiple roles and labeled or numbered work bullets map to separate profil
   assert.equal(mapped.experience[0].endDate, "Present");
 });
 
+test("nested roles inherit their employer and retain month-year and year-only dates", () => {
+  const parsed = parseResumeText([
+    "Experience",
+    "Operations & Finance Manager | Example Services Ltd",
+    "August 2022 – Present",
+    "Accounting & Finance:",
+    "- Managed monthly close and financial reporting.",
+    "Project Management: Delivered cross-functional improvements.",
+    "Data & BI:",
+    "1. Built dashboards for operational reporting.",
+    "Technology & Compliance: Maintained internal controls.",
+    "Example Banking Group",
+    "Branch Manager (2016–2019)",
+    "- Supervised branch operations.",
+    "Customer Service Officer (2013–2016)",
+    "- Resolved customer account issues.",
+    "Teller (2011–2013)",
+    "- Processed daily transactions.",
+    "Operations Analyst | Example Network | 2023 – Present",
+    "- Prepared regional performance reports.",
+  ].join("\n"));
+  const mapped = mapParsedResumeToProfile(parsed, {
+    name: "",
+    email: "",
+    phone: "",
+    country: "",
+    bio: "",
+    skills: [],
+    skillGroups: { core: [], tools: [], technical: [] },
+    education: [],
+    experience: [],
+    certifications: [],
+    projects: [],
+    workPreferences: { workModes: [], targetRoles: [], preferredLocations: [], willingToRelocate: false },
+  });
+
+  assert.equal(mapped.experience.length, 5);
+  assert.deepEqual(
+    mapped.experience.map(({ position, company, startDate, endDate }) => [position, company, startDate, endDate]),
+    [
+      ["Operations & Finance Manager", "Example Services Ltd", "August 2022", "Present"],
+      ["Branch Manager", "Example Banking Group", "2016", "2019"],
+      ["Customer Service Officer", "Example Banking Group", "2013", "2016"],
+      ["Teller", "Example Banking Group", "2011", "2013"],
+      ["Operations Analyst", "Example Network", "2023", "Present"],
+    ],
+  );
+  assert.deepEqual(mapped.experience[0].description.split("\n"), [
+    "Accounting & Finance: Managed monthly close and financial reporting.",
+    "Project Management: Delivered cross-functional improvements.",
+    "Data & BI: Built dashboards for operational reporting.",
+    "Technology & Compliance: Maintained internal controls.",
+  ]);
+});
+
 test("resume summaries retain up to 1,500 characters", () => {
   const parsed = parseResumeText(`Professional Summary\n${"A".repeat(1600)}`);
   assert.equal(parsed.bio.length, 1500);

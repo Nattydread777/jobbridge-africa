@@ -174,6 +174,47 @@ test('CV parsing repairs split words, populates competencies, and routes trainin
   assert.ok(parsed.education.some((item) => /BSc Computer Science/.test(item.degree)));
 });
 
+test('structured CV parsing keeps multi-role company blocks, dates, and labeled highlights', () => {
+  const parsed = parseCvStructure([
+    'Experience',
+    'Operations & Finance Manager | Example Services Ltd',
+    'August 2022 – Present',
+    'Accounting & Finance:',
+    '- Managed monthly close and financial reporting.',
+    'Project Management: Delivered cross-functional improvements.',
+    'Data & BI:',
+    '1. Built dashboards for operational reporting.',
+    'Technology & Compliance: Maintained internal controls.',
+    'Example Banking Group',
+    'Branch Manager (2016–2019)',
+    '- Supervised branch operations.',
+    'Customer Service Officer (2013–2016)',
+    '- Resolved customer account issues.',
+    'Teller (2011–2013)',
+    '- Processed daily transactions.',
+    'Operations Analyst | Example Network | 2023 – Present',
+    '- Prepared regional performance reports.',
+  ].join('\n'));
+
+  assert.equal(parsed.experience.length, 5);
+  assert.deepEqual(
+    parsed.experience.map(({ title, company, dates }) => [title, company, dates]),
+    [
+      ['Operations & Finance Manager', 'Example Services Ltd', 'August 2022 – Present'],
+      ['Branch Manager', 'Example Banking Group', '2016–2019'],
+      ['Customer Service Officer', 'Example Banking Group', '2013–2016'],
+      ['Teller', 'Example Banking Group', '2011–2013'],
+      ['Operations Analyst', 'Example Network', '2023 – Present'],
+    ],
+  );
+  assert.deepEqual(parsed.experience[0].bullets, [
+    'Accounting & Finance: Managed monthly close and financial reporting.',
+    'Project Management: Delivered cross-functional improvements.',
+    'Data & BI: Built dashboards for operational reporting.',
+    'Technology & Compliance: Maintained internal controls.',
+  ]);
+});
+
 test('job requirements are categorized and AI rewrites remain source-bullet traceable', () => {
   const jobDescription = [
     'Requirements',
