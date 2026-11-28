@@ -284,6 +284,7 @@ const ProfileView = () => {
       <dl className="grid gap-4 sm:grid-cols-2">
         <div><dt className="text-sm text-slate-500">Work arrangement</dt><dd className="mt-1 font-medium text-slate-900">{user.workPreferences?.workModes?.join(", ") || "Not specified"}</dd></div>
         <div><dt className="text-sm text-slate-500">Target roles</dt><dd className="mt-1 font-medium text-slate-900">{user.workPreferences?.targetRoles?.join(", ") || "Not specified"}</dd></div>
+        <div><dt className="text-sm text-slate-500">Professional languages</dt><dd className="mt-1 font-medium text-slate-900">{user.languages?.join(", ") || "Not specified"}</dd></div>
         <div><dt className="text-sm text-slate-500">Preferred locations</dt><dd className="mt-1 font-medium text-slate-900">{user.workPreferences?.preferredLocations?.join(", ") || "Not specified"}</dd></div>
         <div><dt className="text-sm text-slate-500">Relocation</dt><dd className="mt-1 font-medium text-slate-900">{user.workPreferences?.willingToRelocate ? "Open to relocation" : "Not specified"}</dd></div>
       </dl>

@@ -433,6 +433,7 @@ export const getUserProfile = asyncHandler(async (req, res) => {
       experience: req.user.experience,
       skills: req.user.skills,
       skillGroups: req.user.skillGroups,
+      languages: req.user.languages,
       certifications: req.user.certifications,
       projects: req.user.projects,
       workPreferences: req.user.workPreferences,
@@ -465,6 +466,23 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
     if (req.body.experience !== undefined) user.experience = req.body.experience;
     if (req.body.skills !== undefined) user.skills = req.body.skills;
     if (req.body.skillGroups !== undefined) user.skillGroups = req.body.skillGroups;
+    if (req.body.languages !== undefined) {
+      if (!Array.isArray(req.body.languages)
+        || req.body.languages.length > 20
+        || req.body.languages.some((language) => typeof language !== 'string' || language.trim().length > 40)) {
+        res.status(400);
+        throw new Error('Languages must be a list of up to 20 names, each 40 characters or fewer.');
+      }
+      const seenLanguages = new Set();
+      user.languages = req.body.languages
+        .map((language) => language.trim())
+        .filter((language) => {
+          const normalized = language.toLowerCase();
+          if (!normalized || seenLanguages.has(normalized)) return false;
+          seenLanguages.add(normalized);
+          return true;
+        });
+    }
     if (req.body.certifications !== undefined) user.certifications = req.body.certifications;
     if (req.body.projects !== undefined) user.projects = req.body.projects;
     if (req.body.workPreferences !== undefined) user.workPreferences = req.body.workPreferences;
@@ -505,6 +523,7 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
       experience: updatedUser.experience,
       skills: updatedUser.skills,
       skillGroups: updatedUser.skillGroups,
+      languages: updatedUser.languages,
       certifications: updatedUser.certifications,
       projects: updatedUser.projects,
       workPreferences: updatedUser.workPreferences,

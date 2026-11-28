@@ -3,8 +3,7 @@ import mongoose from 'mongoose';
 import { createHash } from 'node:crypto';
 import Job from '../models/Job.js';
 import CvUsage from '../models/CvUsage.js';
-import { buildActiveJobFilter } from '../utils/jobFilters.js';
-import { buildRegionRestrictedJobFilter } from '../utils/jobSignals.js';
+import { buildEligibleActiveJobFilter } from '../utils/jobFilters.js';
 import { isRecommendationProfileReady, rankJobsForUser } from '../services/jobRecommendationService.js';
 import {
   analyzeCvMatch,
@@ -112,16 +111,21 @@ const consumeDailyAllowance = async (req, aiReview) => {
   }
 };
 
-const getRequestedJob = async (jobId, res) => {
+const getRequestedJob = async (jobId, res, languages = []) => {
   if (!jobId) return null;
   if (!mongoose.isValidObjectId(jobId)) {
     res.status(400);
     throw new Error('Choose a valid active job listing.');
   }
-  const job = await Job.findOne({ _id: jobId, ...buildActiveJobFilter() });
+  const job = await Job.findOne({
+    $and: [
+      { _id: jobId },
+      buildEligibleActiveJobFilter(languages),
+    ],
+  });
   if (!job) {
     res.status(404);
-    throw new Error('That job listing is no longer active. Choose another listing or paste a description.');
+    throw new Error('That job listing is no longer active or eligible for your profile. Choose another listing or paste a description.');
   }
   return job;
 };
@@ -132,7 +136,7 @@ export const optimizeCv = asyncHandler(async (req, res) => {
     ? req.body.coverLetterText.trim()
     : '';
   const aiReview = req.body?.mode === 'ai_review';
-  const job = await getRequestedJob(req.body?.jobId, res);
+  const job = await getRequestedJob(req.body?.jobId, res, req.user?.languages);
   const isRemoteRole = job && (
     job.isRemote
     || job.isWorldwideRemote
@@ -277,7 +281,12 @@ export const getAiMatches = asyncHandler(async (req, res) => {
       res.status(400);
       throw new Error('Choose a valid active job listing.');
     }
-    const job = await Job.findOne({ _id: req.query.jobId, ...buildActiveJobFilter() });
+    const job = await Job.findOne({
+      $and: [
+        { _id: req.query.jobId },
+        buildEligibleActiveJobFilter(user.languages),
+      ],
+    });
     if (!job) {
       res.status(404);
       throw new Error('That job listing is no longer active.');
@@ -286,8 +295,7 @@ export const getAiMatches = asyncHandler(async (req, res) => {
   } else {
     jobs = await Job.find({
       $and: [
-        buildActiveJobFilter(),
-        { $nor: [buildRegionRestrictedJobFilter()] },
+        buildEligibleActiveJobFilter(user.languages),
       ],
     }).sort({ createdAt: -1 }).limit(200);
   }

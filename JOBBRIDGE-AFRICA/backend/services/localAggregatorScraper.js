@@ -3,7 +3,10 @@ import { createHash } from 'node:crypto';
 import { load } from 'cheerio';
 import Job from '../models/Job.js';
 import { cleanHtmlSnippet } from '../utils/sanitizer.js';
-import { deriveJobSignals } from '../utils/jobSignals.js';
+import {
+  deriveJobSignals,
+  isGeographicallyEligibleJob,
+} from '../utils/jobSignals.js';
 
 export const MYJOBMAG_TARGETS = [
   {
@@ -126,6 +129,7 @@ export const normalizeMyJobMagListing = (listing) => {
     isApproved: true,
     isActive: true,
   };
+  if (!isGeographicallyEligibleJob(normalized)) return null;
   return { ...normalized, ...deriveJobSignals(normalized) };
 };
 

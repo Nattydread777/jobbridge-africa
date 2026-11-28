@@ -50,7 +50,7 @@ const RecommendedRoles = () => {
       )}
       {!loading && !error && matches.length > 0 && (
         <ul className="mt-5 grid gap-3 md:grid-cols-2">
-          {matches.map(({ job, score }) => (
+          {matches.map(({ job, score, fit_context: fitContext }) => (
             <li key={job._id} className="rounded-xl border border-slate-200 p-4 transition hover:border-amber-300 hover:shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -60,6 +60,11 @@ const RecommendedRoles = () => {
                 <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800">{Math.round(score * 100)}% fit</span>
               </div>
               <p className="mt-3 text-xs text-slate-500">{job.workplaceType || (job.isRemote ? "Remote" : "Work mode not specified")} · {job.jobType || "Type not specified"}</p>
+              {fitContext?.match_reasons?.length > 0 && (
+                <ul className="mt-3 space-y-1 text-xs text-slate-600">
+                  {fitContext.match_reasons.slice(0, 4).map((reason) => <li key={reason}>{reason}</li>)}
+                </ul>
+              )}
             </li>
           ))}
         </ul>

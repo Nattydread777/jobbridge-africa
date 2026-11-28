@@ -2,7 +2,7 @@ import asyncHandler from 'express-async-handler';
 import mongoose from 'mongoose';
 import Job from '../models/Job.js';
 import TailoredCv from '../models/TailoredCv.js';
-import { buildActiveJobFilter } from '../utils/jobFilters.js';
+import { buildEligibleActiveJobFilter } from '../utils/jobFilters.js';
 
 const TAILORED_CV_LIMIT = 50000;
 
@@ -24,7 +24,12 @@ export const saveTailoredCv = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('The structured CV is invalid or exceeds the 50,000-character storage limit.');
   }
-  const job = await Job.findOne({ _id: jobId, ...buildActiveJobFilter() }).select('_id');
+  const job = await Job.findOne({
+    $and: [
+      { _id: jobId },
+      buildEligibleActiveJobFilter(req.user?.languages),
+    ],
+  }).select('_id');
   if (!job) {
     res.status(404);
     throw new Error('That job listing is no longer active.');

@@ -5,7 +5,10 @@ import { isIP } from 'node:net';
 import https from 'node:https';
 import { load } from 'cheerio';
 import Job from '../models/Job.js';
-import { deriveJobSignals } from '../utils/jobSignals.js';
+import {
+  deriveJobSignals,
+  isGeographicallyEligibleJob,
+} from '../utils/jobSignals.js';
 import { extractSalaryCurrency } from '../utils/salary.js';
 
 const USER_AGENT = 'JobBridgeAfrica-JobPostingCrawler/1.0 (+https://jobbridgeafrica.com)';
@@ -511,11 +514,13 @@ export const normalizeSchemaJobPosting = (posting, rootUrlValue, crawledAt = new
     isApproved: true,
     isActive: !posting.validThrough || posting.validThrough > new Date(),
   };
+  if (!isGeographicallyEligibleJob(normalized)) return null;
   return { ...normalized, ...deriveJobSignals(normalized) };
 };
 
 const upsertPosting = async (posting, rootUrl, crawledAt, companyNameOverride) => {
   const normalized = normalizeSchemaJobPosting(posting, rootUrl, crawledAt, companyNameOverride);
+  if (!normalized) return false;
   const { sourceKey, ...fields } = normalized;
   const result = await Job.updateOne(
     { sourceKey, source: 'aggregated', sourceProvider: fields.sourceProvider },
@@ -625,6 +630,7 @@ export const crawlCareerDomain = async (target) => {
   let upserted = 0;
   for (const posting of postings) {
     const normalized = normalizeSchemaJobPosting(posting, rootUrl, crawledAt, companyName);
+    if (!normalized) continue;
     if (seenKeys.has(normalized.sourceKey)) continue;
     seenKeys.add(normalized.sourceKey);
     try {

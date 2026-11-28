@@ -31,12 +31,12 @@ const outboundClickLimiter = rateLimit({
 });
 
 // Public routes
-router.route('/').get(getJobs);
-router.get('/featured-employers', getFeaturedEmployers);
+router.route('/').get(optionalProtect, getJobs);
+router.get('/featured-employers', optionalProtect, getFeaturedEmployers);
 router.get('/my-postings', protect, employer, getEmployerJobs);
 router.post('/:id/report', reportLimiter, reportJob);
 router.post('/:id/outbound-click', outboundClickLimiter, optionalProtect, trackOutboundClick);
-router.route('/:id').get(getJobById);
+router.route('/:id').get(optionalProtect, getJobById);
 
 // Employer protected routes
 router.route('/').post(protect, employer, createJob);

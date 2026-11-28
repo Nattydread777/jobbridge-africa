@@ -1,3 +1,5 @@
+import { buildEligibleJobFilter } from './jobSignals.js';
+
 export const MAX_FEED_JOB_AGE_DAYS = 30;
 
 export const buildActiveJobFilter = (now = new Date()) => {
@@ -44,3 +46,10 @@ export const buildActiveJobFilter = (now = new Date()) => {
     ],
   };
 };
+
+export const buildEligibleActiveJobFilter = (languages = [], now = new Date()) => ({
+  $and: [
+    buildActiveJobFilter(now),
+    buildEligibleJobFilter(languages),
+  ],
+});

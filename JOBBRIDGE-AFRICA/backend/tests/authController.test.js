@@ -12,7 +12,12 @@ import JobOutboundClick from '../models/JobOutboundClick.js';
 import JobReport from '../models/JobReport.js';
 import TailoredCv from '../models/TailoredCv.js';
 import User from '../models/userModel.js';
-import { deleteMyAccount, getResume, registerUser } from '../controllers/authController.js';
+import {
+  deleteMyAccount,
+  getResume,
+  registerUser,
+  updateUserProfile,
+} from '../controllers/authController.js';
 
 test('professional bio schema accepts 1,500 characters and rejects longer values', async () => {
   const accepted = new User({
@@ -131,6 +136,44 @@ test('registerUser accepts required account fields without optional profile data
       if (originalEnvironment[key] === undefined) delete process.env[key];
       else process.env[key] = originalEnvironment[key];
     });
+  }
+});
+
+test('updateUserProfile stores a normalized list of professional languages', async () => {
+  const originalFindById = User.findById;
+  const user = {
+    _id: new mongoose.Types.ObjectId(),
+    role: 'job_seeker',
+    jobAlertPreferences: { enabled: false },
+    async save() {
+      return this;
+    },
+  };
+  User.findById = async () => user;
+  const response = {
+    statusCode: null,
+    body: null,
+    status(statusCode) {
+      this.statusCode = statusCode;
+      return this;
+    },
+    json(body) {
+      this.body = body;
+      return this;
+    },
+  };
+
+  try {
+    await updateUserProfile({
+      user: { _id: user._id },
+      body: { languages: [' French ', 'french', '', 'English'] },
+    }, response, (error) => { throw error; });
+
+    assert.equal(response.statusCode, null);
+    assert.deepEqual(user.languages, ['French', 'English']);
+    assert.deepEqual(response.body.languages, ['French', 'English']);
+  } finally {
+    User.findById = originalFindById;
   }
 });
 

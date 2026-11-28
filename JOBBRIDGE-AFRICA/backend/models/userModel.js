@@ -58,6 +58,7 @@ const userSchema = new mongoose.Schema({
     tools: { type: [String], default: [] },
     technical: { type: [String], default: [] },
   },
+  languages: { type: [String], default: [] },
   certifications: [{
     name: String,
     issuer: String,

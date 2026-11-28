@@ -4,13 +4,14 @@ import Job from '../models/Job.js';
 import JobOutboundClick from '../models/JobOutboundClick.js';
 import User from '../models/userModel.js';
 import JobReport from '../models/JobReport.js';
-import { buildActiveJobFilter } from '../utils/jobFilters.js';
+import { buildActiveJobFilter, buildEligibleActiveJobFilter } from '../utils/jobFilters.js';
 import {
   africaRelevanceExpression,
+  buildEligibleJobFilter,
   buildEligibilityScopeFilter,
-  buildRegionRestrictedJobFilter,
   buildTimezonePolicyFilter,
   deriveJobSignals,
+  isEligibleJobForUser,
 } from '../utils/jobSignals.js';
 import { extractSalaryCurrency } from '../utils/salary.js';
 
@@ -114,13 +115,13 @@ const PLACEHOLDER_EMPLOYER_NAMES = new Set([
   'various',
 ]);
 
-const featuredEmployerPipeline = () => [
+const featuredEmployerPipeline = (languages = []) => [
   {
     $match: {
       $and: [
         buildActiveJobFilter(),
         { sourceProvider: { $ne: 'jobbridge-fallback' } },
-        { $nor: [buildRegionRestrictedJobFilter()] },
+        buildEligibleJobFilter(languages),
       ],
     },
   },
@@ -197,7 +198,7 @@ const collectFeaturedEmployers = (rows) => {
 };
 
 export const getFeaturedEmployers = asyncHandler(async (req, res) => {
-  const rows = await Job.aggregate(featuredEmployerPipeline());
+  const rows = await Job.aggregate(featuredEmployerPipeline(req.user?.languages));
   const employers = collectFeaturedEmployers(rows);
   const all = String(req.query?.all || '').toLowerCase() === 'true';
   const requestedLimit = Number.parseInt(req.query?.limit, 10) || 12;
@@ -244,8 +245,8 @@ export const getJobs = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('workplaceType must be remote, hybrid, or on-site');
   }
-  const filters = [buildActiveJobFilter()];
-  const parsedIncludeRestricted = parseBoolean(includeRestricted, 'includeRestricted', res) === true;
+  const filters = [buildEligibleActiveJobFilter(req.user?.languages)];
+  parseBoolean(includeRestricted, 'includeRestricted', res);
   const validEligibilityScopes = ['worldwide', 'africa_friendly', 'region_restricted'];
   if (eligibilityScope && !validEligibilityScopes.includes(String(eligibilityScope))) {
     res.status(400);
@@ -255,10 +256,6 @@ export const getJobs = asyncHandler(async (req, res) => {
   if (timezonePolicy && !validTimezonePolicies.includes(String(timezonePolicy))) {
     res.status(400);
     throw new Error('timezonePolicy must be africa_eu_friendly, flexible_async, or specific_timezone');
-  }
-  const explicitRestrictedFilter = eligibilityScope === 'region_restricted';
-  if (!parsedIncludeRestricted && !explicitRestrictedFilter) {
-    filters.push({ $nor: [buildRegionRestrictedJobFilter()] });
   }
   if (eligibilityScope) {
     filters.push(buildEligibilityScopeFilter(String(eligibilityScope)));
@@ -575,6 +572,10 @@ export const getJobById = asyncHandler(async (req, res) => {
   const job = await Job.findById(id).populate('postedBy', 'name email');
   if (job) {
     const jobData = job.toObject({ virtuals: true });
+    if (!isEligibleJobForUser(jobData, req.user?.languages)) {
+      res.status(404);
+      throw new Error('Job not found');
+    }
     res.status(200).json({ ...jobData, ...deriveJobSignals(jobData) });
   } else {
     res.status(404);

@@ -5,8 +5,7 @@ import JobDigestDelivery from '../models/JobDigestDelivery.js';
 import User from '../models/userModel.js';
 import { getFrontendBaseUrl, sendJobDigestEmail } from './emailService.js';
 import { rankJobsForUser, isRecommendationProfileReady } from './jobRecommendationService.js';
-import { buildActiveJobFilter } from '../utils/jobFilters.js';
-import { buildRegionRestrictedJobFilter } from '../utils/jobSignals.js';
+import { buildEligibleActiveJobFilter } from '../utils/jobFilters.js';
 
 const DIGEST_INTERVAL_MS = 15 * 60 * 1000;
 const LOCK_DURATION_MS = 10 * 60 * 1000;
@@ -58,8 +57,7 @@ const createUnsubscribeUrl = (user) => {
 const recommendationJobsFor = async (user) => {
   const jobs = await Job.find({
     $and: [
-      buildActiveJobFilter(),
-      { $nor: [buildRegionRestrictedJobFilter()] },
+      buildEligibleActiveJobFilter(user.languages),
     ],
   }).sort({ lastSeenAt: -1, createdAt: -1 }).limit(200);
   return rankJobsForUser(user, jobs).slice(0, 20);

@@ -2,7 +2,12 @@ import axios from 'axios';
 import { createHash } from 'node:crypto';
 import Job from '../models/Job.js';
 import { cleanHtmlSnippet } from '../utils/sanitizer.js';
-import { deriveJobSignals } from '../utils/jobSignals.js';
+import {
+  deriveJobSignals,
+  isGeographicallyEligibleJob,
+  isRegionRestrictedJob,
+  WORLDWIDE_PATTERN,
+} from '../utils/jobSignals.js';
 import { extractSalaryCurrency } from '../utils/salary.js';
 
 const HIMALAYAS_API = 'https://himalayas.app/jobs/api/search';
@@ -43,35 +48,13 @@ const asDate = (value) => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
-const RESTRICTED_LOCATION_PATTERNS = [
-  /\b(?:us|u\.s\.|usa|u\.s\.a\.|united states|america|american)\b/i,
-  /\b(?:uk|u\.k\.|united kingdom|great britain|britain|england|scotland|wales|northern ireland)\b/i,
-  /\b(?:eu|e\.u\.|european union|europe|european)\b/i,
-  /\bcanad(?:a|ian)\b/i,
-  /\b(?:australia|australian)\b/i,
-  /\b(?:except|excluding|only in|available in|restricted to|limited to|based in|located in|must be in|residents? of|citizens? of|work authorization|work authorisation|time zones?|timezone|within)\b/i,
-];
-const GLOBAL_LOCATION_PATTERN = /\b(?:worldwide|anywhere|global(?:ly)?)\b/i;
-const UNRESTRICTED_REMOTE_PATTERN = /\b(?:remote|fully remote|work from home|distributed)\b/i;
-
 export const isWorldwideOnly = (locationString) => {
   const location = asText(locationString).trim();
-  if (!location) return true;
-
-  if (RESTRICTED_LOCATION_PATTERNS.some((pattern) => pattern.test(location))) return false;
-
-  if (GLOBAL_LOCATION_PATTERN.test(location)) return true;
-
-  if (UNRESTRICTED_REMOTE_PATTERN.test(location)) {
-    const residual = location
-      .replace(UNRESTRICTED_REMOTE_PATTERN, '')
-      .replace(/[()[\],|/;:_-]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    return !residual || /^(?:remote|fully|work|from|home|distributed|anywhere|worldwide|global|only)$/i.test(residual);
-  }
-
-  return false;
+  return Boolean(
+    location
+    && new RegExp(WORLDWIDE_PATTERN, 'i').test(location)
+    && !isRegionRestrictedJob({ location, locationRestriction: location }),
+  );
 };
 
 const normalizeJobType = (value) => {
@@ -153,7 +136,7 @@ export const normalizeRemoteJob = (sourceName, rawJob) => {
     pubDate,
     applicationLink,
     locationRestriction: location,
-    location: location || 'Worldwide',
+    location: location || 'Remote',
     jobType: normalizeJobType(rawJob.employmentType || rawJob.job_type || rawJob.jobType),
     seniority: asText(rawJob.seniority || rawJob.experience),
     salary,
@@ -168,6 +151,7 @@ export const normalizeRemoteJob = (sourceName, rawJob) => {
     isApproved: true,
     isActive: true,
   };
+  if (!isGeographicallyEligibleJob(normalized)) return null;
   return { ...normalized, ...deriveJobSignals(normalized) };
 };
 
@@ -205,7 +189,7 @@ const upsertJobs = async (sourceName, rawJobs) => {
     if (result.upsertedCount || result.modifiedCount) upserted += 1;
   }
 
-  console.info(`${sourceName} ingestion: ${rawJobs.length} fetched, ${accepted} worldwide accepted, ${rejected} rejected, ${upserted} inserted or updated.`);
+  console.info(`${sourceName} ingestion: ${rawJobs.length} fetched, ${accepted} geographically eligible accepted, ${rejected} rejected, ${upserted} inserted or updated.`);
   return { fetched: rawJobs.length, accepted, rejected, upserted };
 };
 

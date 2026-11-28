@@ -22,7 +22,6 @@ const Jobs = () => {
     jobType: searchParams.get("jobType") || "",
     eligibilityScope: searchParams.get("eligibilityScope") || "",
     timezonePolicy: searchParams.get("timezonePolicy") || "",
-    includeRestricted: searchParams.get("includeRestricted") || "",
     isRemote: searchParams.get("isRemote") || "",
     workplaceType: searchParams.get("workplaceType") || "",
     salary: searchParams.get("salary") || "",
@@ -49,7 +48,6 @@ const Jobs = () => {
       jobType: params.get("jobType") || "",
       eligibilityScope: params.get("eligibilityScope") || "",
       timezonePolicy: params.get("timezonePolicy") || "",
-      includeRestricted: params.get("includeRestricted") || "",
       isRemote: params.get("remote") || params.get("isRemote") || "",
       workplaceType: params.get("workplaceType") || "",
       salary: params.get("salary") || "",
@@ -181,7 +179,6 @@ const Jobs = () => {
       jobType: "",
       eligibilityScope: "",
       timezonePolicy: "",
-      includeRestricted: "",
       isRemote: "",
       workplaceType: "",
       salary: "",
@@ -381,17 +378,7 @@ const Jobs = () => {
               <option value="">All unrestricted listings (default)</option>
               <option value="worldwide">Worldwide / global</option>
               <option value="africa_friendly">Africa-friendly</option>
-              <option value="region_restricted">Region-restricted</option>
             </select>
-            <label className="mt-3 flex items-start gap-2 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={filters.includeRestricted === "true"}
-                onChange={(event) => handleFilterChange("includeRestricted", event.target.checked ? "true" : "")}
-                className="mt-1"
-              />
-              <span>Also include region-restricted roles alongside other matches</span>
-            </label>
           </div>
 
           <div className="bg-white p-4 rounded-lg shadow">

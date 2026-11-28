@@ -2,13 +2,13 @@ import express from 'express';
 import asyncHandler from 'express-async-handler';
 import Job from '../models/Job.js';
 import User from '../models/userModel.js';
-import { buildActiveJobFilter } from '../utils/jobFilters.js';
+import { buildEligibleActiveJobFilter } from '../utils/jobFilters.js';
 
 const router = express.Router();
 
 router.get('/', asyncHandler(async (req, res) => {
   const [jobsListed, candidates, countries] = await Promise.all([
-    Job.countDocuments(buildActiveJobFilter()),
+    Job.countDocuments(buildEligibleActiveJobFilter()),
     User.countDocuments({ role: 'job_seeker', emailVerified: { $ne: false } }),
     User.distinct('country', {
       role: 'job_seeker',

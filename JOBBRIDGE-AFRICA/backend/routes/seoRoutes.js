@@ -1,7 +1,7 @@
 import express from 'express';
 import asyncHandler from 'express-async-handler';
 import Job from '../models/Job.js';
-import { buildActiveJobFilter } from '../utils/jobFilters.js';
+import { buildEligibleActiveJobFilter } from '../utils/jobFilters.js';
 
 const router = express.Router();
 const publicPaths = [
@@ -35,7 +35,7 @@ const escapeXml = (value) => String(value).replace(/[<>&'"]/g, (character) => ({
 }[character]));
 
 router.get('/sitemap.xml', asyncHandler(async (req, res) => {
-  const jobs = await Job.find(buildActiveJobFilter()).select('_id title updatedAt').lean();
+  const jobs = await Job.find(buildEligibleActiveJobFilter()).select('_id title updatedAt').lean();
   const staticUrls = publicPaths.map((path) => `<url><loc>${escapeXml(`${siteUrl}${path}`)}</loc></url>`);
   const jobUrls = jobs.map((job) => {
     const loc = `${siteUrl}/jobs/${jobSlug(job)}-${job._id}`;

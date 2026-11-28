@@ -143,8 +143,8 @@ const AIMatching = () => {
           <div className="prose max-w-none">
             <p className="text-lg text-gray-700 mb-6">
               JobBridge Africa’s active multi-factor matching engine compares
-              skills, experience, location, work arrangement, salary, listing
-              recency, and Africa-first relevance to surface useful opportunities.{" "}
+              target-role alignment, core skills, work experience, eligibility,
+              and work logistics to surface relevant opportunities.{" "}
               <span className="font-bold text-primary">
                 Free AI matching included!
               </span>
@@ -277,6 +277,11 @@ const AIMatching = () => {
                           <p><strong>Skill fit:</strong> {fitContext.skills.score}% ({fitContext.skills.matched.length}/{fitContext.skills.required.length || "n/a"} recognized requirements)</p>
                           <p><strong>Experience:</strong> {fitContext.experience.status.replaceAll("_", " ")} — {fitContext.experience.notes}</p>
                           <p><strong>Logistics:</strong> {fitContext.logistics.status.replaceAll("_", " ")}{fitContext.logistics.notes.length ? ` — ${fitContext.logistics.notes.join(" ")}` : " — confirm role conditions with the employer."}</p>
+                          {fitContext.match_reasons?.length > 0 && (
+                            <ul className="space-y-1 sm:col-span-3">
+                              {fitContext.match_reasons.map((reason) => <li key={reason}>{reason}</li>)}
+                            </ul>
+                          )}
                           {fitContext.must_have_gaps.length > 0 && (
                             <p className="sm:col-span-3"><strong>Top requirements to review:</strong> {fitContext.must_have_gaps.map((gap) => gap.skill).join("; ")}</p>
                           )}

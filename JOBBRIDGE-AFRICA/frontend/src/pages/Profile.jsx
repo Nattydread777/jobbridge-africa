@@ -227,7 +227,7 @@ const profileStateFromUser = (source = {}) => ({
   certifications: normalizeProfileItems(source.certifications),
   projects: normalizeProfileItems(source.projects),
   workPreferences: { ...emptyWorkPreferences(), ...(source.workPreferences || {}) },
-  languages: source.languages || [],
+  languages: uniqueValues(Array.isArray(source.languages) ? source.languages : []),
 });
 
 const Profile = () => {
@@ -368,6 +368,7 @@ const Profile = () => {
         experience: normalizeProfileItems(nextProfile.experience),
         certifications: normalizeProfileItems(nextProfile.certifications),
         projects: normalizeProfileItems(nextProfile.projects),
+        languages: nextProfile.languages,
         workPreferences: nextProfile.workPreferences,
       });
       const refreshedUser = await refreshUser();
@@ -588,6 +589,7 @@ const Profile = () => {
         skillGroups: profile.skillGroups,
         certifications: normalizeProfileItems(profile.certifications),
         projects: normalizeProfileItems(profile.projects),
+        languages: profile.languages,
         workPreferences: profile.workPreferences,
       });
 
@@ -1660,6 +1662,7 @@ const Profile = () => {
               </div>
             </fieldset>
             <label className="grid gap-1 text-sm font-semibold">Target roles <span className="font-normal text-gray-500">Separate multiple titles with commas.</span><input value={targetRolesText} onChange={(event) => { setTargetRolesText(event.target.value); setProfile((current) => ({ ...current, workPreferences: { ...current.workPreferences, targetRoles: commaSeparatedValues(event.target.value) } })); }} className="rounded border px-3 py-2 font-normal" placeholder="Product Designer, UX Researcher" /></label>
+            <label className="grid gap-1 text-sm font-semibold">Languages you can work in <span className="font-normal text-gray-500">Add languages you can use professionally, separated by commas. This helps match roles with language requirements.</span><input value={profile.languages.join(", ")} onChange={(event) => setProfile((current) => ({ ...current, languages: commaSeparatedValues(event.target.value) }))} className="rounded border px-3 py-2 font-normal" placeholder="English, French" /></label>
             <label className="grid gap-1 text-sm font-semibold">Preferred locations <span className="font-normal text-gray-500">Separate cities or countries with commas.</span><input value={preferredLocationsText} onChange={(event) => { setPreferredLocationsText(event.target.value); setProfile((current) => ({ ...current, workPreferences: { ...current.workPreferences, preferredLocations: commaSeparatedValues(event.target.value) } })); }} className="rounded border px-3 py-2 font-normal" placeholder="Lagos, Nigeria" /></label>
             <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={profile.workPreferences.willingToRelocate} onChange={(event) => setProfile((current) => ({ ...current, workPreferences: { ...current.workPreferences, willingToRelocate: event.target.checked } }))} /><span>Open to relocation</span></label>
             <div className="flex justify-end border-t pt-5">

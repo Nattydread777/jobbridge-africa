@@ -3,7 +3,10 @@ import { createHash } from 'node:crypto';
 import { load } from 'cheerio';
 import Job from '../models/Job.js';
 import { cleanHtmlSnippet } from '../utils/sanitizer.js';
-import { deriveJobSignals } from '../utils/jobSignals.js';
+import {
+  deriveJobSignals,
+  isGeographicallyEligibleJob,
+} from '../utils/jobSignals.js';
 import { extractSalaryCurrency } from '../utils/salary.js';
 
 const HUBSTAFF_ORIGIN = 'https://hubstafftalent.net';
@@ -173,6 +176,7 @@ export const normalizeHubstaffTalentListing = (listing, now = new Date()) => {
     isApproved: true,
     isActive: true,
   };
+  if (!isGeographicallyEligibleJob(normalized)) return null;
   return { ...normalized, ...deriveJobSignals(normalized) };
 };
 

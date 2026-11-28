@@ -14,6 +14,8 @@ import {
   isWorldwideOnly,
   normalizeRemoteJob,
 } from '../services/remoteApiIngestor.js';
+import { normalizeJob } from '../services/jobIngestor.js';
+import { isEligibleJobForUser } from '../utils/jobSignals.js';
 import {
   MYJOBMAG_TARGETS,
   normalizeMyJobMagListing,
@@ -249,16 +251,12 @@ test('provides direct career-page URLs when a domain sitemap is missing', () => 
   ]);
 });
 
-test('accepts only worldwide or unrestricted remote locations for remote API ingestion', () => {
+test('recognizes explicit worldwide location scopes without treating bare remote as unrestricted', () => {
   for (const location of [
-    '',
     'Worldwide',
     'Worldwide only',
     'Anywhere',
     'Global',
-    'Remote',
-    'Remote only',
-    'Fully remote',
     'Remote - Worldwide',
   ]) {
     assert.equal(isWorldwideOnly(location), true, `${location} should be accepted`);
@@ -273,9 +271,46 @@ test('accepts only worldwide or unrestricted remote locations for remote API ing
     'Australia',
     'Remote - Worldwide except Nigeria',
     'EMEA',
+    '',
+    'Remote',
+    'Remote only',
+    'Fully remote',
   ]) {
     assert.equal(isWorldwideOnly(location), false, `${location} should be rejected`);
   }
+});
+
+test('Himalayas ingestion rejects closed or unspecified geography and retains eligible remote roles', () => {
+  const base = {
+    companyName: 'Example Company',
+    title: 'Specialist',
+    description: 'Deliver reliable services.',
+    applicationLink: 'https://company.example/apply',
+  };
+  for (const locationRestriction of [
+    'Remote - United States only',
+    'Remote - Europe only',
+    'Remote - Canada',
+    'Remote',
+  ]) {
+    assert.equal(normalizeJob({ ...base, locationRestriction }), null);
+  }
+
+  const worldwide = normalizeJob({ ...base, locationRestriction: 'Worldwide remote' });
+  const africaRemote = normalizeJob({ ...base, locationRestriction: 'Remote - Africa' });
+  const emeaRemote = normalizeJob({ ...base, locationRestriction: 'Remote - EMEA' });
+  const languageGated = normalizeJob({
+    ...base,
+    locationRestriction: 'Worldwide remote',
+    requirements: 'Fluent French required.',
+  });
+
+  assert.equal(worldwide.eligibilityScope, 'worldwide');
+  assert.equal(africaRemote.eligibilityScope, 'africa_friendly');
+  assert.equal(emeaRemote.eligibilityScope, 'africa_friendly');
+  assert.equal(worldwide.isActive, true);
+  assert.equal(isEligibleJobForUser(languageGated), false);
+  assert.equal(isEligibleJobForUser(languageGated, ['French']), true);
 });
 
 test('normalizes remote API jobs with provider attribution and validates the Job model', () => {
@@ -319,9 +354,7 @@ test('normalizes remote API jobs with provider attribution and validates the Job
     candidate_required_location: 'United States',
     url: 'https://remotive.com/remote-jobs/restricted-role',
   });
-  assert.ok(restrictedRemote);
-  assert.equal(restrictedRemote.eligibilityScope, 'region_restricted');
-  assert.equal(restrictedRemote.isWorldwideRemote, false);
+  assert.equal(restrictedRemote, null);
 
   assert.equal(normalizeRemoteJob('Remotive', null), null);
   assert.equal(normalizeRemoteJob('Remotive', undefined), null);
@@ -436,7 +469,7 @@ test('parses Hubstaff Talent remote jobs and normalizes them for the Job model',
           <i class="hi-remote"></i>
           <span class="a-tooltip" data-original-title="November 15, 2026 at 11:24 am">5 hrs ago</span>
         </div>
-        <div class="profil-bio">Design and maintain accessible product interfaces.</div>
+        <div class="profil-bio">Design and maintain accessible product interfaces. Open to remote candidates worldwide.</div>
         <div class="list-inline"><a class="tag">Figma</a><a class="tag">Product Design</a></div>
       </div>
     </div>
@@ -446,7 +479,7 @@ test('parses Hubstaff Talent remote jobs and normalizes them for the Job model',
         <span class="label label-fixed_price">fixed price</span>
         <div class="budget">$1,200</div>
         <div class="job-company"><a class="job-agency">Another Client</a><i class="hi-remote"></i></div>
-        <div class="profil-bio">Build an integration for the client platform.</div>
+        <div class="profil-bio">Build an integration for the client platform. Open to remote candidates worldwide.</div>
       </div>
     </div>
     <div class="search-result">
@@ -466,7 +499,7 @@ test('parses Hubstaff Talent remote jobs and normalizes them for the Job model',
   assert.deepEqual(listings[0], {
     title: 'Remote Product Designer',
     companyName: 'Example Client',
-    description: 'Design and maintain accessible product interfaces.',
+    description: 'Design and maintain accessible product interfaces. Open to remote candidates worldwide.',
     sourceUrl: 'https://hubstafftalent.net/jobs/remote-product-designer',
     applicationUrl: 'https://hubstafftalent.net/jobs/remote-product-designer/apply',
     salary: '$25/hr',
@@ -486,7 +519,7 @@ test('parses Hubstaff Talent remote jobs and normalizes them for the Job model',
   assert.equal(normalized.location, 'Remote');
   assert.equal(normalized.workplaceType, 'remote');
   assert.equal(normalized.salaryCurrency, '');
-  assert.equal(normalized.eligibilityScope, 'unspecified');
+  assert.equal(normalized.eligibilityScope, 'worldwide');
   assert.equal(normalized.jobType, 'Contract');
   assert.equal(normalized.salaryRange, '$25/hr');
   assert.equal(normalized.applicationLink, 'https://hubstafftalent.net/jobs/remote-product-designer/apply');
@@ -498,5 +531,6 @@ test('parses Hubstaff Talent remote jobs and normalizes them for the Job model',
   assert.equal(modelJob.validateSync(), undefined);
 
   const normalizedFixedPrice = normalizeHubstaffTalentListing(listings[1]);
+  assert.ok(normalizedFixedPrice);
   assert.equal(normalizedFixedPrice.jobType, 'Contract');
 });

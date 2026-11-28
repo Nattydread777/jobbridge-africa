@@ -1,7 +1,11 @@
 import { createHash } from 'node:crypto';
 import Job from '../models/Job.js';
 import { cleanHtmlDescription, cleanHtmlSnippet } from '../utils/sanitizer.js';
-import { deriveJobSignals } from '../utils/jobSignals.js';
+import {
+  buildGeographicallyEligibleJobFilter,
+  deriveJobSignals,
+  isGeographicallyEligibleJob,
+} from '../utils/jobSignals.js';
 import { extractSalaryCurrency } from '../utils/salary.js';
 
 const HIMALAYAS_API = 'https://himalayas.app/jobs/api';
@@ -62,7 +66,7 @@ const asDate = (value) => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
-const normalizeJob = (job) => {
+export const normalizeJob = (job) => {
   const companyName = asText(job.companyName || job.company?.name);
   const companySlug = asText(job.companySlug || job.company?.slug)
     || companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -141,7 +145,9 @@ const normalizeJob = (job) => {
     tags,
     expiryDate,
     isApproved: true,
+    isActive: true,
   };
+  if (!isGeographicallyEligibleJob(normalized)) return null;
   return { ...normalized, ...deriveJobSignals(normalized) };
 };
 
@@ -318,11 +324,32 @@ export const ingestHimalayasJobs = async () => {
   } while (cursor);
 
   console.info(`Global job sync complete: ${pages} pages, fetched ${fetched}, upserted ${upserted}, skipped ${skipped}`);
+  const deactivatedIneligible = await Job.updateMany(
+    {
+      $and: [
+        { source: 'aggregated' },
+        { sourceProvider: { $ne: 'jobbridge-fallback' } },
+        { isActive: { $ne: false } },
+        { $nor: [buildGeographicallyEligibleJobFilter()] },
+      ],
+    },
+    { $set: { isActive: false } },
+  );
+  if (deactivatedIneligible.modifiedCount) {
+    console.info(`Deactivated ${deactivatedIneligible.modifiedCount} aggregated jobs outside the supported regions.`);
+  }
   const removedFallbacks = await Job.deleteMany({ sourceProvider: 'jobbridge-fallback' });
   if (removedFallbacks.deletedCount) {
     console.info(`Removed ${removedFallbacks.deletedCount} sample fallback listings after a successful feed sync.`);
   }
-  return { pages, fetched, upserted, skipped, fallback: false };
+  return {
+    pages,
+    fetched,
+    upserted,
+    skipped,
+    deactivatedIneligible: deactivatedIneligible.modifiedCount || 0,
+    fallback: false,
+  };
 };
 
 export const scheduleDailyJobIngestion = () => {
