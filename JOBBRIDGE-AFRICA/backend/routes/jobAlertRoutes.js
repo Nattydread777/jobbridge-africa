@@ -16,10 +16,17 @@ const subscriptionLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: 'Too many subscription attempts. Please try again later.' },
 });
+const unsubscribeLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 100,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { message: 'Too many unsubscribe requests. Please try again later.' },
+});
 
 router.post('/', subscriptionLimiter, subscribeToJobAlerts);
 router.get('/preferences', protect, getJobDigestPreferences);
 router.put('/preferences', protect, updateJobDigestPreferences);
-router.post('/unsubscribe', subscriptionLimiter, unsubscribeFromJobDigests);
+router.post('/unsubscribe', unsubscribeLimiter, unsubscribeFromJobDigests);
 
 export default router;

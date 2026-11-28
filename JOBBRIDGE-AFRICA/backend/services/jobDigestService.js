@@ -3,7 +3,11 @@ import jwt from 'jsonwebtoken';
 import Job from '../models/Job.js';
 import JobDigestDelivery from '../models/JobDigestDelivery.js';
 import User from '../models/userModel.js';
-import { getFrontendBaseUrl, sendJobDigestEmail } from './emailService.js';
+import {
+  createJobAlertUnsubscribeApiUrl,
+  getFrontendBaseUrl,
+  sendJobDigestEmail,
+} from './emailService.js';
 import { rankJobsForUser, isRecommendationProfileReady } from './jobRecommendationService.js';
 import { buildEligibleActiveJobFilter } from '../utils/jobFilters.js';
 
@@ -47,8 +51,7 @@ export const createUnsubscribeToken = (user) => {
   );
 };
 
-const createUnsubscribeUrl = (user) => {
-  const token = createUnsubscribeToken(user);
+const createUnsubscribeUrl = (token) => {
   const url = new URL('/unsubscribe-job-alerts', getFrontendBaseUrl());
   url.searchParams.set('token', token);
   return url.toString();
@@ -202,12 +205,14 @@ export const deliverJobDigestForUser = async (userId, { forceWelcome = false } =
 
     await reserveDeliveries(lockedUser, jobsToSend);
     const isWelcome = !lockedUser.jobAlertPreferences.welcomeDigestSentAt;
+    const unsubscribeToken = createUnsubscribeToken(lockedUser);
     try {
       await sendJobDigestEmail({
         recipient: lockedUser.email,
         name: lockedUser.name,
         jobs: jobsToSend,
-        unsubscribeUrl: createUnsubscribeUrl(lockedUser),
+        unsubscribeUrl: createUnsubscribeUrl(unsubscribeToken),
+        listUnsubscribeUrl: createJobAlertUnsubscribeApiUrl(unsubscribeToken),
         context: isWelcome
           ? 'Welcome to JobBridge Africa. These roles are a starting point based on the profile details you shared.'
           : 'New roles matching your profile and saved work preferences are now available.',

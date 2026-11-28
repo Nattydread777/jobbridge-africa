@@ -5,6 +5,8 @@ import { sendContactEmail } from '../controllers/contactController.js';
 test('sends contact notification and auto-reply through Resend when configured', async () => {
   const previousApiKey = process.env.RESEND_API_KEY;
   const previousFrom = process.env.RESEND_FROM;
+  const previousSmtpFrom = process.env.SMTP_FROM;
+  const previousEmailFrom = process.env.EMAIL_FROM;
   const previousAdminEmail = process.env.ADMIN_EMAIL;
   const previousRecaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
   const previousNodeEnv = process.env.NODE_ENV;
@@ -12,6 +14,8 @@ test('sends contact notification and auto-reply through Resend when configured',
   const requests = [];
   process.env.RESEND_API_KEY = 'test-resend-key';
   process.env.RESEND_FROM = 'verified@example.com';
+  delete process.env.SMTP_FROM;
+  delete process.env.EMAIL_FROM;
   process.env.ADMIN_EMAIL = 'info@jobbridgeafrica.com';
   delete process.env.RECAPTCHA_SECRET_KEY;
   process.env.NODE_ENV = 'test';
@@ -55,11 +59,12 @@ test('sends contact notification and auto-reply through Resend when configured',
     assert.ok(requests.every(({ options }) => options.headers.Authorization === 'Bearer test-resend-key'));
 
     const adminMail = JSON.parse(requests[0].options.body);
-    assert.equal(adminMail.from, 'verified@example.com');
+    assert.equal(adminMail.from, '"JobBridge Africa" <verified@example.com>');
     assert.deepEqual(adminMail.to, ['info@jobbridgeafrica.com']);
     assert.equal(adminMail.reply_to, 'candidate@example.com');
 
     const autoReply = JSON.parse(requests[1].options.body);
+    assert.equal(autoReply.from, '"JobBridge Africa" <verified@example.com>');
     assert.deepEqual(autoReply.to, ['candidate@example.com']);
     assert.equal(autoReply.reply_to, 'info@jobbridgeafrica.com');
   } finally {
@@ -68,6 +73,10 @@ test('sends contact notification and auto-reply through Resend when configured',
     else process.env.RESEND_API_KEY = previousApiKey;
     if (previousFrom === undefined) delete process.env.RESEND_FROM;
     else process.env.RESEND_FROM = previousFrom;
+    if (previousSmtpFrom === undefined) delete process.env.SMTP_FROM;
+    else process.env.SMTP_FROM = previousSmtpFrom;
+    if (previousEmailFrom === undefined) delete process.env.EMAIL_FROM;
+    else process.env.EMAIL_FROM = previousEmailFrom;
     if (previousAdminEmail === undefined) delete process.env.ADMIN_EMAIL;
     else process.env.ADMIN_EMAIL = previousAdminEmail;
     if (previousRecaptchaSecret === undefined) delete process.env.RECAPTCHA_SECRET_KEY;

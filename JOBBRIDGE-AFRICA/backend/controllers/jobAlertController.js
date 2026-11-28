@@ -102,7 +102,11 @@ export const updateJobDigestPreferences = asyncHandler(async (req, res) => {
 });
 
 export const unsubscribeFromJobDigests = asyncHandler(async (req, res) => {
-  const token = typeof req.body?.token === 'string' ? req.body.token : '';
+  const token = typeof req.body?.token === 'string'
+    ? req.body.token
+    : typeof req.query?.token === 'string'
+      ? req.query.token
+      : '';
   if (!token || token.length > 2000) {
     res.status(400);
     throw new Error('A valid unsubscribe link is required.');
@@ -134,5 +138,8 @@ export const unsubscribeFromJobDigests = asyncHandler(async (req, res) => {
   user.jobAlertPreferences.unsubscribedAt = new Date();
   user.jobAlertPreferences.unsubscribeVersion = randomBytes(24).toString('hex');
   await user.save();
-  res.json({ message: 'You have been unsubscribed from personalized job alert emails.' });
+  res.json({
+    message: 'You have been unsubscribed from personalized job alert emails.',
+    preferences: { enabled: false },
+  });
 });

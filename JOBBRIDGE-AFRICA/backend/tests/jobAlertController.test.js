@@ -76,11 +76,16 @@ test('unsubscribe requires the signed confirmation token and invalidates it afte
     }, process.env.JWT_SECRET, { subject: String(user._id) });
     const res = createResponse();
     await unsubscribeFromJobDigests(
-      { body: { token } },
+      {
+        query: { token },
+        body: { 'List-Unsubscribe': 'One-Click' },
+      },
       res,
       (error) => { throw error; },
     );
     assert.equal(res.statusCode, 200);
+    assert.equal(res.body.preferences.enabled, false);
+    assert.match(res.body.message, /unsubscribed/i);
     assert.equal(user.jobAlertPreferences.enabled, false);
     assert.notEqual(user.jobAlertPreferences.unsubscribeVersion, 'current-version');
   } finally {

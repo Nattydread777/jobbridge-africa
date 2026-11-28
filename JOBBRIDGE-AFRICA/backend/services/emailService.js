@@ -8,6 +8,47 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (character)
   "'": '&#39;',
 }[character]));
 
+export const formatEmailFrom = (value) => {
+  const configuredFrom = String(value || '').trim();
+  if (!configuredFrom || /[\r\n]/.test(configuredFrom)) {
+    throw new Error('Email sender must be a valid address without line breaks.');
+  }
+  const openingBracket = configuredFrom.indexOf('<');
+  const closingBracket = configuredFrom.indexOf('>');
+  const hasAngleBracket = openingBracket >= 0 || closingBracket >= 0;
+  if (hasAngleBracket && (
+    openingBracket < 0
+    || closingBracket < openingBracket
+    || openingBracket !== configuredFrom.lastIndexOf('<')
+    || closingBracket !== configuredFrom.lastIndexOf('>')
+    || closingBracket !== configuredFrom.length - 1
+  )) {
+    throw new Error('Email sender must have a valid address and optional display name.');
+  }
+  const displayName = openingBracket > 0
+    ? configuredFrom.slice(0, openingBracket).trim()
+    : '';
+  if (displayName) return configuredFrom;
+
+  const address = hasAngleBracket
+    ? configuredFrom.slice(openingBracket + 1, closingBracket).trim()
+    : configuredFrom;
+  if (!address) throw new Error('Email sender address is missing.');
+  return `"JobBridge Africa" <${address}>`;
+};
+
+export const getEmailFromAddress = (provider = 'smtp') => {
+  const configuredFrom = provider === 'resend'
+    ? process.env.RESEND_FROM
+      || process.env.EMAIL_FROM
+      || process.env.SMTP_FROM
+      || process.env.EMAIL_USER
+    : process.env.SMTP_FROM
+      || process.env.EMAIL_FROM
+      || process.env.EMAIL_USER;
+  return formatEmailFrom(configuredFrom || 'info@jobbridgeafrica.com');
+};
+
 export const isEmailConfigured = () =>
   Boolean(process.env.RESEND_API_KEY?.trim()
     || (process.env.EMAIL_USER?.trim() && process.env.EMAIL_PASS?.trim()));
@@ -25,9 +66,28 @@ export const getFrontendBaseUrl = () => {
     || (isProduction ? 'https://jobbridgeafrica.com' : 'http://localhost:5173');
 };
 
+export const getBackendBaseUrl = () => {
+  const configuredBackendUrl = [
+    process.env.BACKEND_URL,
+    process.env.RENDER_EXTERNAL_URL,
+  ].map((url) => url?.trim()).find(Boolean);
+  const isProduction = process.env.NODE_ENV === 'production'
+    || process.env.RENDER === 'true'
+    || Boolean(process.env.RENDER_SERVICE_ID);
+  return configuredBackendUrl
+    || (isProduction ? 'https://jobbridge-backend.onrender.com' : 'http://localhost:4000');
+};
+
 export const createPasswordResetUrl = (resetToken) => {
   const frontendUrl = getFrontendBaseUrl();
   return new URL(`/reset-password/${encodeURIComponent(resetToken)}`, frontendUrl).toString();
+};
+
+export const createJobAlertUnsubscribeApiUrl = (token) => {
+  if (!token) throw new Error('Job alert unsubscribe token is required.');
+  const url = new URL('/api/job-alerts/unsubscribe', getBackendBaseUrl());
+  url.searchParams.set('token', token);
+  return url.toString();
 };
 
 const postedTimeFor = (value) => {
@@ -62,14 +122,19 @@ export const sendJobDigestEmail = async ({
   name,
   jobs,
   unsubscribeUrl,
+  listUnsubscribeUrl,
   context = 'These roles were selected using the skills, experience, and work preferences on your profile.',
 }) => {
-  if (!recipient || !Array.isArray(jobs) || !jobs.length || !unsubscribeUrl) {
-    throw new Error('A job digest requires a recipient, matching roles, and an unsubscribe URL.');
+  if (!recipient || !Array.isArray(jobs) || !jobs.length || !unsubscribeUrl || !listUnsubscribeUrl) {
+    throw new Error('A job digest requires a recipient, matching roles, and working unsubscribe URLs.');
   }
   const safeName = escapeHtml(name || 'there');
   const safeContext = escapeHtml(context);
   const safeUnsubscribeUrl = escapeHtml(unsubscribeUrl);
+  const safeListUnsubscribeUrl = new URL(listUnsubscribeUrl);
+  if (!['http:', 'https:'].includes(safeListUnsubscribeUrl.protocol)) {
+    throw new Error('Job digest one-click unsubscribe URL must use HTTP or HTTPS.');
+  }
   const entries = jobs.map(({ job }) => {
     if (!job) throw new Error('Job digest entries must include a job.');
     const title = escapeHtml(job.title || 'Job opportunity');
@@ -124,7 +189,7 @@ export const sendJobDigestEmail = async ({
     '',
     ...entries.map((entry) => entry.text),
     '',
-    `Manage or unsubscribe from these alerts: ${unsubscribeUrl}`,
+    `Unsubscribe from these alerts: ${unsubscribeUrl}`,
   ].join('\n\n');
   const html = `<main style="max-width:680px;margin:auto;font-family:Arial,sans-serif;color:#0f172a;line-height:1.55">
     <h1 style="color:#0f172a">Roles that fit your profile</h1>
@@ -132,7 +197,7 @@ export const sendJobDigestEmail = async ({
     <p>${safeContext}</p>
     ${entries.map((entry) => entry.html).join('')}
     <hr style="border:0;border-top:1px solid #e2e8f0;margin-top:28px">
-    <p style="font-size:13px;color:#64748b">You received this because you opted in to personalized JobBridge Africa job alerts. <a href="${safeUnsubscribeUrl}">Manage or unsubscribe</a>.</p>
+    <p style="font-size:13px;color:#64748b">You received this because you opted in to personalized JobBridge Africa job alerts. <a href="${safeUnsubscribeUrl}">Unsubscribe from email alerts</a>.</p>
   </main>`;
 
   return sendTransactionalEmail({
@@ -140,11 +205,15 @@ export const sendJobDigestEmail = async ({
     subject: `Job matches for your profile (${jobs.length})`,
     text,
     html,
+    headers: {
+      'List-Unsubscribe': `<${safeListUnsubscribeUrl.toString()}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    },
   });
 };
 
 const createTransporter = () => {
-  const emailFrom = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+  const emailFrom = getEmailFromAddress('smtp');
   const emailHost = process.env.EMAIL_HOST || 'smtp.zoho.com';
   if (!emailHost || !emailFrom || !isEmailConfigured()) {
     throw new Error('Email delivery is not configured (EMAIL_USER and EMAIL_PASS are required).');
@@ -158,7 +227,7 @@ const createTransporter = () => {
       ? process.env.EMAIL_SECURE === 'true'
       : port === 465,
     auth: {
-      user: process.env.EMAIL_USER || emailFrom,
+      user: process.env.EMAIL_USER || emailFrom.match(/<([^<>]+)>/)?.[1] || emailFrom,
       pass: process.env.EMAIL_PASS,
     },
     connectionTimeout: 10000,
@@ -168,9 +237,9 @@ const createTransporter = () => {
 };
 
 const sendTransactionalEmail = async (message) => {
-  const from = process.env.RESEND_FROM || process.env.EMAIL_FROM || process.env.EMAIL_USER;
-  if (!from) throw new Error('Email delivery is not configured (RESEND_FROM or EMAIL_FROM is required).');
-  if (process.env.RESEND_API_KEY?.trim()) {
+  const usesResend = Boolean(process.env.RESEND_API_KEY?.trim());
+  const from = getEmailFromAddress(usesResend ? 'resend' : 'smtp');
+  if (usesResend) {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -191,7 +260,7 @@ const sendTransactionalEmail = async (message) => {
 export const sendEmployerApplicationNotification = async ({ recipient, job, applicant, application }) => {
   if (!recipient) throw new Error('Employer notification recipient is not configured.');
   const transporter = createTransporter();
-  const emailFrom = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+  const emailFrom = getEmailFromAddress('smtp');
   const name = escapeHtml(applicant.name);
   const email = escapeHtml(applicant.email);
   const phone = escapeHtml(applicant.phone || 'Not provided');

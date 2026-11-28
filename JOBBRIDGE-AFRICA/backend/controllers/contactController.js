@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import asyncHandler from 'express-async-handler';
+import { getEmailFromAddress } from '../services/emailService.js';
 
 const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
   '&': '&amp;',
@@ -92,7 +93,8 @@ const sendContactEmail = asyncHandler(async (req, res) => {
   }
 
   // Prepare email payloads BEFORE attempting any provider so variables exist.
-  const defaultFrom = process.env.RESEND_FROM || 'JobBridge Africa <info@jobbridgeafrica.com>';
+  const defaultFrom = getEmailFromAddress('smtp');
+  const resendFrom = getEmailFromAddress('resend');
   const adminEmail = process.env.ADMIN_EMAIL || 'info@jobbridgeafrica.com';
   const safeName = escapeHtml(name.trim());
   const safeEmail = escapeHtml(email.trim());
@@ -162,7 +164,7 @@ const sendContactEmail = asyncHandler(async (req, res) => {
     try {
       const sendViaResend = async (mailData) => {
         const payload = {
-          from: mailData.from,
+          from: resendFrom,
           to: [mailData.to],
           subject: mailData.subject,
           html: mailData.html,

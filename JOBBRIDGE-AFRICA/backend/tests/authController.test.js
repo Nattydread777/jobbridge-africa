@@ -87,7 +87,14 @@ test('registerUser accepts required account fields without optional profile data
   const originalFindOne = User.findOne;
   const originalCreate = User.create;
   const originalConsoleError = console.error;
-  const environmentKeys = ['RESEND_API_KEY', 'RESEND_FROM', 'EMAIL_FROM', 'EMAIL_USER', 'EMAIL_PASS'];
+  const environmentKeys = [
+    'RESEND_API_KEY',
+    'RESEND_FROM',
+    'SMTP_FROM',
+    'EMAIL_FROM',
+    'EMAIL_USER',
+    'EMAIL_PASS',
+  ];
   const originalEnvironment = Object.fromEntries(environmentKeys.map((key) => [key, process.env[key]]));
   let createdUser;
   User.findOne = async () => null;

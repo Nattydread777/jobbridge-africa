@@ -399,6 +399,7 @@ Notes
 - In development, the API allows Vite origins on `localhost` and `127.0.0.1` at ports 5173 and 5174. Production allows `jobbridgeafrica.com`, `www.jobbridgeafrica.com`, and `jobbridge-africa.vercel.app`; configure additional comma-separated origins with `CORS_ORIGIN`.
 - The frontend uses `VITE_API_URL` (or `VITE_API_BASE`) when configured, adds one `/api` suffix, and otherwise defaults to `http://localhost:4000/api`.
 - Password reset email requires SMTP credentials (`EMAIL_USER` and `EMAIL_PASS`). Contact-form email prefers Resend when `RESEND_API_KEY` is configured and falls back to SMTP; set `RESEND_FROM` to a sender verified in Resend for production. Set `EMAIL_FROM`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, and the public `FRONTEND_URL` for the deployed environment.
+- Outbound mail automatically uses the `JobBridge Africa` display name when `RESEND_FROM`, `SMTP_FROM`, `EMAIL_FROM`, or `EMAIL_USER` is a bare address; an explicitly configured display name is preserved. Set `BACKEND_URL` when the public API origin differs from the Render-provided URL so one-click unsubscribe links reach the API.
 - External career-site crawling is opt-in: configure `CAREER_CRAWLER_DOMAINS` with comma-separated public HTTPS domains or a JSON target list. The crawler extracts Schema.org `JobPosting` JSON-LD only; domains without that structured data or with crawler access denied need another supported feed. It is disabled when the target list is empty.
 
 Optional frontend `.env`
