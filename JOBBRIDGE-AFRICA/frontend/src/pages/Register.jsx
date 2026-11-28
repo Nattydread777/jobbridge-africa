@@ -1,32 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import ForgotPasswordModal from "../components/ForgotPasswordModal";
-import africaLocations from "../data/jobLocations";
-import { extractResumeText, parseResumeText } from "../utils/resumeParser";
 import GoogleSignInButton from "../components/GoogleSignInButton";
 import ResendVerification from "../components/ResendVerification";
 
-const emptyParsed = {
-  name: "",
-  email: "",
-  phone: "",
-  bio: "",
-  skills: [],
-  education: [],
-  experience: [],
-};
-
 const Register = () => {
   const [searchParams] = useSearchParams();
-  const resumeInputRef = useRef(null);
   const [form, setForm] = useState({
     name: "", email: "", password: "", role: searchParams.get("role") === "employer" ? "employer" : "job_seeker",
-    companyName: "", country: "", phone: "", bio: "", targetRoles: "",
+    companyName: "",
   });
-  const [resume, setResume] = useState(null);
-  const [parsed, setParsed] = useState(emptyParsed);
-  const [pastedText, setPastedText] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [hasRegistered, setHasRegistered] = useState(false);
@@ -34,9 +17,6 @@ const Register = () => {
   const [registeredEmail, setRegisteredEmail] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
-  const [jobAlertsEnabled, setJobAlertsEnabled] = useState(false);
-  const [jobAlertFrequency, setJobAlertFrequency] = useState("daily");
-  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const { register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -55,20 +35,9 @@ const Register = () => {
       password: "",
       role: searchParams.get("role") === "employer" ? "employer" : "job_seeker",
       companyName: "",
-      country: "",
-      phone: "",
-      bio: "",
-      targetRoles: "",
     });
-    setResume(null);
-    setParsed({ ...emptyParsed, skills: [], education: [], experience: [] });
-    setPastedText("");
     setTermsAccepted(false);
     setPrivacyAccepted(false);
-    setJobAlertsEnabled(false);
-    setJobAlertFrequency("daily");
-    setForgotPasswordOpen(false);
-    if (resumeInputRef.current) resumeInputRef.current.value = "";
   };
 
   const completeRegistration = (emailAddress) => {
@@ -77,60 +46,18 @@ const Register = () => {
     setVerificationSent(true);
   };
 
-  const applyParsedDetails = (details) => {
-    setParsed(details);
-    setForm((current) => ({
-      ...current,
-      name: details.name || current.name,
-      email: details.email || current.email,
-      phone: details.phone || current.phone,
-      bio: details.bio || current.bio,
-    }));
-  };
-
-  const handleResume = async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setError("");
-    setResume(file);
-    try {
-      const text = await extractResumeText(file);
-      applyParsedDetails(parseResumeText(text));
-      setPastedText("");
-    } catch (parseError) {
-      setError(`${parseError.message} You can paste the resume text below instead.`);
-    }
-  };
-
-  const parsePastedText = () => {
-    try {
-      applyParsedDetails(parseResumeText(pastedText));
-      setError("");
-    } catch (parseError) {
-      setError(parseError.message);
-    }
-  };
-
   const handleRegister = async (event) => {
     event.preventDefault();
     setError("");
     setSubmitting(true);
     try {
-      const profileData = form.role === "job_seeker" ? {
-        country: form.country,
-        phone: form.phone,
-        bio: form.bio,
-        skills: parsed.skills,
-        education: parsed.education,
-        experience: parsed.experience,
-        targetRoles: form.targetRoles.split(",").map((role) => role.trim()).filter(Boolean),
-        jobAlertsEnabled,
-        jobAlertFrequency,
-      } : {};
       const emailAddress = form.email.trim();
       await register({
-        ...form,
-        ...profileData,
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        role: form.role,
+        ...(form.role === "employer" ? { companyName: form.companyName } : {}),
         termsAccepted,
         privacyAccepted,
       });
@@ -161,68 +88,14 @@ const Register = () => {
       <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-lg md:p-9">
         <div className="mb-6">
           <h2 className="text-3xl font-bold text-slate-900">Create your account</h2>
-          <p className="mt-2 text-slate-600">Resume suggestions are editable in your profile after registration.</p>
+          <p className="mt-2 text-slate-600">Start with your account details. You can complete your profile after verifying your email.</p>
         </div>
         {error && <div role="alert" className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
         {verificationSent && (
           <div className="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
             <p className="font-semibold">Account created. Verify your email before signing in.</p>
-            <p className="mt-1">We sent a one-time verification link to {registeredEmail}. If you don’t see it, check your spam folder or request another link.</p>
+            <p className="mt-1">We sent a one-time verification link to {registeredEmail}. After verifying and signing in, choose Auto-fill from CV or Manual entry in your profile editor.</p>
             <ResendVerification initialEmail={registeredEmail} />
-          </div>
-        )}
-
-        {form.role === "job_seeker" && (
-          <div className="mb-7 rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
-            <h3 className="font-bold text-slate-900">Add your CV to prefill your profile</h3>
-            <p className="mt-1 text-sm text-slate-600">PDF, DOCX, or TXT. Text is extracted in your browser; the file itself is not uploaded until you choose to add it to your profile after verifying your account.</p>
-            <label htmlFor="registration-resume" className="mt-4 flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-amber-400 bg-white px-4 py-5 text-center font-semibold text-amber-900 hover:bg-amber-50">
-              {resume ? `Selected: ${resume.name}` : "Choose a resume file"}
-              <input ref={resumeInputRef} id="registration-resume" type="file" accept=".pdf,.docx,.txt" onChange={handleResume} className="sr-only" />
-            </label>
-            {(parsed.name || parsed.email || parsed.bio || parsed.skills.length > 0 || parsed.education.length > 0 || parsed.experience.length > 0) && (
-              <div className="mt-3 space-y-3 rounded-xl bg-white p-4 text-sm text-slate-700">
-                <p className="font-semibold text-slate-900">Review detected details; you can edit the form fields before creating your account.</p>
-                {(parsed.name || parsed.email) && (
-                  <p><strong>Contact:</strong> {[parsed.name, parsed.email].filter(Boolean).join(" · ")}</p>
-                )}
-                {parsed.bio && <p><strong>Summary:</strong> {parsed.bio.slice(0, 240)}{parsed.bio.length > 240 ? "…" : ""}</p>}
-                {parsed.skills.length > 0 && (
-                  <p><strong>Skills ({parsed.skills.length}):</strong> {parsed.skills.slice(0, 10).join(", ")}{parsed.skills.length > 10 ? "…" : ""}</p>
-                )}
-                {parsed.education.length > 0 && (
-                  <div>
-                    <strong>Education ({parsed.education.length}):</strong>
-                    {parsed.education.map((entry, index) => (
-                      <p key={`education-${index}`} className="mt-1">{[entry.degree, entry.field, entry.school, entry.startYear, entry.endYear].filter(Boolean).join(" · ")}</p>
-                    ))}
-                  </div>
-                )}
-                {parsed.experience.length > 0 && (
-                  <div>
-                    <strong>Experience ({parsed.experience.length} roles):</strong>
-                    {parsed.experience.slice(0, 8).map((entry, index) => (
-                      <p key={`experience-${index}`} className="mt-1">
-                        {[entry.title, entry.company, entry.dates].filter(Boolean).join(" · ")}
-                        {" · "}{entry.bullets?.length || 0} highlights
-                      </p>
-                    ))}
-                    {parsed.experience.length > 8 && <p className="mt-1">Plus {parsed.experience.length - 8} more roles.</p>}
-                  </div>
-                )}
-              </div>
-            )}
-            <details className="mt-4">
-              <summary className="cursor-pointer text-sm font-semibold text-slate-700">Or paste resume text</summary>
-              <textarea
-                value={pastedText}
-                onChange={(event) => setPastedText(event.target.value)}
-                rows={4}
-                className="mt-3 w-full rounded-xl border border-slate-300 p-3 text-sm"
-                placeholder="Paste the text from your CV here..."
-              />
-              <button type="button" onClick={parsePastedText} className="mt-2 rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white">Extract profile details</button>
-            </details>
           </div>
         )}
 
@@ -245,57 +118,12 @@ const Register = () => {
           <div>
             <label htmlFor="register-password" className="mb-1.5 block text-sm font-semibold text-slate-700">Password</label>
             <input id="register-password" name="password" type="password" value={form.password} onChange={updateField} autoComplete="new-password" minLength={8} required className="w-full rounded-xl border border-slate-300 px-4 py-3 focus:border-amber-500 focus:outline-none focus:ring-4 focus:ring-amber-100" />
-            <button
-              type="button"
-              onClick={() => setForgotPasswordOpen(true)}
-              className="mt-2 text-sm font-semibold text-amber-700 hover:underline"
-            >
-              Forgot password?
-            </button>
           </div>
-          {form.role === "employer" ? (
+          {form.role === "employer" && (
             <div>
               <label htmlFor="register-company" className="mb-1.5 block text-sm font-semibold text-slate-700">Company name</label>
               <input id="register-company" name="companyName" value={form.companyName} onChange={updateField} required className="w-full rounded-xl border border-slate-300 px-4 py-3" />
             </div>
-          ) : (
-            <>
-              <div>
-                <label htmlFor="register-phone" className="mb-1.5 block text-sm font-semibold text-slate-700">Phone (optional)</label>
-                <input id="register-phone" name="phone" type="tel" value={form.phone} onChange={updateField} autoComplete="tel" className="w-full rounded-xl border border-slate-300 px-4 py-3" />
-              </div>
-              <div>
-                <label htmlFor="register-country" className="mb-1.5 block text-sm font-semibold text-slate-700">Country</label>
-                <select id="register-country" name="country" value={form.country} onChange={updateField} className="w-full rounded-xl border border-slate-300 px-4 py-3">
-                  <option value="">Select your country</option>
-                  {africaLocations.map(({ country }) => <option key={country} value={country}>{country}</option>)}
-                </select>
-              </div>
-              <div className="sm:col-span-2">
-                <label htmlFor="register-bio" className="mb-1.5 block text-sm font-semibold text-slate-700">Professional summary (optional)</label>
-                <textarea id="register-bio" name="bio" value={form.bio} onChange={updateField} rows={3} maxLength={1500} className="w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="A professional summary of your experience and goals" />
-              </div>
-              <div className="sm:col-span-2">
-                <label htmlFor="register-target-roles" className="mb-1.5 block text-sm font-semibold text-slate-700">Target roles (optional)</label>
-                <input id="register-target-roles" name="targetRoles" value={form.targetRoles} onChange={updateField} className="w-full rounded-xl border border-slate-300 px-4 py-3" placeholder="Operations Manager, Business Analyst" />
-              </div>
-              <div className="sm:col-span-2 rounded-xl border border-slate-200 p-4">
-                <label className="flex items-start gap-3 text-sm leading-6 text-slate-700">
-                  <input type="checkbox" checked={jobAlertsEnabled} onChange={(event) => setJobAlertsEnabled(event.target.checked)} className="mt-1" />
-                  <span><strong className="block">Email me personalized role matches</strong>This is optional. We’ll only send profile-matched roles after you verify your email. Recommendations remain available on your dashboard if you leave this off.</span>
-                </label>
-                {jobAlertsEnabled && (
-                  <label htmlFor="register-alert-frequency" className="mt-3 grid gap-1 text-sm font-semibold text-slate-700">
-                    Email frequency
-                    <select id="register-alert-frequency" value={jobAlertFrequency} onChange={(event) => setJobAlertFrequency(event.target.value)} className="rounded-xl border border-slate-300 px-4 py-3 font-normal">
-                      <option value="instant">As new matches are found</option>
-                      <option value="daily">Daily digest</option>
-                      <option value="weekly">Weekly digest</option>
-                    </select>
-                  </label>
-                )}
-              </div>
-            </>
           )}
           <div className="grid gap-3 sm:col-span-2">
             <label className="flex items-start gap-2 text-sm leading-6 text-slate-700">
@@ -328,12 +156,6 @@ const Register = () => {
         </div>
         <p className="mt-5 text-center text-sm text-slate-600">Already have an account? <Link to="/login" className="font-bold text-amber-700 hover:underline">Sign in</Link></p>
       </section>
-      {forgotPasswordOpen && (
-        <ForgotPasswordModal
-          initialEmail={form.email}
-          onClose={() => setForgotPasswordOpen(false)}
-        />
-      )}
     </main>
   );
 };

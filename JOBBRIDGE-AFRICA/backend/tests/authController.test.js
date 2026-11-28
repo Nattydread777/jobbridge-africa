@@ -12,7 +12,7 @@ import JobOutboundClick from '../models/JobOutboundClick.js';
 import JobReport from '../models/JobReport.js';
 import TailoredCv from '../models/TailoredCv.js';
 import User from '../models/userModel.js';
-import { deleteMyAccount, getResume } from '../controllers/authController.js';
+import { deleteMyAccount, getResume, registerUser } from '../controllers/authController.js';
 
 test('professional bio schema accepts 1,500 characters and rejects longer values', async () => {
   const accepted = new User({
@@ -75,6 +75,62 @@ test('getResume streams the original document with a safe download filename and 
   } finally {
     User.findById = originalFindById;
     axios.get = originalAxiosGet;
+  }
+});
+
+test('registerUser accepts required account fields without optional profile data', async () => {
+  const originalFindOne = User.findOne;
+  const originalCreate = User.create;
+  const originalConsoleError = console.error;
+  const environmentKeys = ['RESEND_API_KEY', 'RESEND_FROM', 'EMAIL_FROM', 'EMAIL_USER', 'EMAIL_PASS'];
+  const originalEnvironment = Object.fromEntries(environmentKeys.map((key) => [key, process.env[key]]));
+  let createdUser;
+  User.findOne = async () => null;
+  User.create = async (document) => {
+    createdUser = document;
+    return { name: document.name, email: document.email };
+  };
+  environmentKeys.forEach((key) => { process.env[key] = ''; });
+  console.error = () => {};
+  const response = {
+    statusCode: null,
+    body: null,
+    status(statusCode) {
+      this.statusCode = statusCode;
+      return this;
+    },
+    json(body) {
+      this.body = body;
+      return this;
+    },
+  };
+
+  try {
+    await registerUser({
+      body: {
+        name: 'Candidate',
+        email: 'candidate@example.com',
+        password: 'secure-password',
+        role: 'job_seeker',
+        termsAccepted: true,
+        privacyAccepted: true,
+      },
+    }, response, (error) => { throw error; });
+
+    assert.equal(response.statusCode, 503);
+    assert.match(response.body.message, /account was created/i);
+    assert.equal(createdUser.name, 'Candidate');
+    assert.equal(createdUser.email, 'candidate@example.com');
+    assert.deepEqual(createdUser.experience, []);
+    assert.deepEqual(createdUser.education, []);
+  } finally {
+    User.findOne = originalFindOne;
+    User.create = originalCreate;
+    console.error = originalConsoleError;
+    environmentKeys.forEach((key) => {
+      if (originalEnvironment[key] === undefined) delete process.env[key];
+      else process.env[key] = originalEnvironment[key];
+    });
   }
 });
 
