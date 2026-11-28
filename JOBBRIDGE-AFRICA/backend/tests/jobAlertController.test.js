@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
+import JobAlert from '../models/JobAlert.js';
 import User from '../models/userModel.js';
 import {
+  getJobDigestPreferences,
   unsubscribeFromJobDigests,
   updateJobDigestPreferences,
 } from '../controllers/jobAlertController.js';
@@ -27,11 +29,13 @@ test('updating digest frequency preserves existing unsubscribe links while opted
     _id: new mongoose.Types.ObjectId(),
     role: 'job_seeker',
     emailVerified: true,
+    email: 'candidate@example.com',
     jobAlertPreferences: {
       enabled: true,
       frequency: 'daily',
       unsubscribeVersion: 'stable-version',
     },
+    newsletterPreferences: { enabled: false },
     save: async () => {},
   };
   User.findById = () => ({ select: async () => user });
@@ -50,6 +54,84 @@ test('updating digest frequency preserves existing unsubscribe links while opted
     assert.equal(user.jobAlertPreferences.unsubscribeVersion, 'stable-version');
   } finally {
     User.findById = previousFindById;
+  }
+});
+
+test('job seeker profile saves personalized alerts and newsletter preferences together', async () => {
+  const previousFindById = User.findById;
+  const previousNewsletterUpsert = JobAlert.findOneAndUpdate;
+  const previousNewsletterUpdate = JobAlert.updateOne;
+  const calls = { upsert: null, update: null, saves: 0 };
+  const user = {
+    _id: new mongoose.Types.ObjectId(),
+    email: 'candidate@example.com',
+    role: 'job_seeker',
+    emailVerified: true,
+    jobAlertPreferences: {
+      enabled: false,
+      frequency: 'daily',
+      unsubscribeVersion: 'stable-version',
+    },
+    newsletterPreferences: { enabled: false },
+    save: async () => { calls.saves += 1; },
+  };
+  User.findById = () => ({ select: async () => user });
+  JobAlert.findOneAndUpdate = async (...args) => { calls.upsert = args; };
+  JobAlert.updateOne = async (...args) => { calls.update = args; };
+
+  try {
+    const enabledResponse = createResponse();
+    await updateJobDigestPreferences({
+      user: { _id: user._id, role: user.role, emailVerified: user.emailVerified },
+      body: { enabled: true, frequency: 'weekly', newsletterEnabled: true },
+    }, enabledResponse, (error) => { throw error; });
+
+    assert.equal(user.jobAlertPreferences.enabled, true);
+    assert.equal(user.jobAlertPreferences.frequency, 'weekly');
+    assert.equal(user.newsletterPreferences.enabled, true);
+    assert.equal(enabledResponse.body.preferences.newsletterEnabled, true);
+    assert.deepEqual(calls.upsert[0], { email: 'candidate@example.com' });
+    assert.equal(calls.upsert[1].$set.isActive, true);
+    assert.ok(calls.upsert[1].$set.consentedAt instanceof Date);
+
+    const disabledResponse = createResponse();
+    await updateJobDigestPreferences({
+      user: { _id: user._id, role: user.role, emailVerified: user.emailVerified },
+      body: { enabled: true, frequency: 'weekly', newsletterEnabled: false },
+    }, disabledResponse, (error) => { throw error; });
+
+    assert.equal(user.jobAlertPreferences.enabled, true);
+    assert.equal(user.newsletterPreferences.enabled, false);
+    assert.equal(disabledResponse.body.preferences.newsletterEnabled, false);
+    assert.deepEqual(calls.update, [
+      { email: 'candidate@example.com' },
+      { $set: { isActive: false } },
+    ]);
+    assert.equal(calls.saves, 2);
+  } finally {
+    User.findById = previousFindById;
+    JobAlert.findOneAndUpdate = previousNewsletterUpsert;
+    JobAlert.updateOne = previousNewsletterUpdate;
+  }
+});
+
+test('profile preference read reflects an existing public newsletter subscription', async () => {
+  const previousFindOne = JobAlert.findOne;
+  JobAlert.findOne = async () => ({ isActive: true });
+
+  try {
+    const res = createResponse();
+    await getJobDigestPreferences({
+      user: {
+        email: 'candidate@example.com',
+        newsletterPreferences: { enabled: false },
+        jobAlertPreferences: { enabled: false, frequency: 'daily' },
+      },
+    }, res, (error) => { throw error; });
+
+    assert.equal(res.body.newsletterEnabled, true);
+  } finally {
+    JobAlert.findOne = previousFindOne;
   }
 });
 

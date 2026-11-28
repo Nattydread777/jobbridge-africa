@@ -441,6 +441,9 @@ export const getUserProfile = asyncHandler(async (req, res) => {
         enabled: Boolean(req.user.jobAlertPreferences?.enabled),
         frequency: req.user.jobAlertPreferences?.frequency || 'daily',
       },
+      newsletterPreferences: {
+        enabled: Boolean(req.user.newsletterPreferences?.enabled),
+      },
     });
   } else {
     res.status(404);
@@ -530,6 +533,9 @@ export const updateUserProfile = asyncHandler(async (req, res) => {
       jobAlertPreferences: {
         enabled: Boolean(updatedUser.jobAlertPreferences?.enabled),
         frequency: updatedUser.jobAlertPreferences?.frequency || 'daily',
+      },
+      newsletterPreferences: {
+        enabled: Boolean(updatedUser.newsletterPreferences?.enabled),
       },
     });
 

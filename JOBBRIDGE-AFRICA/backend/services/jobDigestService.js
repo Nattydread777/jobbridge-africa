@@ -13,6 +13,7 @@ import { buildEligibleActiveJobFilter } from '../utils/jobFilters.js';
 
 const DIGEST_INTERVAL_MS = 15 * 60 * 1000;
 const LOCK_DURATION_MS = 10 * 60 * 1000;
+const MIN_DIGEST_MATCH_SCORE = 0.6;
 const frequencyIntervals = {
   instant: DIGEST_INTERVAL_MS,
   daily: 24 * 60 * 60 * 1000,
@@ -57,13 +58,17 @@ const createUnsubscribeUrl = (token) => {
   return url.toString();
 };
 
+export const selectPersonalizedDigestJobs = (user, jobs) => rankJobsForUser(user, jobs)
+  .filter(({ score }) => score >= MIN_DIGEST_MATCH_SCORE)
+  .slice(0, 20);
+
 const recommendationJobsFor = async (user) => {
   const jobs = await Job.find({
     $and: [
       buildEligibleActiveJobFilter(user.languages),
     ],
   }).sort({ lastSeenAt: -1, createdAt: -1 }).limit(200);
-  return rankJobsForUser(user, jobs).slice(0, 20);
+  return selectPersonalizedDigestJobs(user, jobs);
 };
 
 const claimDigestLock = async (userId, lockToken, now) => User.findOneAndUpdate(

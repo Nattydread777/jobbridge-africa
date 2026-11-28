@@ -147,6 +147,7 @@ test('job digest email includes structured role details and a confirmed unsubscr
     });
 
     assert.equal(messages.length, 1);
+    assert.equal(messages[0].to, 'candidate@example.com');
     assert.equal(messages[0].from, '"JobBridge Africa" <verified@example.com>');
     assert.equal(
       messages[0].headers['List-Unsubscribe'],

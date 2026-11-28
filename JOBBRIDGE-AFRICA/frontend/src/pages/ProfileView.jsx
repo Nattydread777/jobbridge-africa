@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
@@ -11,6 +11,7 @@ const PROFILE_TABS = [
   { id: "skills", label: "Skills" },
   { id: "credentials", label: "Certifications & Projects" },
   { id: "preferences", label: "Work Preferences" },
+  { id: "alerts", label: "Job Alerts & Newsletter" },
   { id: "resume", label: "Resume Management" },
 ];
 
@@ -28,6 +29,8 @@ const countUniqueSkills = (user) => new Set([
 
 const ProfileView = () => {
   const { user, logout, refreshUser, deleteAccount } = useAuth();
+  const userId = user?._id;
+  const userRole = user?.role;
   const navigate = useNavigate();
   const resumeInput = useRef(null);
   const [activeTab, setActiveTab] = useState("overview");
@@ -38,6 +41,35 @@ const ProfileView = () => {
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleteAccountError, setDeleteAccountError] = useState("");
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [emailPreferences, setEmailPreferences] = useState({
+    enabled: false,
+    frequency: "daily",
+    newsletterEnabled: false,
+  });
+  const [emailPreferencesError, setEmailPreferencesError] = useState("");
+
+  useEffect(() => {
+    if (!userId || userRole !== "job_seeker") return undefined;
+    let active = true;
+    api.get("/job-alerts/preferences")
+      .then(({ data }) => {
+        if (!active) return;
+        setEmailPreferences({
+          enabled: Boolean(data.enabled),
+          frequency: data.frequency || "daily",
+          newsletterEnabled: Boolean(data.newsletterEnabled),
+        });
+        setEmailPreferencesError("");
+      })
+      .catch((error) => {
+        if (active) {
+          setEmailPreferencesError(
+            error.response?.data?.message || "Email preferences could not be loaded.",
+          );
+        }
+      });
+    return () => { active = false; };
+  }, [userId, userRole]);
 
   if (!user) {
     return (
@@ -291,6 +323,45 @@ const ProfileView = () => {
     </section>
   );
 
+  const renderAlerts = () => (
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold text-slate-900">Job alerts &amp; newsletter</h2>
+          <p className="mt-1 text-sm text-slate-500">Manage optional email updates sent to {user.email}.</p>
+        </div>
+        <Link to="/profile?tab=alerts" className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-amber-400">
+          Edit email preferences
+        </Link>
+      </div>
+      {emailPreferencesError ? (
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          {emailPreferencesError}
+        </p>
+      ) : (
+        <>
+          <dl className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <dt className="text-sm text-slate-500">Personalized role alerts</dt>
+              <dd className="mt-1 font-semibold text-slate-900">
+                {emailPreferences.enabled ? `On · ${emailPreferences.frequency}` : "Off"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm text-slate-500">General job newsletter</dt>
+              <dd className="mt-1 font-semibold text-slate-900">
+                {emailPreferences.newsletterEnabled ? "Subscribed" : "Not subscribed"}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-4 text-sm leading-6 text-slate-600">
+            Personalized alerts are selected using your profile, target roles, skills, experience, and eligible job locations.
+          </p>
+        </>
+      )}
+    </section>
+  );
+
   const renderResume = () => (
     <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="mb-5">
@@ -456,6 +527,7 @@ const ProfileView = () => {
             {activeTab === "skills" && renderSkills()}
             {activeTab === "credentials" && renderCredentials()}
             {activeTab === "preferences" && renderPreferences()}
+            {activeTab === "alerts" && renderAlerts()}
             {activeTab === "resume" && renderResume()}
           </div>
           <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">

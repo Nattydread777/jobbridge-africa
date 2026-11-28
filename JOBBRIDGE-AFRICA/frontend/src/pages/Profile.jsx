@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import api from "../services/api";
 import africaLocations from "../data/jobLocations";
 import {
@@ -232,10 +232,16 @@ const profileStateFromUser = (source = {}) => ({
 
 const Profile = () => {
   const { user, refreshUser } = useAuth();
+  const userId = user?._id;
+  const userRole = user?.role;
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const resumeInputRef = useRef(null);
   const profileImageInputRef = useRef(null);
-  const [activeTab, setActiveTab] = useState("basic");
+  const requestedTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(
+    PROFILE_SECTIONS.some(([tab]) => tab === requestedTab) ? requestedTab : "basic"
+  );
   const [resumeFile, setResumeFile] = useState(null);
   const [profileImagePreview, setProfileImagePreview] = useState(
     user?.profileImageUrl || null
@@ -263,10 +269,8 @@ const Profile = () => {
   const [newSkillGroup, setNewSkillGroup] = useState("core");
   const [skillSuggestions, setSkillSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [emailNotifications, setEmailNotifications] = useState(false);
-  const [jobAlertStatus, setJobAlertStatus] = useState(null);
-  const [jobAlertSubmitting, setJobAlertSubmitting] = useState(false);
   const [jobDigestPreferences, setJobDigestPreferences] = useState({ enabled: false, frequency: "daily" });
+  const [newsletterEnabled, setNewsletterEnabled] = useState(false);
   const [jobDigestStatus, setJobDigestStatus] = useState(null);
   const [jobDigestSubmitting, setJobDigestSubmitting] = useState(false);
   const [profileSaveStatus, setProfileSaveStatus] = useState(null);
@@ -286,8 +290,31 @@ const Profile = () => {
         enabled: Boolean(user.jobAlertPreferences?.enabled),
         frequency: user.jobAlertPreferences?.frequency || "daily",
       });
+      setNewsletterEnabled(Boolean(user.newsletterPreferences?.enabled));
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!userId || userRole !== "job_seeker") return undefined;
+    let active = true;
+    api.get("/job-alerts/preferences")
+      .then(({ data }) => {
+        if (!active) return;
+        setJobDigestPreferences({
+          enabled: Boolean(data.enabled),
+          frequency: data.frequency || "daily",
+        });
+        setNewsletterEnabled(Boolean(data.newsletterEnabled));
+      })
+      .catch((error) => {
+        if (!active) return;
+        setJobDigestStatus({
+          type: "error",
+          message: error.response?.data?.message || "We couldn't load your email preferences.",
+        });
+      });
+    return () => { active = false; };
+  }, [userId, userRole]);
 
   const handleResumeUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -624,41 +651,20 @@ const Profile = () => {
     }
   };
 
-  const handleSubscribeAlerts = async () => {
-    setJobAlertStatus(null);
-    if (!profile.email) {
-      setJobAlertStatus({ type: "error", message: "Add an email address to your profile before subscribing." });
-      return;
-    }
-    if (!emailNotifications) {
-      setJobAlertStatus({ type: "error", message: "Choose to receive job alert emails before subscribing." });
-      return;
-    }
-    setJobAlertSubmitting(true);
-    try {
-      const { data } = await api.post("/job-alerts", {
-        email: profile.email,
-        location: profile.country,
-        consent: true,
-      });
-      setEmailNotifications(false);
-      setJobAlertStatus({ type: "success", message: data.message || "Your job alert subscription is saved." });
-    } catch (error) {
-      setJobAlertStatus({
-        type: "error",
-        message: error.response?.data?.message || "We couldn't save your job alerts. Please try again.",
-      });
-    } finally {
-      setJobAlertSubmitting(false);
-    }
-  };
-
   const handleSaveJobDigestPreferences = async () => {
     setJobDigestStatus(null);
     setJobDigestSubmitting(true);
     try {
-      const { data } = await api.put("/job-alerts/preferences", jobDigestPreferences);
-      setJobDigestStatus({ type: "success", message: data.message || "Your personalized alert preferences are saved." });
+      const { data } = await api.put("/job-alerts/preferences", {
+        ...jobDigestPreferences,
+        newsletterEnabled,
+      });
+      setJobDigestPreferences({
+        enabled: Boolean(data.preferences.enabled),
+        frequency: data.preferences.frequency || "daily",
+      });
+      setNewsletterEnabled(Boolean(data.preferences.newsletterEnabled));
+      setJobDigestStatus({ type: "success", message: data.message || "Your email preferences are saved." });
       await refreshUser();
     } catch (error) {
       setJobDigestStatus({
@@ -1704,45 +1710,38 @@ const Profile = () => {
                     <option value="weekly">Weekly digest</option>
                   </select>
                 </label>
-                {jobDigestStatus && (
-                  <p role={jobDigestStatus.type === "error" ? "alert" : "status"} className={`mt-3 rounded-lg border p-3 text-sm ${jobDigestStatus.type === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
-                    {jobDigestStatus.message}
-                  </p>
-                )}
-                <button
-                  type="button"
-                  onClick={handleSaveJobDigestPreferences}
-                  disabled={jobDigestSubmitting}
-                  className="mt-4 rounded-lg bg-amber-700 px-5 py-2 font-semibold text-white hover:bg-amber-800 disabled:cursor-wait disabled:opacity-60"
-                >
-                  {jobDigestSubmitting ? "Saving…" : "Save personalized alerts"}
-                </button>
               </section>
 
               <label className="flex items-start gap-3 rounded-lg border p-4 text-sm">
-                <input type="checkbox" checked={emailNotifications} onChange={(event) => setEmailNotifications(event.target.checked)} className="mt-1 h-4 w-4 accent-amber-600" />
-                <span><strong className="block">General job newsletter</strong>This is a separate, optional subscription for general latest-job notices at {profile.email || "the email address on my profile"}.</span>
+                <input
+                  type="checkbox"
+                  checked={newsletterEnabled}
+                  onChange={(event) => setNewsletterEnabled(event.target.checked)}
+                  className="mt-1 h-4 w-4 accent-amber-600"
+                />
+                <span>
+                  <strong className="block">General job newsletter</strong>
+                  Receive general JobBridge Africa job updates at <strong>{profile.email || user.email}</strong>.
+                  This is separate from personalized role matches; change or unsubscribe here at any time.
+                </span>
               </label>
-
-              <div className="border-t pt-6">
-                <h3 className="font-semibold mb-4">Subscribe to Latest Jobs</h3>
-                <p className="text-gray-600 mb-4">
-                  Get weekly emails with the latest job opportunities matching
-                  your interests at <strong>{profile.email || "your profile email"}</strong>.
+              <p className="text-sm text-slate-500">
+                Your email preferences are saved to your profile. Personalized matches use your skills, experience,
+                target roles, languages, and eligible job locations.
+              </p>
+              {jobDigestStatus && (
+                <p role={jobDigestStatus.type === "error" ? "alert" : "status"} className={`rounded-lg border p-3 text-sm ${jobDigestStatus.type === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+                  {jobDigestStatus.message}
                 </p>
-                {jobAlertStatus && (
-                  <p role={jobAlertStatus.type === "error" ? "alert" : "status"} className={`mb-4 rounded-lg border p-3 text-sm ${jobAlertStatus.type === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
-                    {jobAlertStatus.message}
-                  </p>
-                )}
-                <button
-                  onClick={handleSubscribeAlerts}
-                  disabled={jobAlertSubmitting}
-                  className="rounded bg-secondary px-6 py-2 text-white transition hover:bg-green-700 disabled:cursor-wait disabled:opacity-60"
-                >
-                  {jobAlertSubmitting ? "Saving…" : jobAlertStatus?.type === "success" ? "Update subscription" : "Subscribe Now"}
-                </button>
-              </div>
+              )}
+              <button
+                type="button"
+                onClick={handleSaveJobDigestPreferences}
+                disabled={jobDigestSubmitting}
+                className="w-fit rounded-lg bg-amber-700 px-5 py-2 font-semibold text-white hover:bg-amber-800 disabled:cursor-wait disabled:opacity-60"
+              >
+                {jobDigestSubmitting ? "Saving…" : "Save alert preferences"}
+              </button>
             </div>
             <div className="flex gap-3 mt-6">
               <button

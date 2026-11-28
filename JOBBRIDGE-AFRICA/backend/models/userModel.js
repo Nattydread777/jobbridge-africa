@@ -91,6 +91,11 @@ const userSchema = new mongoose.Schema({
     digestLockToken: { type: String, select: false },
     digestLockUntil: { type: Date, select: false },
   },
+  newsletterPreferences: {
+    enabled: { type: Boolean, default: false },
+    subscribedAt: { type: Date, select: false },
+    unsubscribedAt: { type: Date, select: false },
+  },
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {
